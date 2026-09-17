@@ -14,6 +14,7 @@ import { systemRouter } from './routes/system.routes.js';
 import { whitelistRouter } from './routes/whitelist.routes.js';
 import { pluginsRouter } from './routes/plugins.routes.js';
 import { pluginRegistryRouter } from './routes/pluginRegistry.routes.js';
+import { environmentRouter } from './routes/environment.routes.js';
 import { verifyToken } from './auth/tokens.js';
 import { userHasServerAccess } from './services/userService.js';
 import { getServer, listServers } from './services/serverService.js';
@@ -42,6 +43,7 @@ app.use('/api/servers/:serverId/plugins', pluginsRouter);
 app.use('/api/servers', serversRouter);
 app.use('/api/plugins', pluginRegistryRouter);
 app.use('/api/system', systemRouter);
+app.use('/api/environment', environmentRouter);
 
 app.get('/api/health', (_req, res) => res.json({ ok: true }));
 

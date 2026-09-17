@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { Layout } from '../components/Layout.js';
 import { Badge, Button, Card, ErrorText, Field, Input, Modal, Select } from '../components/ui.js';
 import { useToast } from '../components/Toast.js';
+import { EnvironmentBackupCard } from '../components/EnvironmentBackupCard.js';
 import { api, ApiError } from '../api/client.js';
 import type { PublicUser, Role, ServerRecord } from '../api/types.js';
 import { useAuth } from '../state/AuthContext.js';
@@ -61,6 +62,8 @@ export function UsersPage() {
             + New user
           </Button>
         </motion.div>
+
+        <EnvironmentBackupCard />
 
         {users === null ? (
           <p className="text-sm text-slate-500">Loading…</p>

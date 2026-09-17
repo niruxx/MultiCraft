@@ -24,3 +24,13 @@ export function prep(sql: string): StatementSync {
   }
   return stmt;
 }
+
+/**
+ * Closes the database file handle. Only used right before an environment import swaps the
+ * entire data directory out from under this process — the process exits immediately after,
+ * so nothing re-opens it; a fresh `db.ts` module load on the next start reopens the restored file.
+ */
+export function closeDatabase(): void {
+  statementCache.clear();
+  db.close();
+}
