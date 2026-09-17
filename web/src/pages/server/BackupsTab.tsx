@@ -145,7 +145,7 @@ export function BackupsTab() {
 
       <Card className="p-4">
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-400">Backups</h2>
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-400">Backups</h2>
           {canWrite && (
             <Button variant="primary" onClick={createBackup} disabled={creating}>
               {creating ? 'Creating…' : 'Create backup now'}
@@ -153,9 +153,9 @@ export function BackupsTab() {
           )}
         </div>
         {backups === null ? (
-          <p className="text-sm text-slate-500">Loading…</p>
+          <p className="text-sm text-ink-500">Loading…</p>
         ) : backups.length === 0 ? (
-          <p className="text-sm text-slate-500">No backups yet.</p>
+          <p className="text-sm text-ink-500">No backups yet.</p>
         ) : (
           <div className="divide-y divide-surface-800">
             {backups.map((b, i) => (
@@ -164,12 +164,12 @@ export function BackupsTab() {
                 style={{ animationDelay: `${Math.min(i, 20) * 18}ms` }}
                 className="animate-fade-in-up flex flex-wrap items-center gap-3 py-2"
               >
-                <span className="flex-1 truncate font-mono text-sm text-slate-200">{b.fileName}</span>
-                <span className="text-xs text-slate-500">{formatSize(b.sizeBytes)}</span>
-                <span className="text-xs text-slate-500">{new Date(b.createdAt).toLocaleString()}</span>
+                <span className="flex-1 truncate font-mono text-sm text-ink-200">{b.fileName}</span>
+                <span className="text-xs text-ink-500">{formatSize(b.sizeBytes)}</span>
+                <span className="text-xs text-ink-500">{new Date(b.createdAt).toLocaleString()}</span>
                 <div className="flex gap-1.5">
                   <a
-                    className="rounded px-2 py-1 text-xs text-slate-400 hover:bg-surface-700 hover:text-slate-200"
+                    className="rounded px-2 py-1 text-xs text-ink-400 hover:bg-surface-700 hover:text-ink-200"
                     href={downloadUrl(`/servers/${serverId}/backups/${encodeURIComponent(b.fileName)}/download`)}
                   >
                     Download
@@ -177,7 +177,7 @@ export function BackupsTab() {
                   {canWrite && (
                     <>
                       <button
-                        className="rounded px-2 py-1 text-xs text-slate-400 hover:bg-surface-700 hover:text-slate-200"
+                        className="rounded px-2 py-1 text-xs text-ink-400 hover:bg-surface-700 hover:text-ink-200"
                         disabled={busyFile === b.fileName}
                         onClick={() => restoreBackup(b.fileName)}
                       >
@@ -200,10 +200,10 @@ export function BackupsTab() {
       </Card>
 
       <Card className="p-4">
-        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Automated backups</h2>
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-ink-400">Automated backups</h2>
         {schedule && (
-          <p className="mb-3 text-sm text-slate-400">
-            Current schedule: <span className="font-mono text-slate-200">{schedule.cron_expression}</span>, keeping the last{' '}
+          <p className="mb-3 text-sm text-ink-400">
+            Current schedule: <span className="font-mono text-ink-200">{schedule.cron_expression}</span>, keeping the last{' '}
             {schedule.retention_count} backup(s), {schedule.enabled ? 'enabled' : 'disabled'}.
           </p>
         )}
@@ -213,7 +213,7 @@ export function BackupsTab() {
               {PRESETS.map((p) => (
                 <button
                   key={p.cron}
-                  className="rounded-full border border-surface-600 px-3 py-1 text-xs text-slate-300 hover:border-accent-600 hover:text-accent-500"
+                  className="rounded-full border border-surface-600 px-3 py-1 text-xs text-ink-300 hover:border-accent-600 hover:text-accent-500"
                   onClick={() => setCronExpression(p.cron)}
                 >
                   {p.label}
@@ -228,7 +228,7 @@ export function BackupsTab() {
                 <Input type="number" min={1} value={retentionCount} onChange={(e) => setRetentionCount(Number(e.target.value))} />
               </Field>
               <Field label="Enabled">
-                <label className="flex h-9 items-center gap-2 text-sm text-slate-300">
+                <label className="flex h-9 items-center gap-2 text-sm text-ink-300">
                   <input type="checkbox" checked={scheduleEnabled} onChange={(e) => setScheduleEnabled(e.target.checked)} />
                   Run automatically
                 </label>

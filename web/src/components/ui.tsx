@@ -13,10 +13,10 @@ export function Button({
   const base =
     'relative inline-flex items-center justify-center gap-1.5 rounded-lg text-sm font-medium px-3.5 py-1.5 border transition-colors duration-150 disabled:opacity-40 disabled:cursor-not-allowed select-none';
   const variants: Record<string, string> = {
-    default: 'bg-surface-800/70 hover:bg-surface-700 border-surface-700 text-slate-100',
-    primary: 'bg-accent-500 hover:bg-accent-400 border-transparent text-white font-semibold',
+    default: 'bg-surface-800/70 hover:bg-surface-700 border-surface-700 text-ink-100',
+    primary: 'bg-accent-500 hover:bg-accent-400 border-transparent text-ink-50 font-semibold',
     danger: 'bg-red-500/15 hover:bg-red-500/25 border-red-500/30 text-red-400',
-    ghost: 'bg-transparent hover:bg-surface-800 border-transparent text-slate-300',
+    ghost: 'bg-transparent hover:bg-surface-800 border-transparent text-ink-300',
   };
   return (
     <motion.button
@@ -36,7 +36,7 @@ export function Input(props: InputHTMLAttributes<HTMLInputElement>) {
   return (
     <input
       {...props}
-      className={`w-full rounded-lg bg-surface-800/80 border border-surface-600 px-3 py-1.5 text-sm text-slate-100 placeholder-slate-500 outline-none transition-all duration-150 focus:border-accent-500/60 focus:ring-2 focus:ring-accent-500/25 hover:border-surface-500 ${props.className ?? ''}`}
+      className={`w-full rounded-lg bg-surface-800/80 border border-surface-600 px-3 py-1.5 text-sm text-ink-100 placeholder-ink-500 outline-none transition-all duration-150 focus:border-accent-500/60 focus:ring-2 focus:ring-accent-500/25 hover:border-surface-500 ${props.className ?? ''}`}
     />
   );
 }
@@ -45,7 +45,7 @@ export function Select(props: SelectHTMLAttributes<HTMLSelectElement>) {
   return (
     <select
       {...props}
-      className={`w-full rounded-lg bg-surface-800/80 border border-surface-600 px-3 py-1.5 text-sm text-slate-100 outline-none transition-all duration-150 focus:border-accent-500/60 focus:ring-2 focus:ring-accent-500/25 hover:border-surface-500 ${props.className ?? ''}`}
+      className={`w-full rounded-lg bg-surface-800/80 border border-surface-600 px-3 py-1.5 text-sm text-ink-100 outline-none transition-all duration-150 focus:border-accent-500/60 focus:ring-2 focus:ring-accent-500/25 hover:border-surface-500 ${props.className ?? ''}`}
     />
   );
 }
@@ -74,7 +74,7 @@ export function Card({
 // `green` deliberately uses the `success` palette, not `accent` — status color (good/running)
 // and brand/interactive color are different concepts and must stay visually distinct.
 const BADGE_TONES: Record<string, string> = {
-  neutral: 'bg-surface-700/70 text-slate-300',
+  neutral: 'bg-surface-700/70 text-ink-300',
   green: 'bg-success-500/15 text-success-400',
   red: 'bg-red-500/15 text-red-400',
   yellow: 'bg-yellow-500/15 text-yellow-400',
@@ -91,7 +91,7 @@ export function Badge({
   pulse?: boolean;
 }) {
   const dotColor: Record<string, string> = {
-    neutral: 'bg-slate-400',
+    neutral: 'bg-ink-400',
     green: 'bg-success-400',
     red: 'bg-red-400',
     yellow: 'bg-yellow-400',
@@ -162,8 +162,8 @@ export function Modal({
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex shrink-0 items-center justify-between border-b border-surface-700/80 px-4 py-3">
-              <h3 className="text-sm font-semibold text-slate-100">{title}</h3>
-              <button onClick={onClose} className="rounded-md p-1 text-slate-400 transition-colors hover:bg-surface-800 hover:text-slate-200">
+              <h3 className="text-sm font-semibold text-ink-100">{title}</h3>
+              <button onClick={onClose} className="rounded-md p-1 text-ink-400 transition-colors hover:bg-surface-800 hover:text-ink-200">
                 ✕
               </button>
             </div>
@@ -178,7 +178,7 @@ export function Modal({
 export function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <label className="block space-y-1">
-      <span className="text-xs font-medium uppercase tracking-wide text-slate-400">{label}</span>
+      <span className="text-xs font-medium uppercase tracking-wide text-ink-400">{label}</span>
       {children}
     </label>
   );

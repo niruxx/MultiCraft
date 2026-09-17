@@ -151,7 +151,7 @@ export function FilesTab() {
           >
             ← Back
           </Button>
-          <span className="font-mono text-sm text-slate-300">{editingPath}</span>
+          <span className="font-mono text-sm text-ink-300">{editingPath}</span>
           {canWrite && (
             <Button variant="primary" className="ml-auto" onClick={saveFile} disabled={!editorDirty || editorSaving}>
               {editorSaving ? 'Saving…' : 'Save'}
@@ -159,7 +159,7 @@ export function FilesTab() {
           )}
         </div>
         <textarea
-          className="console-view flex-1 resize-none rounded-lg border border-surface-700 bg-surface-900 p-4 text-[13px] text-slate-200 focus:outline-none focus:ring-2 focus:ring-accent-600/60"
+          className="console-view flex-1 resize-none rounded-lg border border-surface-700 bg-surface-900 p-4 text-[13px] text-ink-200 focus:outline-none focus:ring-2 focus:ring-accent-600/60"
           value={editorContent}
           spellCheck={false}
           readOnly={!canWrite}
@@ -181,7 +181,7 @@ export function FilesTab() {
           server
         </button>
         {segments.map((seg, i) => (
-          <span key={i} className="flex items-center gap-2 text-sm text-slate-400">
+          <span key={i} className="flex items-center gap-2 text-sm text-ink-400">
             /
             <button className="hover:underline hover:text-accent-500" onClick={() => setPath(segments.slice(0, i + 1).join('/'))}>
               {seg}
@@ -201,9 +201,9 @@ export function FilesTab() {
 
       <Card className="divide-y divide-surface-800">
         {entries === null ? (
-          <p className="px-4 py-3 text-sm text-slate-500">Loading…</p>
+          <p className="px-4 py-3 text-sm text-ink-500">Loading…</p>
         ) : entries.length === 0 ? (
-          <p className="px-4 py-3 text-sm text-slate-500">This folder is empty.</p>
+          <p className="px-4 py-3 text-sm text-ink-500">This folder is empty.</p>
         ) : (
           entries.map((entry, i) => (
             <div
@@ -216,18 +216,18 @@ export function FilesTab() {
                 onClick={() => (entry.isDirectory ? setPath(entry.path) : openFile(entry))}
               >
                 <span>{entry.isDirectory ? '📁' : '📄'}</span>
-                <span className="truncate text-slate-200">{entry.name}</span>
+                <span className="truncate text-ink-200">{entry.name}</span>
               </button>
-              <span className="w-20 shrink-0 text-right text-xs text-slate-500">
+              <span className="w-20 shrink-0 text-right text-xs text-ink-500">
                 {entry.isDirectory ? '' : formatSize(entry.size)}
               </span>
-              <span className="w-36 shrink-0 text-right text-xs text-slate-500">
+              <span className="w-36 shrink-0 text-right text-xs text-ink-500">
                 {new Date(entry.modifiedAt).toLocaleString()}
               </span>
               <div className="flex shrink-0 gap-1">
                 {!entry.isDirectory && (
                   <a
-                    className="rounded px-2 py-1 text-xs text-slate-400 hover:bg-surface-700 hover:text-slate-200"
+                    className="rounded px-2 py-1 text-xs text-ink-400 hover:bg-surface-700 hover:text-ink-200"
                     href={downloadUrl(`/servers/${serverId}/files/download?path=${encodeURIComponent(entry.path)}`)}
                   >
                     Download
@@ -236,7 +236,7 @@ export function FilesTab() {
                 {canWrite && (
                   <>
                     <button
-                      className="rounded px-2 py-1 text-xs text-slate-400 hover:bg-surface-700 hover:text-slate-200"
+                      className="rounded px-2 py-1 text-xs text-ink-400 hover:bg-surface-700 hover:text-ink-200"
                       onClick={() => renameEntry(entry)}
                     >
                       Rename

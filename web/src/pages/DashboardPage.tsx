@@ -5,6 +5,7 @@ import { Layout } from '../components/Layout.js';
 import { StatusBadge } from '../components/StatusBadge.js';
 import { Button, Card, Skeleton, fadeInUp, staggerContainer } from '../components/ui.js';
 import { CreateServerModal } from '../components/CreateServerModal.js';
+import { Logo } from '../components/Logo.js';
 import { useToast } from '../components/Toast.js';
 import { api, ApiError } from '../api/client.js';
 import type { ServerRecord } from '../api/types.js';
@@ -58,8 +59,8 @@ export function DashboardPage() {
           className="mb-6 flex items-center justify-between"
         >
           <div>
-            <h1 className="text-2xl font-bold text-white">Servers</h1>
-            <p className="text-sm text-slate-400">Create, start, and manage your Minecraft servers.</p>
+            <h1 className="text-2xl font-bold text-ink-50">Servers</h1>
+            <p className="text-sm text-ink-400">Create, start, and manage your Minecraft servers.</p>
           </div>
           {canCreate && (
             <Button variant="primary" onClick={() => setCreateOpen(true)}>
@@ -83,12 +84,14 @@ export function DashboardPage() {
         ) : servers.length === 0 ? (
           <Card className="p-12 text-center">
             <motion.div
-              className="mx-auto mb-4 h-14 w-14 rounded-2xl bg-accent-500 shadow-glow"
+              className="mx-auto mb-4 w-fit"
               animate={{ y: [0, -8, 0] }}
               transition={{ duration: 3.5, repeat: Infinity, ease: 'easeInOut' }}
-            />
-            <p className="mb-1 font-semibold text-slate-200">No servers yet</p>
-            <p className="mb-5 text-sm text-slate-500">Spin up a Java or Bedrock server in a couple of clicks.</p>
+            >
+              <Logo className="h-14 w-14 rounded-2xl shadow-glow" />
+            </motion.div>
+            <p className="mb-1 font-semibold text-ink-200">No servers yet</p>
+            <p className="mb-5 text-sm text-ink-500">Spin up a Java or Bedrock server in a couple of clicks.</p>
             {canCreate && (
               <Button variant="primary" onClick={() => setCreateOpen(true)}>
                 Create your first server
@@ -105,10 +108,10 @@ export function DashboardPage() {
                   </div>
                   <Link to={`/servers/${server.id}`} className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
-                      <h2 className="truncate font-semibold text-slate-100">{server.name}</h2>
+                      <h2 className="truncate font-semibold text-ink-100">{server.name}</h2>
                       <StatusBadge status={server.status} />
                     </div>
-                    <p className="mt-0.5 text-xs text-slate-400">
+                    <p className="mt-0.5 text-xs text-ink-400">
                       {server.platform === 'java' ? 'Java' : 'Bedrock'} · {server.loader} {server.version} · port{' '}
                       {server.server_port}
                     </p>

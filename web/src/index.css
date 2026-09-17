@@ -2,20 +2,91 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * Theme tokens — dark is the default and also the fallback (no data-theme attribute yet,
+ * e.g. first paint before React mounts). Every color Tailwind class in the app (surface-*,
+ * ink-*, accent-*, success-*) resolves through these CSS variables, so toggling the
+ * `data-theme` attribute on <html> repaints the whole app without touching component code.
+ * Values are "R G B" triplets (no commas) so Tailwind's rgb(var(--x) / alpha) trick works.
+ */
+:root,
+[data-theme='dark'] {
+  color-scheme: dark;
+
+  --surface-950: 9 9 15;
+  --surface-900: 16 16 24;
+  --surface-850: 21 21 31;
+  --surface-800: 26 26 38;
+  --surface-700: 37 37 51;
+  --surface-600: 56 56 74;
+  --surface-500: 84 84 107;
+
+  --ink-50: 255 255 255;
+  --ink-100: 241 245 249;
+  --ink-200: 226 232 240;
+  --ink-300: 203 213 225;
+  --ink-400: 148 163 184;
+  --ink-500: 100 116 139;
+  --ink-600: 71 85 105;
+
+  --accent-400: 74 222 128;
+  --accent-500: 34 197 94;
+  --accent-600: 22 163 74;
+
+  --success-400: 52 211 153;
+  --success-500: 16 185 129;
+
+  --glass-bg: rgba(255, 255, 255, 0.045);
+  --grid-line: rgba(255, 255, 255, 0.03);
+  --radial-glow: rgba(34, 197, 94, 0.14);
+}
+
+[data-theme='light'] {
+  color-scheme: light;
+
+  --surface-950: 242 243 245;
+  --surface-900: 255 255 255;
+  --surface-850: 248 249 251;
+  --surface-800: 238 240 243;
+  --surface-700: 219 223 229;
+  --surface-600: 195 200 209;
+  --surface-500: 154 161 173;
+
+  --ink-50: 10 12 15;
+  --ink-100: 18 21 26;
+  --ink-200: 38 43 50;
+  --ink-300: 61 67 76;
+  --ink-400: 88 97 110;
+  --ink-500: 107 116 128;
+  --ink-600: 148 157 168;
+
+  --accent-400: 22 163 74;
+  --accent-500: 21 128 61;
+  --accent-600: 22 101 52;
+
+  --success-400: 5 150 105;
+  --success-500: 4 120 87;
+
+  --glass-bg: rgba(15, 23, 20, 0.045);
+  --grid-line: rgba(15, 23, 20, 0.05);
+  --radial-glow: rgba(21, 128, 61, 0.09);
+}
+
 html, body, #root {
   height: 100%;
 }
 
 body {
-  @apply bg-surface-950 text-slate-200 antialiased font-sans;
-  background-image: theme('backgroundImage.radial-fade');
+  @apply bg-surface-950 text-ink-200 antialiased font-sans;
+  background-image: radial-gradient(60% 60% at 50% 0%, var(--radial-glow) 0%, transparent 70%);
   background-repeat: no-repeat;
   background-attachment: fixed;
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 * {
   scrollbar-width: thin;
-  scrollbar-color: theme('colors.surface.600') transparent;
+  scrollbar-color: rgb(var(--surface-600)) transparent;
 }
 
 ::-webkit-scrollbar {
@@ -26,13 +97,13 @@ body {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: theme('colors.surface.600');
+  background: rgb(var(--surface-600));
   border-radius: 6px;
   border: 2px solid transparent;
   background-clip: padding-box;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: theme('colors.surface.500');
+  background: rgb(var(--surface-500));
   background-clip: padding-box;
 }
 
@@ -41,16 +112,19 @@ body {
 }
 
 /* Frosted glass surface used for cards, modals, nav — one flat translucent fill (no inner
-   gradient sheen) plus a hairline border for edge definition; the blur is what does the work. */
+   gradient sheen) plus a hairline border for edge definition; the blur is what does the work.
+   The tint itself flips sign between themes (lightening on dark, darkening on light) via
+   --glass-bg so the "frosted" effect reads correctly against either page background. */
 .glass {
-  background: rgba(255, 255, 255, 0.045);
+  background: var(--glass-bg);
   backdrop-filter: blur(20px) saturate(140%);
   -webkit-backdrop-filter: blur(20px) saturate(140%);
 }
 
-/* Faint animated grid backdrop for auth screens */
+/* Faint grid backdrop for auth screens */
 .grid-backdrop {
-  background-image: theme('backgroundImage.grid-pattern');
+  background-image: linear-gradient(to right, var(--grid-line) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--grid-line) 1px, transparent 1px);
   background-size: 42px 42px;
   mask-image: radial-gradient(70% 70% at 50% 20%, black 0%, transparent 75%);
 }
@@ -58,12 +132,7 @@ body {
 /* Skeleton shimmer loading block */
 .skeleton {
   @apply rounded-md bg-surface-800;
-  background-image: linear-gradient(
-    90deg,
-    theme('colors.surface.800') 0px,
-    theme('colors.surface.700') 40px,
-    theme('colors.surface.800') 80px
-  );
+  background-image: linear-gradient(90deg, rgb(var(--surface-800)) 0px, rgb(var(--surface-700)) 40px, rgb(var(--surface-800)) 80px);
   background-size: 800px 100%;
   animation: shimmer 1.6s ease-in-out infinite;
 }

@@ -71,8 +71,8 @@ export function PluginsTab() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <p className="text-sm text-slate-400">
-          Plugins load from the <span className="font-mono text-slate-300">/plugins</span> folder. Restart the server after
+        <p className="text-sm text-ink-400">
+          Plugins load from the <span className="font-mono text-ink-300">/plugins</span> folder. Restart the server after
           installing, removing, or toggling one.
         </p>
         {canWrite && (
@@ -84,9 +84,9 @@ export function PluginsTab() {
 
       <Card className="divide-y divide-surface-800">
         {plugins === null ? (
-          <p className="px-4 py-3 text-sm text-slate-500">Loading…</p>
+          <p className="px-4 py-3 text-sm text-ink-500">Loading…</p>
         ) : plugins.length === 0 ? (
-          <div className="px-4 py-10 text-center text-sm text-slate-500">
+          <div className="px-4 py-10 text-center text-sm text-ink-500">
             No plugins installed yet.
             {canWrite && (
               <div className="mt-3">
@@ -105,8 +105,8 @@ export function PluginsTab() {
             >
               <span className="text-lg">🧩</span>
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium text-slate-100">{p.displayName}</p>
-                <p className="text-xs text-slate-500">{formatSize(p.sizeBytes)}</p>
+                <p className="truncate text-sm font-medium text-ink-100">{p.displayName}</p>
+                <p className="text-xs text-ink-500">{formatSize(p.sizeBytes)}</p>
               </div>
               <Badge tone={p.enabled ? 'green' : 'neutral'}>{p.enabled ? 'Enabled' : 'Disabled'}</Badge>
               {canWrite && (

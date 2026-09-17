@@ -1,8 +1,10 @@
 import { Navigate, Route, BrowserRouter, Routes } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { AuthProvider, useAuth } from './state/AuthContext.js';
+import { ThemeProvider } from './state/ThemeContext.js';
 import { ToastProvider } from './components/Toast.js';
 import { ConfirmProvider } from './components/ConfirmDialog.js';
+import { Logo } from './components/Logo.js';
 import { LoginPage } from './pages/LoginPage.js';
 import { SetupPage } from './pages/SetupPage.js';
 import { DashboardPage } from './pages/DashboardPage.js';
@@ -14,10 +16,11 @@ function FullScreenLoader() {
   return (
     <div className="flex h-screen items-center justify-center bg-surface-950">
       <motion.div
-        className="h-9 w-9 rounded-lg bg-accent-500 shadow-glow"
         animate={{ opacity: [1, 0.5, 1] }}
         transition={{ duration: 1.3, repeat: Infinity, ease: 'easeInOut' }}
-      />
+      >
+        <Logo className="h-9 w-9 rounded-lg shadow-glow" />
+      </motion.div>
     </div>
   );
 }
@@ -78,13 +81,15 @@ function AppRoutes() {
 export default function App() {
   return (
     <BrowserRouter>
-      <AuthProvider>
-        <ToastProvider>
-          <ConfirmProvider>
-            <AppRoutes />
-          </ConfirmProvider>
-        </ToastProvider>
-      </AuthProvider>
+      <ThemeProvider>
+        <AuthProvider>
+          <ToastProvider>
+            <ConfirmProvider>
+              <AppRoutes />
+            </ConfirmProvider>
+          </ToastProvider>
+        </AuthProvider>
+      </ThemeProvider>
     </BrowserRouter>
   );
 }

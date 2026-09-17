@@ -76,10 +76,10 @@ export function WhitelistTab() {
       <Card className="p-4">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-400">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-400">
               {label === 'allowlist' ? 'Allowlist' : 'Whitelist'} enforcement
             </h2>
-            <p className="mt-1 text-xs text-slate-500">
+            <p className="mt-1 text-xs text-ink-500">
               {state?.enabled
                 ? `Only players on the list below can join.`
                 : `Anyone can join — the ${label} is not currently enforced.`}
@@ -103,7 +103,7 @@ export function WhitelistTab() {
       </Card>
 
       <Card className="p-4">
-        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Players</h2>
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-ink-400">Players</h2>
         {canWrite && (
           <div className="mb-4 flex gap-2">
             <Field label="Player name">
@@ -121,9 +121,9 @@ export function WhitelistTab() {
         )}
 
         {state === null ? (
-          <p className="text-sm text-slate-500">Loading…</p>
+          <p className="text-sm text-ink-500">Loading…</p>
         ) : state.players.length === 0 ? (
-          <p className="text-sm text-slate-500">No players on the {label} yet.</p>
+          <p className="text-sm text-ink-500">No players on the {label} yet.</p>
         ) : (
           <div className="flex flex-wrap gap-2">
             <AnimatePresence initial={false}>
@@ -134,14 +134,14 @@ export function WhitelistTab() {
                   initial={{ opacity: 0, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.9 }}
-                  className="inline-flex items-center gap-2 rounded-full border border-surface-600 bg-surface-800 py-1 pl-3 pr-1.5 text-sm text-slate-200"
+                  className="inline-flex items-center gap-2 rounded-full border border-surface-600 bg-surface-800 py-1 pl-3 pr-1.5 text-sm text-ink-200"
                 >
                   {name}
                   {canWrite && (
                     <button
                       disabled={busy}
                       onClick={() => removePlayer(name)}
-                      className="rounded-full p-0.5 text-slate-500 hover:bg-surface-700 hover:text-red-400"
+                      className="rounded-full p-0.5 text-ink-500 hover:bg-surface-700 hover:text-red-400"
                     >
                       ✕
                     </button>

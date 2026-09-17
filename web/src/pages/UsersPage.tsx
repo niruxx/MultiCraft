@@ -64,8 +64,8 @@ export function UsersPage() {
           className="mb-6 flex items-center justify-between"
         >
           <div>
-            <h1 className="text-2xl font-bold text-white">Users</h1>
-            <p className="text-sm text-slate-400">Manage panel accounts and per-server access.</p>
+            <h1 className="text-2xl font-bold text-ink-50">Users</h1>
+            <p className="text-sm text-ink-400">Manage panel accounts and per-server access.</p>
           </div>
           <Button variant="primary" onClick={() => setCreateOpen(true)}>
             + New user
@@ -75,7 +75,7 @@ export function UsersPage() {
         <EnvironmentBackupCard />
 
         {users === null ? (
-          <p className="text-sm text-slate-500">Loading…</p>
+          <p className="text-sm text-ink-500">Loading…</p>
         ) : (
           <Card className="divide-y divide-surface-800">
             {users.map((u, i) => (
@@ -86,11 +86,11 @@ export function UsersPage() {
               >
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
-                    <span className="font-medium text-slate-100">{u.username}</span>
+                    <span className="font-medium text-ink-100">{u.username}</span>
                     <Badge tone={u.role === 'admin' ? 'green' : u.role === 'moderator' ? 'blue' : 'neutral'}>{u.role}</Badge>
                   </div>
                   {u.role !== 'admin' && (
-                    <p className="mt-0.5 text-xs text-slate-500">
+                    <p className="mt-0.5 text-xs text-ink-500">
                       {u.serverAccess && u.serverAccess.length > 0
                         ? `Access to ${u.serverAccess.length} server(s)`
                         : 'No server access granted'}
@@ -253,9 +253,9 @@ function EditUserModal({
         {role !== 'admin' && (
           <Field label="Server access">
             <div className="max-h-40 space-y-1 overflow-y-auto rounded-md border border-surface-700 p-2">
-              {servers.length === 0 && <p className="text-xs text-slate-500">No servers exist yet.</p>}
+              {servers.length === 0 && <p className="text-xs text-ink-500">No servers exist yet.</p>}
               {servers.map((s) => (
-                <label key={s.id} className="flex items-center gap-2 text-sm text-slate-300">
+                <label key={s.id} className="flex items-center gap-2 text-sm text-ink-300">
                   <input
                     type="checkbox"
                     checked={access.includes(s.id)}

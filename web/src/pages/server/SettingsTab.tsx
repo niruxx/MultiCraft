@@ -67,7 +67,7 @@ export function SettingsTab() {
   return (
     <div className="space-y-6">
       <Card className="p-4">
-        <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-slate-400">General</h2>
+        <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-ink-400">General</h2>
         <div className="grid grid-cols-2 gap-4">
           <Field label="Server name">
             <Input value={name} onChange={(e) => setName(e.target.value)} disabled={!canWrite} />
@@ -100,11 +100,11 @@ export function SettingsTab() {
             <Input value={extraArgs} onChange={(e) => setExtraArgs(e.target.value)} disabled={!canWrite} />
           </Field>
         </div>
-        <label className="mt-4 flex items-center gap-2 text-sm text-slate-300">
+        <label className="mt-4 flex items-center gap-2 text-sm text-ink-300">
           <input type="checkbox" checked={autoStart} onChange={(e) => setAutoStart(e.target.checked)} disabled={!canWrite} />
           Automatically start this server when the panel boots
         </label>
-        <p className="mt-2 text-xs text-slate-500">
+        <p className="mt-2 text-xs text-ink-500">
           Memory and argument changes take effect the next time the server starts.
         </p>
         <ErrorText>{saveError}</ErrorText>
@@ -165,13 +165,13 @@ function PropertiesEditor({ serverId, canWrite }: { serverId: string; canWrite: 
     }
   }
 
-  if (!properties) return <p className="text-sm text-slate-500">Loading properties…</p>;
+  if (!properties) return <p className="text-sm text-ink-500">Loading properties…</p>;
 
   return (
     <Card className="p-4">
       <div className="mb-3 flex items-center justify-between">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-400">server.properties</h2>
-        <p className="text-xs text-slate-500">Restart the server for changes to take effect.</p>
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-400">server.properties</h2>
+        <p className="text-xs text-ink-500">Restart the server for changes to take effect.</p>
       </div>
 
       <div className="max-h-96 overflow-y-auto rounded-md border border-surface-700">
@@ -179,10 +179,10 @@ function PropertiesEditor({ serverId, canWrite }: { serverId: string; canWrite: 
           <tbody>
             {properties.map((p) => (
               <tr key={p.key} className="border-b border-surface-800 last:border-0">
-                <td className="w-1/3 px-3 py-1.5 font-mono text-xs text-slate-400">{p.key}</td>
+                <td className="w-1/3 px-3 py-1.5 font-mono text-xs text-ink-400">{p.key}</td>
                 <td className="px-3 py-1.5">
                   <input
-                    className="w-full rounded bg-transparent px-1 py-0.5 font-mono text-xs text-slate-100 focus:bg-surface-800 focus:outline-none"
+                    className="w-full rounded bg-transparent px-1 py-0.5 font-mono text-xs text-ink-100 focus:bg-surface-800 focus:outline-none"
                     defaultValue={p.value}
                     disabled={!canWrite}
                     onChange={(e) => setEdited((prev) => ({ ...prev, [p.key]: e.target.value }))}

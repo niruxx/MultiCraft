@@ -52,8 +52,8 @@ export function FactoryResetCard() {
         <div className="flex items-center gap-3">
           <Spinner className="h-5 w-5 text-accent-400" />
           <div>
-            <p className="text-sm font-semibold text-slate-100">MultiCraft is restarting…</p>
-            <p className="text-xs text-slate-400">
+            <p className="text-sm font-semibold text-ink-100">MultiCraft is restarting…</p>
+            <p className="text-xs text-ink-400">
               This page will stop responding for a few seconds. Reload once it's back — you'll land on the first-run
               setup wizard.
             </p>
@@ -67,7 +67,7 @@ export function FactoryResetCard() {
     <>
       <Card className="border-red-500/25 p-4">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-red-400">Danger zone</h2>
-        <p className="mt-1 mb-4 text-xs text-slate-500">
+        <p className="mt-1 mb-4 text-xs text-ink-500">
           Permanently delete every account, every server (including its world files), and every backup, and return
           this install to the first-run setup wizard. This cannot be undone from the UI.
         </p>
@@ -89,7 +89,7 @@ export function FactoryResetCard() {
                 </ul>
                 <p className="mt-2">The panel restarts and shows the first-run setup wizard, as if freshly installed.</p>
               </div>
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-ink-500">
                 Your current data isn't deleted immediately — it's kept on disk as a timestamped backup folder,
                 but MultiCraft itself won't offer any way to restore it. Recovering it means stopping the panel and
                 renaming the folder back by hand.
@@ -107,7 +107,7 @@ export function FactoryResetCard() {
 
           {step === 1 && (
             <motion.div key="phrase" initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -16 }} className="space-y-4">
-              <p className="text-sm text-slate-300">
+              <p className="text-sm text-ink-300">
                 Type <span className="font-mono font-semibold text-red-400">{CONFIRM_PHRASE}</span> to confirm.
               </p>
               <Input value={typed} onChange={(e) => setTyped(e.target.value)} autoFocus placeholder={CONFIRM_PHRASE} />

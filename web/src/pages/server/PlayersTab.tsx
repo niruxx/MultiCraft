@@ -54,7 +54,7 @@ export function PlayersTab() {
 
       {canWrite && (
         <Card className="p-4">
-          <h3 className="mb-2 text-sm font-semibold text-slate-200">Whitelist a player</h3>
+          <h3 className="mb-2 text-sm font-semibold text-ink-200">Whitelist a player</h3>
           <div className="flex gap-2">
             <Field label="Player name">
               <Input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Notch" />
@@ -71,14 +71,14 @@ export function PlayersTab() {
       )}
 
       <section>
-        <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-400">
+        <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-ink-400">
           Online ({online.length})
         </h2>
         <PlayerTable players={online} canWrite={canWrite} running={running} busyKey={busyKey} onAction={act} />
       </section>
 
       <section>
-        <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-400">
+        <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-ink-400">
           Known players ({offline.length})
         </h2>
         <PlayerTable players={offline} canWrite={canWrite} running={running} busyKey={busyKey} onAction={act} />
@@ -100,7 +100,7 @@ function PlayerTable({
   busyKey: string | null;
   onAction: (name: string, action: string, reason?: string) => void;
 }) {
-  if (players.length === 0) return <p className="text-sm text-slate-500">Nothing to show.</p>;
+  if (players.length === 0) return <p className="text-sm text-ink-500">Nothing to show.</p>;
   return (
     <Card className="divide-y divide-surface-700/80 overflow-hidden">
       <AnimatePresence initial={false}>
@@ -114,7 +114,7 @@ function PlayerTable({
             transition={{ type: 'spring', stiffness: 400, damping: 34 }}
             className="flex flex-wrap items-center gap-3 px-4 py-3"
           >
-            <span className="font-medium text-slate-100">{p.name}</span>
+            <span className="font-medium text-ink-100">{p.name}</span>
             <div className="flex gap-1.5">
               {p.online && <Badge tone="green" pulse>online</Badge>}
               {p.op && <Badge tone="blue">op</Badge>}

@@ -5,6 +5,7 @@ import { StatusBadge } from '../components/StatusBadge.js';
 import { Button } from '../components/ui.js';
 import { useToast } from '../components/Toast.js';
 import { useConfirm } from '../components/ConfirmDialog.js';
+import { Logo } from '../components/Logo.js';
 import { ServerDetailProvider, useServerDetail } from './server/ServerContext.js';
 import { ConsoleTab } from './server/ConsoleTab.js';
 import { PlayersTab } from './server/PlayersTab.js';
@@ -65,11 +66,9 @@ function ServerPageInner() {
     return (
       <Layout>
         <div className="flex h-screen items-center justify-center">
-          <motion.div
-            className="h-8 w-8 rounded-lg bg-accent-500 shadow-glow"
-            animate={{ opacity: [1, 0.5, 1] }}
-            transition={{ duration: 1.3, repeat: Infinity, ease: 'easeInOut' }}
-          />
+          <motion.div animate={{ opacity: [1, 0.5, 1] }} transition={{ duration: 1.3, repeat: Infinity, ease: 'easeInOut' }}>
+            <Logo className="h-8 w-8 rounded-lg shadow-glow" />
+          </motion.div>
         </div>
       </Layout>
     );
@@ -90,7 +89,7 @@ function ServerPageInner() {
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-surface-800 text-base border border-surface-700">
               {PLATFORM_ICON[server.platform]}
             </div>
-            <h1 className="text-lg font-bold text-white">{server.name}</h1>
+            <h1 className="text-lg font-bold text-ink-50">{server.name}</h1>
             <StatusBadge status={server.status} />
             {user?.role === 'admin' && (
               <Button variant="danger" className="ml-auto" disabled={running} onClick={deleteServer}>
@@ -98,7 +97,7 @@ function ServerPageInner() {
               </Button>
             )}
           </div>
-          <p className="mb-3 text-xs text-slate-400">
+          <p className="mb-3 text-xs text-ink-400">
             {server.platform === 'java' ? 'Java' : 'Bedrock'} · {server.loader} {server.version} · port {server.server_port}
           </p>
           <nav className="relative flex flex-wrap gap-1">
@@ -113,7 +112,7 @@ function ServerPageInner() {
                         transition={{ type: 'spring', stiffness: 500, damping: 38 }}
                       />
                     )}
-                    <span className={`relative z-10 ${isActive ? 'text-accent-400' : 'text-slate-400 hover:text-slate-200'}`}>
+                    <span className={`relative z-10 ${isActive ? 'text-accent-400' : 'text-ink-400 hover:text-ink-200'}`}>
                       {t.label}
                     </span>
                     {isActive && (

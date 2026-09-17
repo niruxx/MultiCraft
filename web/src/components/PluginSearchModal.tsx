@@ -60,7 +60,7 @@ export function PluginSearchModal({
             placeholder="Search plugins (EssentialsX, LuckPerms, WorldEdit…)"
             autoFocus
           />
-          <p className="mt-1.5 text-[11px] text-slate-500">
+          <p className="mt-1.5 text-[11px] text-ink-500">
             Results come from Modrinth's plugin catalog (Bukkit / Spigot / Paper / Purpur).
           </p>
         </div>
@@ -68,11 +68,11 @@ export function PluginSearchModal({
         <ErrorText>{error}</ErrorText>
 
         {loading ? (
-          <div className="flex items-center justify-center gap-2 py-12 text-sm text-slate-500">
+          <div className="flex items-center justify-center gap-2 py-12 text-sm text-ink-500">
             <Spinner /> Searching…
           </div>
         ) : results && results.length === 0 ? (
-          <p className="py-12 text-center text-sm text-slate-500">No plugins found.</p>
+          <p className="py-12 text-center text-sm text-ink-500">No plugins found.</p>
         ) : (
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             {results?.map((r) => (
@@ -87,11 +87,11 @@ export function PluginSearchModal({
                 )}
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1.5">
-                    <p className="truncate text-sm font-semibold text-slate-100">{r.title}</p>
+                    <p className="truncate text-sm font-semibold text-ink-100">{r.title}</p>
                   </div>
-                  <p className="line-clamp-2 text-xs text-slate-500">{r.description}</p>
+                  <p className="line-clamp-2 text-xs text-ink-500">{r.description}</p>
                   <div className="mt-1.5 flex items-center justify-between">
-                    <span className="text-[11px] text-slate-500">
+                    <span className="text-[11px] text-ink-500">
                       {r.downloads.toLocaleString()} downloads · {r.author}
                     </span>
                     <Button className="!px-2.5 !py-1 text-xs" variant="primary" onClick={() => setPicking(r)}>
@@ -174,13 +174,13 @@ function InstallTargetModal({
   return (
     <Modal open onClose={onClose} title={`Install ${plugin.title}`}>
       <div className="space-y-4">
-        <p className="text-sm text-slate-400">Which server should this be installed to?</p>
+        <p className="text-sm text-ink-400">Which server should this be installed to?</p>
         {servers === null ? (
-          <div className="flex items-center gap-2 text-sm text-slate-500">
+          <div className="flex items-center gap-2 text-sm text-ink-500">
             <Spinner /> Loading servers…
           </div>
         ) : servers.length === 0 ? (
-          <p className="text-sm text-slate-500">
+          <p className="text-sm text-ink-500">
             No Paper, Purpur, or Spigot servers found. Create one first — Vanilla and Bedrock don't support plugins.
           </p>
         ) : (
@@ -194,8 +194,8 @@ function InstallTargetModal({
               >
                 <input type="radio" name="target-server" checked={selected === s.id} onChange={() => setSelected(s.id)} />
                 <span>{LOADER_ICON[s.loader] ?? '🧩'}</span>
-                <span className="min-w-0 flex-1 truncate text-slate-200">{s.name}</span>
-                <span className="shrink-0 text-xs text-slate-500">
+                <span className="min-w-0 flex-1 truncate text-ink-200">{s.name}</span>
+                <span className="shrink-0 text-xs text-ink-500">
                   {s.loader} {s.version}
                 </span>
               </label>

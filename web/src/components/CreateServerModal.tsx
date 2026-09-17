@@ -102,7 +102,7 @@ export function CreateServerModal({ open, onClose, onCreated }: { open: boolean;
 
         <Field label="Version">
           {loadingVersions ? (
-            <div className="flex items-center gap-2 text-sm text-slate-400">
+            <div className="flex items-center gap-2 text-sm text-ink-400">
               <Spinner /> Loading versions…
             </div>
           ) : (
@@ -138,7 +138,7 @@ export function CreateServerModal({ open, onClose, onCreated }: { open: boolean;
         </div>
 
         {platform === 'java' && (
-          <label className="flex items-start gap-2 text-sm text-slate-300">
+          <label className="flex items-start gap-2 text-sm text-ink-300">
             <input type="checkbox" className="mt-0.5" checked={acceptEula} onChange={(e) => setAcceptEula(e.target.checked)} />
             <span>
               I have read and accept the{' '}

@@ -4,6 +4,8 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { useAuth } from '../state/AuthContext.js';
 import { ApiError } from '../api/client.js';
 import { Button, ErrorText, Field, Input } from '../components/ui.js';
+import { Logo } from '../components/Logo.js';
+import { ThemeToggle } from '../components/ThemeToggle.js';
 
 const FEATURES = [
   { icon: '🖥️', title: 'Create & run servers', desc: 'Vanilla, Paper, Purpur & Bedrock — installed for you.' },
@@ -100,6 +102,9 @@ export function SetupPage() {
   return (
     <div className="relative flex min-h-screen items-center justify-center px-4">
       <Backdrop />
+      <div className="fixed right-4 top-4 z-20">
+        <ThemeToggle />
+      </div>
       <div className="relative z-10 w-full max-w-md">
         <StepDots step={step} />
         <AnimatePresence mode="wait">
@@ -113,11 +118,11 @@ export function SetupPage() {
               className="glass rounded-2xl border border-surface-700/80 p-7 shadow-card"
             >
               <div className="mb-6 text-center">
-                <div className="mx-auto mb-4 h-12 w-12 rounded-2xl bg-accent-500 shadow-glow" />
-                <h1 className="text-2xl font-bold text-white">
+                <Logo className="mx-auto mb-4 h-12 w-12 rounded-2xl shadow-glow" />
+                <h1 className="text-2xl font-bold text-ink-50">
                   Welcome to <span className="text-accent-400">MultiCraft</span>
                 </h1>
-                <p className="mt-1.5 text-sm text-slate-400">Your self-hosted Minecraft server control panel.</p>
+                <p className="mt-1.5 text-sm text-ink-400">Your self-hosted Minecraft server control panel.</p>
               </div>
               <div className="mb-6 grid grid-cols-2 gap-3">
                 {FEATURES.map((f, i) => (
@@ -129,8 +134,8 @@ export function SetupPage() {
                     className="rounded-xl border border-surface-700/70 bg-surface-800/50 p-3"
                   >
                     <div className="mb-1 text-lg">{f.icon}</div>
-                    <p className="text-xs font-semibold text-slate-200">{f.title}</p>
-                    <p className="mt-0.5 text-[11px] leading-snug text-slate-500">{f.desc}</p>
+                    <p className="text-xs font-semibold text-ink-200">{f.title}</p>
+                    <p className="mt-0.5 text-[11px] leading-snug text-ink-500">{f.desc}</p>
                   </motion.div>
                 ))}
               </div>
@@ -150,8 +155,8 @@ export function SetupPage() {
               className="glass rounded-2xl border border-surface-700/80 p-7 shadow-card"
             >
               <div className="mb-6">
-                <h1 className="text-xl font-bold text-white">Create your admin account</h1>
-                <p className="mt-1 text-sm text-slate-400">You'll use this to sign in and manage the panel.</p>
+                <h1 className="text-xl font-bold text-ink-50">Create your admin account</h1>
+                <p className="mt-1 text-sm text-ink-400">You'll use this to sign in and manage the panel.</p>
               </div>
               <form onSubmit={onSubmit} className="space-y-4">
                 <Field label="Username">
@@ -175,7 +180,7 @@ export function SetupPage() {
                         transition={{ type: 'spring', stiffness: 300, damping: 30 }}
                       />
                     </div>
-                    <p className="text-[11px] text-slate-500">{strength.label}</p>
+                    <p className="text-[11px] text-ink-500">{strength.label}</p>
                   </div>
                 )}
                 <Field label="Confirm password">
@@ -210,8 +215,8 @@ export function SetupPage() {
               >
                 ✓
               </motion.div>
-              <h1 className="text-xl font-bold text-white">You're all set!</h1>
-              <p className="mt-1.5 text-sm text-slate-400">Taking you to your dashboard…</p>
+              <h1 className="text-xl font-bold text-ink-50">You're all set!</h1>
+              <p className="mt-1.5 text-sm text-ink-400">Taking you to your dashboard…</p>
             </motion.div>
           )}
         </AnimatePresence>

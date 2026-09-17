@@ -46,7 +46,7 @@ function Sparkline({
 
   const values = data.map((d) => d.value);
   if (values.length < 2) {
-    return <div className="flex h-12 items-center text-xs text-slate-600">{emptyLabel}</div>;
+    return <div className="flex h-12 items-center text-xs text-ink-600">{emptyLabel}</div>;
   }
 
   const max = Math.max(1, ...values);
@@ -101,7 +101,7 @@ function Sparkline({
         {hover && <circle cx={hover[0]} cy={hover[1]} r="2.2" fill={color} stroke="black" strokeOpacity="0.4" />}
       </svg>
       {hoverIdx !== null && (
-        <div className="pointer-events-none absolute -top-7 rounded-md bg-surface-950 px-2 py-1 text-[11px] font-medium text-slate-200 shadow-card" style={{ left: `${(hover![0] / width) * 100}%`, transform: 'translateX(-50%)' }}>
+        <div className="pointer-events-none absolute -top-7 rounded-md bg-surface-950 px-2 py-1 text-[11px] font-medium text-ink-200 shadow-card" style={{ left: `${(hover![0] / width) * 100}%`, transform: 'translateX(-50%)' }}>
           {formatValue(values[hoverIdx])}
         </div>
       )}
@@ -112,9 +112,9 @@ function Sparkline({
 function StatCard({ label, value, sub, chart }: { label: string; value: string; sub?: string; chart?: React.ReactNode }) {
   return (
     <Card className="p-4">
-      <p className="text-xs font-medium uppercase tracking-wide text-slate-400">{label}</p>
-      <p className="mt-1 text-2xl font-bold text-white">{value}</p>
-      {sub && <p className="mt-0.5 text-xs text-slate-500">{sub}</p>}
+      <p className="text-xs font-medium uppercase tracking-wide text-ink-400">{label}</p>
+      <p className="mt-1 text-2xl font-bold text-ink-50">{value}</p>
+      {sub && <p className="mt-0.5 text-xs text-ink-500">{sub}</p>}
       {chart && <div className="mt-3">{chart}</div>}
     </Card>
   );
@@ -195,29 +195,29 @@ export function ResourcesTab() {
 
       {info?.host && (
         <Card className="p-4">
-          <p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-400">Host machine</p>
+          <p className="mb-2 text-xs font-medium uppercase tracking-wide text-ink-400">Host machine</p>
           <div className="grid grid-cols-2 gap-4 text-sm sm:grid-cols-4">
             <div>
-              <p className="text-slate-500">Total RAM</p>
-              <p className="font-medium text-slate-200">{formatBytes(info.host.totalMemMb * 1024 * 1024)}</p>
+              <p className="text-ink-500">Total RAM</p>
+              <p className="font-medium text-ink-200">{formatBytes(info.host.totalMemMb * 1024 * 1024)}</p>
             </div>
             <div>
-              <p className="text-slate-500">Free RAM</p>
-              <p className="font-medium text-slate-200">{formatBytes(info.host.freeMemMb * 1024 * 1024)}</p>
+              <p className="text-ink-500">Free RAM</p>
+              <p className="font-medium text-ink-200">{formatBytes(info.host.freeMemMb * 1024 * 1024)}</p>
             </div>
             <div>
-              <p className="text-slate-500">Used (all processes)</p>
-              <p className="font-medium text-slate-200">{usedMb !== null ? formatBytes(usedMb * 1024 * 1024) : '—'}</p>
+              <p className="text-ink-500">Used (all processes)</p>
+              <p className="font-medium text-ink-200">{usedMb !== null ? formatBytes(usedMb * 1024 * 1024) : '—'}</p>
             </div>
             <div>
-              <p className="text-slate-500">CPU cores</p>
-              <p className="font-medium text-slate-200">{info.host.cpuCores}</p>
+              <p className="text-ink-500">CPU cores</p>
+              <p className="font-medium text-ink-200">{info.host.cpuCores}</p>
             </div>
           </div>
         </Card>
       )}
 
-      <p className="text-right text-[11px] text-slate-600">{connected ? 'Live' : 'Reconnecting…'}</p>
+      <p className="text-right text-[11px] text-ink-600">{connected ? 'Live' : 'Reconnecting…'}</p>
     </div>
   );
 }

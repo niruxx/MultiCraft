@@ -3,6 +3,8 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useAuth } from '../state/AuthContext.js';
 import { Badge } from './ui.js';
+import { Logo } from './Logo.js';
+import { ThemeToggle } from './ThemeToggle.js';
 import { api } from '../api/client.js';
 import type { SystemInfo } from '../api/types.js';
 
@@ -23,8 +25,8 @@ export function Layout({ children }: { children: ReactNode }) {
     <div className="flex min-h-screen bg-surface-950">
       <aside className="glass relative flex w-56 shrink-0 flex-col border-r border-surface-700/80">
         <div className="flex items-center gap-2.5 px-4 py-5">
-          <div className="h-8 w-8 shrink-0 rounded-lg bg-accent-500 shadow-glow" />
-          <span className="text-[15px] font-bold tracking-tight text-white">MultiCraft</span>
+          <Logo className="h-8 w-8 shrink-0 rounded-lg shadow-glow" />
+          <span className="text-[15px] font-bold tracking-tight text-ink-50">MultiCraft</span>
         </div>
         <nav className="flex-1 space-y-0.5 px-2.5">
           <SidebarLink to="/" active={location.pathname === '/'}>
@@ -41,23 +43,26 @@ export function Layout({ children }: { children: ReactNode }) {
             <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-accent-500/15 text-xs font-semibold text-accent-400 border border-accent-500/25">
               {user?.username?.slice(0, 1).toUpperCase()}
             </div>
-            <span className="min-w-0 flex-1 truncate text-sm font-medium text-slate-200">{user?.username}</span>
+            <span className="min-w-0 flex-1 truncate text-sm font-medium text-ink-200">{user?.username}</span>
             <Badge tone="neutral">{user?.role}</Badge>
           </div>
-          <motion.button
-            whileHover={{ x: 2 }}
-            whileTap={{ scale: 0.97 }}
-            onClick={() => {
-              logout();
-              navigate('/login');
-            }}
-            className="w-full rounded-lg bg-surface-800/80 px-3 py-1.5 text-left text-sm text-slate-400 transition-colors hover:bg-surface-700 hover:text-slate-200"
-          >
-            Sign out
-          </motion.button>
+          <div className="flex items-center gap-1.5">
+            <motion.button
+              whileHover={{ x: 2 }}
+              whileTap={{ scale: 0.97 }}
+              onClick={() => {
+                logout();
+                navigate('/login');
+              }}
+              className="flex-1 rounded-lg bg-surface-800/80 px-3 py-1.5 text-left text-sm text-ink-400 transition-colors hover:bg-surface-700 hover:text-ink-200"
+            >
+              Sign out
+            </motion.button>
+            <ThemeToggle />
+          </div>
           {system && (
             <p
-              className="mt-2.5 truncate text-[11px] text-slate-500"
+              className="mt-2.5 truncate text-[11px] text-ink-500"
               title={`Node ${system.nodeVersion} on ${system.hostname}`}
             >
               <span className="inline-block h-1.5 w-1.5 rounded-full bg-accent-500/70 align-middle mr-1.5" />
@@ -82,7 +87,7 @@ function SidebarLink({ to, active, children }: { to: string; active: boolean; ch
           transition={{ type: 'spring', stiffness: 500, damping: 38 }}
         />
       )}
-      <span className={`relative z-10 transition-colors ${active ? 'text-accent-400' : 'text-slate-400 hover:text-slate-200'}`}>
+      <span className={`relative z-10 transition-colors ${active ? 'text-accent-400' : 'text-ink-400 hover:text-ink-200'}`}>
         {children}
       </span>
     </Link>

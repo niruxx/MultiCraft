@@ -22,8 +22,8 @@ function QuickCommandRow({
   return (
     <div className="flex flex-wrap items-end gap-2 border-b border-surface-800 py-3 last:border-0">
       <div className="min-w-[10rem] flex-1">
-        <p className="text-sm font-medium text-slate-200">{label}</p>
-        {hint && <p className="text-xs text-slate-500">{hint}</p>}
+        <p className="text-sm font-medium text-ink-200">{label}</p>
+        {hint && <p className="text-xs text-ink-500">{hint}</p>}
       </div>
       <Select className="w-44" value={value} onChange={(e) => setValue(e.target.value)} disabled={disabled}>
         {options.map((o) => (
@@ -87,8 +87,8 @@ export function OperatorTab() {
       )}
 
       <Card className="p-4">
-        <h2 className="mb-1 text-sm font-semibold uppercase tracking-wide text-slate-400">Broadcast</h2>
-        <p className="mb-3 text-xs text-slate-500">Send a message to everyone currently online.</p>
+        <h2 className="mb-1 text-sm font-semibold uppercase tracking-wide text-ink-400">Broadcast</h2>
+        <p className="mb-3 text-xs text-ink-500">Send a message to everyone currently online.</p>
         <div className="flex gap-2">
           <Input
             value={broadcast}
@@ -106,7 +106,7 @@ export function OperatorTab() {
       </Card>
 
       <Card className="p-4">
-        <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-400">World controls</h2>
+        <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-ink-400">World controls</h2>
         <QuickCommandRow
           label="Save the world now"
           hint="Flushes all loaded chunks to disk"
@@ -166,12 +166,12 @@ export function OperatorTab() {
 
       <Card className="p-4">
         <div className="mb-2 flex items-center justify-between">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-400">Moderate a player</h2>
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-400">Moderate a player</h2>
           <Link to="../whitelist" className="text-xs text-accent-500 hover:underline">
             Manage the allowlist →
           </Link>
         </div>
-        <p className="mb-3 text-xs text-slate-500">Kick, ban, or pardon by name — they don't need to be online.</p>
+        <p className="mb-3 text-xs text-ink-500">Kick, ban, or pardon by name — they don't need to be online.</p>
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_1fr_auto_auto_auto]">
           <Field label="Player name">
             <Input value={targetName} onChange={(e) => setTargetName(e.target.value)} placeholder="Notch" disabled={disabled} />

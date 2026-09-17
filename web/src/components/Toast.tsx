@@ -60,13 +60,13 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, x: 40, scale: 0.94 }}
               transition={{ type: 'spring', stiffness: 420, damping: 32 }}
-              className={`glass pointer-events-auto flex items-start gap-2.5 rounded-lg border border-surface-700/80 px-3.5 py-3 text-sm text-slate-200 shadow-card ring-1 ${RING[t.kind]}`}
+              className={`glass pointer-events-auto flex items-start gap-2.5 rounded-lg border border-surface-700/80 px-3.5 py-3 text-sm text-ink-200 shadow-card ring-1 ${RING[t.kind]}`}
             >
               <span className="mt-0.5">{ICONS[t.kind]}</span>
               <span className="flex-1 leading-snug">{t.message}</span>
               <button
                 onClick={() => setToasts((prev) => prev.filter((x) => x.id !== t.id))}
-                className="text-slate-500 hover:text-slate-300"
+                className="text-ink-500 hover:text-ink-300"
               >
                 ✕
               </button>

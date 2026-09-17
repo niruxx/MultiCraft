@@ -5,6 +5,8 @@ import { useConsoleSocket } from '../../hooks/useConsoleSocket.js';
 import { api, ApiError } from '../../api/client.js';
 import { Button, Card, ErrorText, Input, Spinner } from '../../components/ui.js';
 
+// The console pane itself is always dark (a terminal, not page chrome), regardless of the
+// site's light/dark theme, so these stay fixed Tailwind colors rather than theme-aware `ink-*`.
 function lineColor(stream: string, line: string): string {
   if (stream === 'stderr') return 'text-red-400';
   if (stream === 'system') return 'text-sky-400';
@@ -116,7 +118,7 @@ export function ConsoleTab() {
             )}
           </>
         )}
-        <div className="ml-auto flex items-center gap-4 text-xs text-slate-400">
+        <div className="ml-auto flex items-center gap-4 text-xs text-ink-400">
           <span className="inline-flex items-center gap-1.5">
             <span className="relative flex h-2 w-2">
               {connected && (
@@ -135,7 +137,7 @@ export function ConsoleTab() {
 
       {installProgress && (
         <Card className="p-3">
-          <div className="mb-1 flex justify-between text-xs text-slate-400">
+          <div className="mb-1 flex justify-between text-xs text-ink-400">
             <span className="inline-flex items-center gap-1.5">
               <Spinner className="h-3 w-3 text-accent-400" />
               {installProgress.message}

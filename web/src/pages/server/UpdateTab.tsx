@@ -68,29 +68,29 @@ export function UpdateTab() {
     <div className="space-y-6">
       <Card className="p-4">
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-400">Version status</h2>
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-400">Version status</h2>
           <Button className="!px-2.5 !py-1 text-xs" onClick={runCheck} disabled={checking}>
             {checking ? 'Checking…' : 'Check again'}
           </Button>
         </div>
 
         {checking && !check ? (
-          <div className="flex items-center gap-2 py-4 text-sm text-slate-500">
+          <div className="flex items-center gap-2 py-4 text-sm text-ink-500">
             <Spinner /> Checking for updates…
           </div>
         ) : check ? (
           <div className="space-y-3">
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div>
-                <p className="text-xs text-slate-500">Current</p>
-                <p className="font-medium text-slate-200">
+                <p className="text-xs text-ink-500">Current</p>
+                <p className="font-medium text-ink-200">
                   {check.currentVersion}
                   {check.currentBuild ? ` (build ${check.currentBuild})` : ''}
                 </p>
               </div>
               <div>
-                <p className="text-xs text-slate-500">Latest available</p>
-                <p className="font-medium text-slate-200">
+                <p className="text-xs text-ink-500">Latest available</p>
+                <p className="font-medium text-ink-200">
                   {check.latestVersion ?? '—'}
                   {check.latestBuild ? ` (build ${check.latestBuild})` : ''}
                 </p>
@@ -99,18 +99,18 @@ export function UpdateTab() {
             <Badge tone={check.updateAvailable ? 'yellow' : 'green'}>
               {check.updateAvailable ? 'Update available' : 'Up to date'}
             </Badge>
-            {check.note && <p className="text-xs text-slate-500">{check.note}</p>}
+            {check.note && <p className="text-xs text-ink-500">{check.note}</p>}
           </div>
         ) : null}
         <ErrorText>{error}</ErrorText>
       </Card>
 
       <Card className="p-4">
-        <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-400">What's preserved</h2>
-        <p className="mb-2 text-sm text-slate-400">
+        <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-ink-400">What's preserved</h2>
+        <p className="mb-2 text-sm text-ink-400">
           Updating replaces the server software in place. These are never touched:
         </p>
-        <ul className="mb-4 list-inside list-disc space-y-1 text-sm text-slate-300">
+        <ul className="mb-4 list-inside list-disc space-y-1 text-sm text-ink-300">
           {preserved.map((p) => (
             <li key={p} className="font-mono text-xs text-success-400">
               {p}
@@ -126,7 +126,7 @@ export function UpdateTab() {
 
         {canWrite && (
           <>
-            <label className="mb-3 flex items-center gap-2 text-sm text-slate-300">
+            <label className="mb-3 flex items-center gap-2 text-sm text-ink-300">
               <input type="checkbox" checked={backupFirst} onChange={(e) => setBackupFirst(e.target.checked)} />
               Create a backup first (recommended)
             </label>
@@ -139,7 +139,7 @@ export function UpdateTab() {
 
       {isUpdating && (
         <Card className="p-4">
-          <div className="mb-1 flex items-center justify-between text-xs text-slate-400">
+          <div className="mb-1 flex items-center justify-between text-xs text-ink-400">
             <span className="inline-flex items-center gap-1.5">
               <Spinner className="h-3 w-3 text-accent-400" />
               {installProgress?.message ?? 'Updating…'}
@@ -153,7 +153,7 @@ export function UpdateTab() {
               transition={{ type: 'spring', stiffness: 120, damping: 20 }}
             />
           </div>
-          <p className="mt-2 text-xs text-slate-500">Full output is streaming on the Console tab.</p>
+          <p className="mt-2 text-xs text-ink-500">Full output is streaming on the Console tab.</p>
         </Card>
       )}
     </div>
