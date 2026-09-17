@@ -3,7 +3,9 @@ import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useAuth } from '../state/AuthContext.js';
 import { ApiError } from '../api/client.js';
-import { Button, ErrorText, Field, Input } from '../components/ui.js';
+import { Badge, Button, ErrorText, Field, Input } from '../components/ui.js';
+
+const APP_VERSION = '1.0.0';
 
 export function LoginPage() {
   const { login, user, setupRequired } = useAuth();
@@ -53,7 +55,10 @@ export function LoginPage() {
             animate={{ backgroundPosition: ['0% 50%', '100% 50%', '0% 50%'] }}
             transition={{ duration: 5, repeat: Infinity, ease: 'easeInOut' }}
           />
-          <h1 className="text-xl font-bold text-white">Sign in to MultiCraft</h1>
+          <div className="flex items-center justify-center gap-2">
+            <h1 className="text-xl font-bold text-white">Sign in to MultiCraft</h1>
+            <Badge tone="neutral">v{APP_VERSION}</Badge>
+          </div>
           <p className="mt-1 text-sm text-slate-400">Manage your Minecraft servers.</p>
         </div>
         <form onSubmit={onSubmit} className="space-y-4">
