@@ -18,13 +18,13 @@ interface ToastState {
 const ToastContext = createContext<ToastState | null>(null);
 
 const ICONS: Record<ToastKind, ReactNode> = {
-  success: <span className="text-accent-400">✓</span>,
+  success: <span className="text-success-400">✓</span>,
   error: <span className="text-red-400">✕</span>,
   info: <span className="text-sky-400">ℹ</span>,
 };
 
 const RING: Record<ToastKind, string> = {
-  success: 'ring-accent-500/25',
+  success: 'ring-success-500/25',
   error: 'ring-red-500/25',
   info: 'ring-sky-500/25',
 };

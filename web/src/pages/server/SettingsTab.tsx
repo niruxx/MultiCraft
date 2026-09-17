@@ -113,7 +113,7 @@ export function SettingsTab() {
             <Button variant="primary" onClick={saveGeneral} disabled={saving}>
               {saving ? 'Saving…' : 'Save changes'}
             </Button>
-            {saved && <span className="text-sm text-accent-500">Saved</span>}
+            {saved && <span className="text-sm text-success-500">Saved</span>}
           </div>
         )}
       </Card>
@@ -223,7 +223,7 @@ function PropertiesEditor({ serverId, canWrite }: { serverId: string; canWrite: 
           <Button variant="primary" onClick={save} disabled={saving || Object.keys(edited).length === 0}>
             {saving ? 'Saving…' : `Save ${Object.keys(edited).length || ''} change(s)`}
           </Button>
-          {saved && <span className="text-sm text-accent-500">Saved</span>}
+          {saved && <span className="text-sm text-success-500">Saved</span>}
         </div>
       )}
     </Card>

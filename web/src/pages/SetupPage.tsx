@@ -24,8 +24,8 @@ function scorePassword(pw: string): { score: number; label: string; color: strin
     { label: 'Weak', color: 'bg-red-500' },
     { label: 'Fair', color: 'bg-yellow-500' },
     { label: 'Good', color: 'bg-sky-500' },
-    { label: 'Strong', color: 'bg-accent-500' },
-    { label: 'Excellent', color: 'bg-accent-400' },
+    { label: 'Strong', color: 'bg-success-500' },
+    { label: 'Excellent', color: 'bg-success-400' },
   ];
   return { score, ...levels[Math.min(score, levels.length - 1)] };
 }
@@ -40,7 +40,7 @@ function Backdrop() {
         transition={{ duration: 8, repeat: Infinity, ease: 'easeInOut' }}
       />
       <motion.div
-        className="absolute bottom-[-6rem] right-1/4 h-80 w-80 rounded-full bg-brand-to/20 blur-[100px]"
+        className="absolute bottom-[-6rem] right-1/4 h-80 w-80 rounded-full bg-sky-500/15 blur-[100px]"
         animate={{ y: [0, -24, 0] }}
         transition={{ duration: 9, repeat: Infinity, ease: 'easeInOut', delay: 0.5 }}
       />
@@ -113,9 +113,9 @@ export function SetupPage() {
               className="glass rounded-2xl border border-surface-700/80 p-7 shadow-card"
             >
               <div className="mb-6 text-center">
-                <div className="mx-auto mb-4 h-12 w-12 rounded-2xl bg-brand-gradient shadow-glow" />
+                <div className="mx-auto mb-4 h-12 w-12 rounded-2xl bg-accent-500 shadow-glow" />
                 <h1 className="text-2xl font-bold text-white">
-                  Welcome to <span className="text-gradient">MultiCraft</span>
+                  Welcome to <span className="text-accent-400">MultiCraft</span>
                 </h1>
                 <p className="mt-1.5 text-sm text-slate-400">Your self-hosted Minecraft server control panel.</p>
               </div>
@@ -206,7 +206,7 @@ export function SetupPage() {
                 initial={{ scale: 0, rotate: -45 }}
                 animate={{ scale: 1, rotate: 0 }}
                 transition={{ type: 'spring', stiffness: 300, damping: 18, delay: 0.1 }}
-                className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-accent-500/15 text-2xl text-accent-400 border border-accent-500/30"
+                className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-success-500/15 text-2xl text-success-400 border border-success-500/30"
               >
                 ✓
               </motion.div>

@@ -112,7 +112,7 @@ export function UpdateTab() {
         </p>
         <ul className="mb-4 list-inside list-disc space-y-1 text-sm text-slate-300">
           {preserved.map((p) => (
-            <li key={p} className="font-mono text-xs text-accent-400">
+            <li key={p} className="font-mono text-xs text-success-400">
               {p}
             </li>
           ))}

@@ -14,7 +14,7 @@ export function Button({
     'relative inline-flex items-center justify-center gap-1.5 rounded-lg text-sm font-medium px-3.5 py-1.5 border transition-colors duration-150 disabled:opacity-40 disabled:cursor-not-allowed select-none';
   const variants: Record<string, string> = {
     default: 'bg-surface-800/70 hover:bg-surface-700 border-surface-700 text-slate-100',
-    primary: 'bg-accent-500 hover:bg-accent-400 border-transparent text-surface-950 font-semibold',
+    primary: 'bg-accent-500 hover:bg-accent-400 border-transparent text-white font-semibold',
     danger: 'bg-red-500/15 hover:bg-red-500/25 border-red-500/30 text-red-400',
     ghost: 'bg-transparent hover:bg-surface-800 border-transparent text-slate-300',
   };
@@ -71,9 +71,11 @@ export function Card({
   );
 }
 
+// `green` deliberately uses the `success` palette, not `accent` — status color (good/running)
+// and brand/interactive color are different concepts and must stay visually distinct.
 const BADGE_TONES: Record<string, string> = {
   neutral: 'bg-surface-700/70 text-slate-300',
-  green: 'bg-accent-500/15 text-accent-400',
+  green: 'bg-success-500/15 text-success-400',
   red: 'bg-red-500/15 text-red-400',
   yellow: 'bg-yellow-500/15 text-yellow-400',
   blue: 'bg-sky-500/15 text-sky-400',
@@ -90,7 +92,7 @@ export function Badge({
 }) {
   const dotColor: Record<string, string> = {
     neutral: 'bg-slate-400',
-    green: 'bg-accent-400',
+    green: 'bg-success-400',
     red: 'bg-red-400',
     yellow: 'bg-yellow-400',
     blue: 'bg-sky-400',

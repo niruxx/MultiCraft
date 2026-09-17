@@ -9,37 +9,40 @@ export default {
         mono: ['"JetBrains Mono"', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
       },
       colors: {
+        // Neutral surfaces lean slightly cool/slate rather than pure black, to pair with
+        // an indigo accent instead of the old green one.
         surface: {
-          950: '#08090d',
-          900: '#0f1218',
-          850: '#141821',
-          800: '#191e28',
-          700: '#232a37',
-          600: '#333c4c',
-          500: '#4a5568',
+          950: '#09090f',
+          900: '#101018',
+          850: '#15151f',
+          800: '#1a1a26',
+          700: '#252533',
+          600: '#38384a',
+          500: '#54546b',
         },
+        // Primary interactive/brand hue — flat indigo, used for buttons, links, focus
+        // rings, and the active-nav indicator. One hue, no gradient.
         accent: {
-          400: '#34e0a1',
-          500: '#22d3a5',
-          600: '#14b891',
-          glow: '#34e0a1',
+          400: '#818cf8',
+          500: '#6366f1',
+          600: '#4f46e5',
         },
-        brand: {
-          from: '#34e0a1',
-          via: '#22d3ee',
-          to: '#818cf8',
+        // Separate from `accent`: reserved for "good / running" status only, so status
+        // color and brand color can never be confused with each other.
+        success: {
+          400: '#34d399',
+          500: '#10b981',
         },
       },
       boxShadow: {
         // Flat, neutral elevation — no colored glow. Depth comes from blur + a hairline
         // border, not drop shadows, to keep surfaces reading flat rather than skeuomorphic.
         flat: '0 1px 2px rgba(0,0,0,0.2)',
-        card: '0 4px 20px -6px rgba(0,0,0,0.35)',
-        glow: '0 4px 20px -4px rgba(34,211,165,0.28)',
+        card: '0 4px 20px -6px rgba(0,0,0,0.4)',
+        glow: '0 4px 24px -4px rgba(99,102,241,0.35)',
       },
       backgroundImage: {
-        'brand-gradient': 'linear-gradient(115deg, #34e0a1 0%, #22d3ee 50%, #818cf8 100%)',
-        'radial-fade': 'radial-gradient(60% 60% at 50% 0%, rgba(34,211,165,0.12) 0%, rgba(8,9,13,0) 70%)',
+        'radial-fade': 'radial-gradient(60% 60% at 50% 0%, rgba(99,102,241,0.14) 0%, rgba(9,9,15,0) 70%)',
         'grid-pattern':
           'linear-gradient(to right, rgba(255,255,255,0.03) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.03) 1px, transparent 1px)',
       },

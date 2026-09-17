@@ -120,11 +120,11 @@ export function ConsoleTab() {
           <span className="inline-flex items-center gap-1.5">
             <span className="relative flex h-2 w-2">
               {connected && (
-                <span className="absolute inline-flex h-full w-full animate-ping-slow rounded-full bg-accent-400" />
+                <span className="absolute inline-flex h-full w-full animate-ping-slow rounded-full bg-success-400" />
               )}
-              <span className={`relative inline-flex h-2 w-2 rounded-full ${connected ? 'bg-accent-400' : 'bg-red-400'}`} />
+              <span className={`relative inline-flex h-2 w-2 rounded-full ${connected ? 'bg-success-400' : 'bg-red-400'}`} />
             </span>
-            <span className={connected ? 'text-accent-500' : 'text-red-400'}>{connected ? 'live' : 'reconnecting'}</span>
+            <span className={connected ? 'text-success-500' : 'text-red-400'}>{connected ? 'live' : 'reconnecting'}</span>
           </span>
           {stats.memoryMb !== null && <span>RAM {stats.memoryMb} MB</span>}
           {stats.cpuPercent !== null && <span>CPU {stats.cpuPercent}%</span>}

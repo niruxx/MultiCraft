@@ -23,7 +23,7 @@ export function Layout({ children }: { children: ReactNode }) {
     <div className="flex min-h-screen bg-surface-950">
       <aside className="glass relative flex w-56 shrink-0 flex-col border-r border-surface-700/80">
         <div className="flex items-center gap-2.5 px-4 py-5">
-          <div className="h-8 w-8 shrink-0 rounded-lg bg-brand-gradient shadow-glow" />
+          <div className="h-8 w-8 shrink-0 rounded-lg bg-accent-500 shadow-glow" />
           <span className="text-[15px] font-bold tracking-tight text-white">MultiCraft</span>
         </div>
         <nav className="flex-1 space-y-0.5 px-2.5">
@@ -38,7 +38,7 @@ export function Layout({ children }: { children: ReactNode }) {
         </nav>
         <div className="border-t border-surface-700/80 px-3 py-3">
           <div className="mb-2.5 flex items-center gap-2.5">
-            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-accent-400/30 to-brand-to/30 text-xs font-semibold text-accent-400 border border-accent-500/25">
+            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-accent-500/15 text-xs font-semibold text-accent-400 border border-accent-500/25">
               {user?.username?.slice(0, 1).toUpperCase()}
             </div>
             <span className="min-w-0 flex-1 truncate text-sm font-medium text-slate-200">{user?.username}</span>

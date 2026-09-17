@@ -83,7 +83,7 @@ export function DashboardPage() {
         ) : servers.length === 0 ? (
           <Card className="p-12 text-center">
             <motion.div
-              className="mx-auto mb-4 h-14 w-14 rounded-2xl bg-brand-gradient shadow-glow"
+              className="mx-auto mb-4 h-14 w-14 rounded-2xl bg-accent-500 shadow-glow"
               animate={{ y: [0, -8, 0] }}
               transition={{ duration: 3.5, repeat: Infinity, ease: 'easeInOut' }}
             />

@@ -40,11 +40,6 @@ body {
   font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
-/* Gradient text for headings / brand marks — static, not animated: flat over flashy */
-.text-gradient {
-  @apply bg-brand-gradient bg-clip-text text-transparent;
-}
-
 /* Frosted glass surface used for cards, modals, nav — one flat translucent fill (no inner
    gradient sheen) plus a hairline border for edge definition; the blur is what does the work. */
 .glass {
