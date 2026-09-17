@@ -8,6 +8,7 @@ const LOADERS_BY_PLATFORM: Record<Platform, { value: Loader; label: string }[]> 
     { value: 'vanilla', label: 'Vanilla' },
     { value: 'paper', label: 'Paper' },
     { value: 'purpur', label: 'Purpur' },
+    { value: 'spigot', label: 'Spigot (built from source)' },
   ],
   bedrock: [{ value: 'bedrock', label: 'Bedrock Dedicated Server' }],
 };
@@ -115,6 +116,14 @@ export function CreateServerModal({ open, onClose, onCreated }: { open: boolean;
             </Select>
           )}
         </Field>
+
+        {loader === 'spigot' && (
+          <p className="rounded-lg border border-yellow-500/30 bg-yellow-500/10 px-3 py-2 text-xs text-yellow-400">
+            Spigot isn't pre-built — MultiCraft compiles it from source with BuildTools on this machine. That
+            requires a full JDK (not just a JRE) and git, and can take several minutes. Watch the Console tab for
+            live build output.
+          </p>
+        )}
 
         <div className="grid grid-cols-3 gap-3">
           <Field label="Min memory (MB)">

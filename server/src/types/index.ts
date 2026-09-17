@@ -12,7 +12,10 @@ export interface User {
 export type PublicUser = Omit<User, 'password_hash' | 'password_salt'>;
 
 export type Platform = 'java' | 'bedrock';
-export type Loader = 'vanilla' | 'paper' | 'purpur' | 'bedrock';
+export type Loader = 'vanilla' | 'paper' | 'purpur' | 'spigot' | 'bedrock';
+
+/** Loaders that support the Bukkit plugin API (a /plugins directory of jars). */
+export const PLUGIN_CAPABLE_LOADERS: Loader[] = ['paper', 'purpur', 'spigot'];
 
 export type ServerStatus =
   | 'installing'
@@ -21,7 +24,8 @@ export type ServerStatus =
   | 'starting'
   | 'running'
   | 'stopping'
-  | 'crashed';
+  | 'crashed'
+  | 'updating';
 
 export interface ServerRecord {
   id: string;

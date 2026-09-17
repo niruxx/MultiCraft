@@ -18,6 +18,10 @@ export function instanceDir(serverId: string): string {
   return path.join(INSTANCES_DIR, serverId);
 }
 
+export function pluginsDir(serverId: string): string {
+  return path.join(instanceDir(serverId), 'plugins');
+}
+
 export function backupDir(serverId: string): string {
   return path.join(BACKUPS_DIR, serverId);
 }

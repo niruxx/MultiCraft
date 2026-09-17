@@ -122,7 +122,25 @@ export function Skeleton({ className = 'h-4 w-full' }: { className?: string }) {
   return <div className={`skeleton ${className}`} />;
 }
 
-export function Modal({ open, onClose, title, children }: { open: boolean; onClose: () => void; title: string; children: ReactNode }) {
+const MODAL_SIZE: Record<string, string> = {
+  md: 'max-w-lg',
+  lg: 'max-w-2xl',
+  xl: 'max-w-4xl',
+};
+
+export function Modal({
+  open,
+  onClose,
+  title,
+  children,
+  size = 'md',
+}: {
+  open: boolean;
+  onClose: () => void;
+  title: string;
+  children: ReactNode;
+  size?: 'md' | 'lg' | 'xl';
+}) {
   return (
     <AnimatePresence>
       {open && (
@@ -135,20 +153,20 @@ export function Modal({ open, onClose, title, children }: { open: boolean; onClo
           onClick={onClose}
         >
           <motion.div
-            className="glass w-full max-w-lg rounded-xl border border-surface-700/80 shadow-card"
+            className={`glass flex max-h-[85vh] w-full ${MODAL_SIZE[size]} flex-col rounded-xl border border-surface-700/80 shadow-card`}
             initial={{ opacity: 0, scale: 0.95, y: 12 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.96, y: 8 }}
             transition={springy}
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between border-b border-surface-700/80 px-4 py-3">
+            <div className="flex shrink-0 items-center justify-between border-b border-surface-700/80 px-4 py-3">
               <h3 className="text-sm font-semibold text-slate-100">{title}</h3>
               <button onClick={onClose} className="rounded-md p-1 text-slate-400 transition-colors hover:bg-surface-800 hover:text-slate-200">
                 ✕
               </button>
             </div>
-            <div className="p-4">{children}</div>
+            <div className="overflow-y-auto p-4">{children}</div>
           </motion.div>
         </motion.div>
       )}

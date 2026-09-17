@@ -1,9 +1,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { Readable } from 'node:stream';
-import { finished } from 'node:stream/promises';
+import { spawn } from 'node:child_process';
 import AdmZip from 'adm-zip';
 import { logger } from '../utils/logger.js';
+import { downloadFile, fetchJson, formatBytes, type LogFn } from '../utils/download.js';
+import { findJava, findJavac } from './javaService.js';
 import type { Loader, Platform } from '../types/index.js';
 
 const MOJANG_MANIFEST = 'https://launchermeta.mojang.com/mc/game/version_manifest_v2.json';
@@ -11,6 +12,8 @@ const PAPER_API = 'https://fill.papermc.io/v3/projects';
 const PURPUR_API = 'https://api.purpurmc.org/v2/purpur';
 const BEDROCK_LINKS_API =
   'https://net-secondary.web.minecraft-services.net/api/v1.0/download/links';
+const BUILD_TOOLS_URL =
+  'https://hub.spigotmc.org/jenkins/job/BuildTools/lastSuccessfulBuild/artifact/target/BuildTools.jar';
 
 export interface VersionOption {
   version: string;
@@ -20,76 +23,36 @@ export interface VersionOption {
 
 /** Progress callback for the coarse install progress bar. */
 export type ProgressFn = (pct: number, message: string) => void;
-/** Verbose, line-by-line log callback — mirrors what `npm install --verbose` prints. */
-export type LogFn = (line: string) => void;
-
-function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  const units = ['KB', 'MB', 'GB'];
-  let value = bytes / 1024;
-  let i = 0;
-  while (value >= 1024 && i < units.length - 1) {
-    value /= 1024;
-    i++;
-  }
-  return `${value.toFixed(1)} ${units[i]}`;
-}
+export type { LogFn };
 
 function describeHost(): string {
   const osName = process.platform === 'win32' ? 'Windows' : process.platform === 'darwin' ? 'macOS' : 'Linux';
   return `${osName} (${process.platform}/${process.arch})`;
 }
 
-async function fetchJson<T>(url: string, onLog?: LogFn): Promise<T> {
-  onLog?.(`> GET ${url}`);
-  const res = await fetch(url, { headers: { 'User-Agent': 'MultiCraft-Panel' } });
-  if (!res.ok) throw new Error(`Request to ${url} failed with status ${res.status}`);
-  return (await res.json()) as T;
-}
-
-async function downloadFile(
-  url: string,
-  destination: string,
-  onProgress?: (pct: number) => void,
-  onLog?: LogFn
-) {
-  onLog?.(`> GET ${url}`);
-  const res = await fetch(url, { headers: { 'User-Agent': 'MultiCraft-Panel' } });
-  if (!res.ok || !res.body) throw new Error(`Download failed (${res.status}) for ${url}`);
-  fs.mkdirSync(path.dirname(destination), { recursive: true });
-  const total = Number(res.headers.get('content-length') ?? 0);
-  onLog?.(
-    total > 0
-      ? `  content-length: ${formatBytes(total)} -> ${path.basename(destination)}`
-      : `  streaming -> ${path.basename(destination)} (size unknown)`
-  );
-
-  const startedAt = Date.now();
-  let received = 0;
-  let lastLoggedDecile = -1;
-  const nodeStream = Readable.fromWeb(res.body as import('stream/web').ReadableStream);
-  const out = fs.createWriteStream(destination);
-  nodeStream.on('data', (chunk: Buffer) => {
-    received += chunk.length;
-    if (total > 0) {
-      const pct = Math.round((received / total) * 100);
-      onProgress?.(pct);
-      const decile = Math.floor(pct / 10);
-      if (decile > lastLoggedDecile) {
-        lastLoggedDecile = decile;
-        onLog?.(`  ... ${pct}% (${formatBytes(received)} / ${formatBytes(total)})`);
-      }
-    }
+/** Runs a child process, streaming every stdout/stderr line through onLog in real time. */
+function runStreamed(cmd: string, args: string[], cwd: string, onLog?: LogFn): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const child = spawn(cmd, args, { cwd, windowsHide: true });
+    child.stdout.setEncoding('utf8');
+    child.stderr.setEncoding('utf8');
+    child.stdout.on('data', (chunk: string) => {
+      for (const line of chunk.split(/\r?\n/)) if (line.length) onLog?.(`  ${line}`);
+    });
+    child.stderr.on('data', (chunk: string) => {
+      for (const line of chunk.split(/\r?\n/)) if (line.length) onLog?.(`  ${line}`);
+    });
+    child.on('error', (err) => reject(err));
+    child.on('exit', (code) => {
+      if (code === 0) resolve();
+      else reject(new Error(`${path.basename(cmd)} exited with code ${code}`));
+    });
   });
-  nodeStream.pipe(out);
-  await finished(out);
-  const seconds = ((Date.now() - startedAt) / 1000).toFixed(1);
-  onLog?.(`  done in ${seconds}s (${formatBytes(received)})`);
 }
 
 /** Lists installable versions for a given loader, newest first. */
 export async function listAvailableVersions(loader: Loader): Promise<VersionOption[]> {
-  if (loader === 'vanilla') {
+  if (loader === 'vanilla' || loader === 'spigot') {
     const manifest = await fetchJson<{
       latest: { release: string; snapshot: string };
       versions: { id: string; type: string }[];
@@ -251,5 +214,86 @@ export async function installServer(
     return { jarFile: null, build: versionMatch?.[1] ?? null, executable };
   }
 
+  if (loader === 'spigot') {
+    onLog?.('==> Spigot is built from source with BuildTools — this compiles Minecraft + CraftBukkit + Spigot patches and typically takes several minutes.');
+    const javaPath = await findJava();
+    const javacPath = await findJavac();
+    if (!javaPath) {
+      throw new Error(
+        'No Java runtime was found on this machine. BuildTools needs a full JDK (Java 21+ recommended) on PATH or JAVA_HOME.'
+      );
+    }
+    if (!javacPath) {
+      throw new Error(
+        'Building Spigot requires a full JDK (with javac), not just a JRE. Install a JDK (e.g. Temurin 21) and ensure it is on PATH / JAVA_HOME, then try again.'
+      );
+    }
+    onLog?.(`==> Using JDK: ${javacPath}`);
+
+    onProgress?.(2, 'Downloading BuildTools.jar');
+    onLog?.('==> Downloading BuildTools.jar from the SpigotMC Jenkins');
+    const buildToolsPath = path.join(instanceDir, 'BuildTools.jar');
+    await downloadFile(BUILD_TOOLS_URL, buildToolsPath, (pct) => onProgress?.(2 + Math.round(pct * 0.08), 'Downloading BuildTools.jar'), onLog);
+
+    onProgress?.(10, `Running BuildTools for ${version} (this can take a while)`);
+    onLog?.(`==> Running BuildTools --rev ${version} (streaming full BuildTools output below)`);
+    await runStreamed(
+      javaPath,
+      ['-jar', 'BuildTools.jar', '--rev', version, '--output-dir', instanceDir, '--nogui'],
+      instanceDir,
+      (line) => {
+        onLog?.(line);
+        // BuildTools doesn't report machine-readable progress; nudge the bar so it doesn't look stuck.
+        onProgress?.(Math.min(95, 10 + Math.floor(Math.random() * 2)), `Building Spigot ${version} with BuildTools…`);
+      }
+    );
+
+    const jarFile = `spigot-${version}.jar`;
+    if (!fs.existsSync(path.join(instanceDir, jarFile))) {
+      throw new Error(
+        `BuildTools finished but ${jarFile} was not found — check the build log above for the actual output filename or a failure partway through.`
+      );
+    }
+    fs.rmSync(buildToolsPath, { force: true });
+    onLog?.(`==> Built ${jarFile} successfully`);
+    onProgress?.(100, 'Installed');
+    return { jarFile, build: null, executable: null };
+  }
+
   throw new Error(`Unknown loader: ${loader}`);
+}
+
+// --- Lightweight "what's the latest?" lookups, shared with updateService ---
+
+export async function getLatestVanillaRelease(): Promise<string> {
+  const manifest = await fetchJson<{ latest: { release: string } }>(MOJANG_MANIFEST);
+  return manifest.latest.release;
+}
+
+export async function getLatestPaperBuild(version: string): Promise<string | null> {
+  const builds = await fetchJson<{ id: number; channel: string }[]>(`${PAPER_API}/paper/versions/${version}/builds`).catch(
+    () => []
+  );
+  if (!builds.length) return null;
+  const best = builds.find((b) => b.channel === 'STABLE' || b.channel === 'DEFAULT') ?? builds[0];
+  return String(best.id);
+}
+
+export async function getLatestPurpurBuild(version: string): Promise<string | null> {
+  const info = await fetchJson<{ builds: { latest: string } }>(`${PURPUR_API}/${version}`).catch(() => null);
+  return info?.builds.latest ?? null;
+}
+
+export interface BedrockDownloadInfo {
+  url: string;
+  version: string | null;
+}
+
+export async function getLatestBedrockDownload(): Promise<BedrockDownloadInfo> {
+  const data = await fetchJson<{ result: { links: { downloadType: string; downloadUrl: string }[] } }>(BEDROCK_LINKS_API);
+  const platformKey = process.platform === 'win32' ? 'serverBedrockWindows' : 'serverBedrockLinux';
+  const link = data.result.links.find((l) => l.downloadType === platformKey);
+  if (!link) throw new Error('Could not resolve Bedrock server download link');
+  const versionMatch = link.downloadUrl.match(/bedrock-server-([\d.]+)\.zip/);
+  return { url: link.downloadUrl, version: versionMatch?.[1] ?? null };
 }

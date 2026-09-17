@@ -7,21 +7,19 @@ import { useToast } from '../components/Toast.js';
 import { ServerDetailProvider, useServerDetail } from './server/ServerContext.js';
 import { ConsoleTab } from './server/ConsoleTab.js';
 import { PlayersTab } from './server/PlayersTab.js';
+import { OperatorTab } from './server/OperatorTab.js';
+import { WhitelistTab } from './server/WhitelistTab.js';
+import { PluginsTab } from './server/PluginsTab.js';
 import { SettingsTab } from './server/SettingsTab.js';
 import { FilesTab } from './server/FilesTab.js';
 import { BackupsTab } from './server/BackupsTab.js';
+import { ResourcesTab } from './server/ResourcesTab.js';
+import { UpdateTab } from './server/UpdateTab.js';
 import { api, ApiError } from '../api/client.js';
 import { useAuth } from '../state/AuthContext.js';
+import { PLUGIN_CAPABLE_LOADERS } from '../api/types.js';
 
 const PLATFORM_ICON: Record<string, string> = { java: '☕', bedrock: '🪨' };
-
-const TABS = [
-  { to: 'console', label: 'Console' },
-  { to: 'players', label: 'Players' },
-  { to: 'settings', label: 'Settings' },
-  { to: 'files', label: 'Files' },
-  { to: 'backups', label: 'Backups' },
-];
 
 function ServerPageInner() {
   const { server, running } = useServerDetail();
@@ -41,6 +39,19 @@ function ServerPageInner() {
       toast.error(err instanceof ApiError ? err.message : 'Failed to delete server');
     }
   }
+
+  const tabs = [
+    { to: 'console', label: 'Console' },
+    { to: 'players', label: 'Players' },
+    { to: 'operator', label: 'Operator' },
+    { to: 'whitelist', label: 'Whitelist' },
+    ...(server && PLUGIN_CAPABLE_LOADERS.includes(server.loader) ? [{ to: 'plugins', label: 'Plugins' }] : []),
+    { to: 'settings', label: 'Settings' },
+    { to: 'files', label: 'Files' },
+    { to: 'backups', label: 'Backups' },
+    { to: 'resources', label: 'Resources' },
+    { to: 'update', label: 'Update' },
+  ];
 
   if (!server) {
     return (
@@ -82,8 +93,8 @@ function ServerPageInner() {
           <p className="mb-3 text-xs text-slate-400">
             {server.platform === 'java' ? 'Java' : 'Bedrock'} · {server.loader} {server.version} · port {server.server_port}
           </p>
-          <nav className="relative flex gap-1">
-            {TABS.map((t) => (
+          <nav className="relative flex flex-wrap gap-1">
+            {tabs.map((t) => (
               <NavLink key={t.to} to={t.to} className="relative rounded-lg px-3 py-1.5 text-sm font-medium">
                 {({ isActive }) => (
                   <>
@@ -121,9 +132,14 @@ function ServerPageInner() {
             <Route index element={<Navigate to="console" replace />} />
             <Route path="console" element={<ConsoleTab />} />
             <Route path="players" element={<PlayersTab />} />
+            <Route path="operator" element={<OperatorTab />} />
+            <Route path="whitelist" element={<WhitelistTab />} />
+            {PLUGIN_CAPABLE_LOADERS.includes(server.loader) && <Route path="plugins" element={<PluginsTab />} />}
             <Route path="settings" element={<SettingsTab />} />
             <Route path="files" element={<FilesTab />} />
             <Route path="backups" element={<BackupsTab />} />
+            <Route path="resources" element={<ResourcesTab />} />
+            <Route path="update" element={<UpdateTab />} />
           </Routes>
         </motion.div>
       </div>

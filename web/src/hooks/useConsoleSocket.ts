@@ -14,21 +14,28 @@ export interface Stats {
   cpuPercent: number | null;
 }
 
+export interface StatsSample extends Stats {
+  t: number;
+}
+
 interface ConsoleState {
   lines: LogLine[];
   status: ServerStatus | null;
   stats: Stats;
+  statsHistory: StatsSample[];
   connected: boolean;
   installProgress: { pct: number; message: string } | null;
 }
 
 const MAX_LINES = 4000;
+const MAX_STATS_SAMPLES = 150; // ~10 minutes at the 4s server-side poll interval
 let counter = 0;
 
 export function useConsoleSocket(serverId: string | undefined): ConsoleState {
   const [lines, setLines] = useState<LogLine[]>([]);
   const [status, setStatus] = useState<ServerStatus | null>(null);
   const [stats, setStats] = useState<Stats>({ memoryMb: null, cpuPercent: null });
+  const [statsHistory, setStatsHistory] = useState<StatsSample[]>([]);
   const [connected, setConnected] = useState(false);
   const [installProgress, setInstallProgress] = useState<{ pct: number; message: string } | null>(null);
   const socketRef = useRef<WebSocket | null>(null);
@@ -65,7 +72,12 @@ export function useConsoleSocket(serverId: string | undefined): ConsoleState {
           setStatus(msg.status);
           if (msg.status !== 'installing') setInstallProgress(null);
         } else if (msg.type === 'stats') {
-          setStats({ memoryMb: msg.memoryMb, cpuPercent: msg.cpuPercent });
+          const sample: Stats = { memoryMb: msg.memoryMb, cpuPercent: msg.cpuPercent };
+          setStats(sample);
+          setStatsHistory((prev) => {
+            const next = [...prev, { ...sample, t: Date.now() }];
+            return next.length > MAX_STATS_SAMPLES ? next.slice(next.length - MAX_STATS_SAMPLES) : next;
+          });
         } else if (msg.type === 'install_progress') {
           setInstallProgress({ pct: msg.pct, message: msg.message });
         }
@@ -80,5 +92,5 @@ export function useConsoleSocket(serverId: string | undefined): ConsoleState {
     };
   }, [serverId]);
 
-  return { lines, status, stats, connected, installProgress };
+  return { lines, status, stats, statsHistory, connected, installProgress };
 }

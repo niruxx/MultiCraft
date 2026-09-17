@@ -9,6 +9,7 @@ const TONE: Record<ServerStatus, 'neutral' | 'green' | 'red' | 'yellow' | 'blue'
   running: 'green',
   stopping: 'yellow',
   crashed: 'red',
+  updating: 'blue',
 };
 
 const LABEL: Record<ServerStatus, string> = {
@@ -19,6 +20,7 @@ const LABEL: Record<ServerStatus, string> = {
   running: 'Running',
   stopping: 'Stopping',
   crashed: 'Crashed',
+  updating: 'Updating',
 };
 
 const PULSE: Record<ServerStatus, boolean> = {
@@ -29,6 +31,7 @@ const PULSE: Record<ServerStatus, boolean> = {
   running: true,
   stopping: true,
   crashed: false,
+  updating: true,
 };
 
 export function StatusBadge({ status }: { status: ServerStatus }) {

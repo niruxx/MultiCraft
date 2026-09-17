@@ -9,7 +9,9 @@ export interface PublicUser {
 }
 
 export type Platform = 'java' | 'bedrock';
-export type Loader = 'vanilla' | 'paper' | 'purpur' | 'bedrock';
+export type Loader = 'vanilla' | 'paper' | 'purpur' | 'spigot' | 'bedrock';
+
+export const PLUGIN_CAPABLE_LOADERS: Loader[] = ['paper', 'purpur', 'spigot'];
 
 export type ServerStatus =
   | 'installing'
@@ -18,7 +20,8 @@ export type ServerStatus =
   | 'starting'
   | 'running'
   | 'stopping'
-  | 'crashed';
+  | 'crashed'
+  | 'updating';
 
 export interface ServerRecord {
   id: string;
@@ -92,4 +95,52 @@ export interface SystemInfo {
   hostname: string;
   nodeVersion: string;
   java: { available: boolean; version: string | null };
+}
+
+export interface WhitelistState {
+  enabled: boolean;
+  players: string[];
+  running: boolean;
+}
+
+export interface InstalledPlugin {
+  fileName: string;
+  displayName: string;
+  enabled: boolean;
+  sizeBytes: number;
+  modifiedAt: string;
+}
+
+export interface PluginSearchResult {
+  slug: string;
+  title: string;
+  description: string;
+  iconUrl: string | null;
+  downloads: number;
+  author: string;
+  categories: string[];
+}
+
+export interface ResolvedPluginVersion {
+  versionNumber: string;
+  fileName: string;
+  downloadUrl: string;
+  sizeBytes: number;
+  versionMismatchWarning: boolean;
+}
+
+export interface ResourcesInfo {
+  runtime: RuntimeInfo | null;
+  running: boolean;
+  disk: { serverBytes: number; backupsBytes: number };
+  host: { totalMemMb: number; freeMemMb: number; cpuCores: number; loadAvg: number | null };
+}
+
+export interface UpdateCheckResult {
+  currentVersion: string;
+  currentBuild: string | null;
+  latestVersion: string | null;
+  latestBuild: string | null;
+  updateAvailable: boolean;
+  note?: string;
 }

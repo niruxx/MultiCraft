@@ -1,6 +1,7 @@
 import { Router, type Request } from 'express';
 import { asyncHandler, HttpError } from '../utils/asyncHandler.js';
 import { requireAuth, requireRole, requireServerAccess } from '../auth/middleware.js';
+import os from 'node:os';
 import {
   createServerRecord,
   deleteServerRecord,
@@ -8,9 +9,11 @@ import {
   listServers,
   setServerJar,
   setServerStatus,
+  setServerVersion,
   updateServerRecord,
 } from '../services/serverService.js';
 import { installServer, listAvailableVersions } from '../services/downloadService.js';
+import { checkForUpdate, performUpdate } from '../services/updateService.js';
 import { writeEula, readServerProperties, writeServerProperties } from '../services/propertiesService.js';
 import {
   getRuntimeInfo,
@@ -25,6 +28,7 @@ import { getUserServerAccess, logAudit } from '../services/userService.js';
 import { publish, consoleTopic } from '../services/wsHub.js';
 import { appendLine } from '../services/consoleLogService.js';
 import { findJava, getJavaVersion } from '../services/javaService.js';
+import { getDiskUsage } from '../services/diskUsageService.js';
 import { instanceDir } from '../utils/paths.js';
 import type { Loader, Platform, Role } from '../types/index.js';
 
@@ -311,5 +315,82 @@ serversRouter.put(
     writeServerProperties(server.id, server.platform, updates);
     logAudit(req.auth!.sub, req.auth!.username, 'server.properties.update', server.id);
     res.json({ properties: readServerProperties(server.id, server.platform) });
+  })
+);
+
+serversRouter.get(
+  '/:serverId/resources',
+  requireServerAccess(),
+  asyncHandler(async (req, res) => {
+    const server = getServer(req.params.serverId);
+    if (!server) throw new HttpError(404, 'Server not found');
+    const disk = getDiskUsage(server.id);
+    res.json({
+      runtime: getRuntimeInfo(server.id),
+      running: isRunning(server.id),
+      disk,
+      host: {
+        totalMemMb: Math.round(os.totalmem() / (1024 * 1024)),
+        freeMemMb: Math.round(os.freemem() / (1024 * 1024)),
+        cpuCores: os.cpus().length,
+        loadAvg: process.platform === 'win32' ? null : os.loadavg()[0],
+      },
+    });
+  })
+);
+
+serversRouter.get(
+  '/:serverId/update/check',
+  requireServerAccess(),
+  asyncHandler(async (req, res) => {
+    const server = getServer(req.params.serverId);
+    if (!server) throw new HttpError(404, 'Server not found');
+    try {
+      const result = await checkForUpdate(server);
+      res.json(result);
+    } catch (err) {
+      throw new HttpError(502, err instanceof Error ? err.message : 'Failed to check for updates');
+    }
+  })
+);
+
+serversRouter.post(
+  '/:serverId/update',
+  requireServerAccess(),
+  asyncHandler(async (req, res) => {
+    requireWrite(req);
+    const server = getServer(req.params.serverId);
+    if (!server) throw new HttpError(404, 'Server not found');
+    if (isRunning(server.id)) throw new HttpError(409, 'Stop the server before updating it');
+    if (server.status === 'installing' || server.status === 'updating') {
+      throw new HttpError(409, 'An install or update is already in progress');
+    }
+
+    const targetVersion = typeof req.body?.targetVersion === 'string' ? req.body.targetVersion : undefined;
+    setServerStatus(server.id, 'updating');
+    publish(consoleTopic(server.id), { type: 'status', status: 'updating' });
+    appendLine(server.id, `[MultiCraft] Update requested by ${req.auth!.username}`);
+    logAudit(req.auth!.sub, req.auth!.username, 'server.update', server.id, targetVersion ?? server.version);
+    res.status(202).json({ ok: true });
+
+    void (async () => {
+      try {
+        const result = await performUpdate(
+          server,
+          targetVersion,
+          (pct, message) => publish(consoleTopic(server.id), { type: 'install_progress', pct, message }),
+          (line) => appendLine(server.id, line)
+        );
+        setServerVersion(server.id, result.version, result.jarFile, result.build);
+        appendLine(server.id, '[MultiCraft] Update finished — server is ready to start');
+        setServerStatus(server.id, 'stopped');
+        publish(consoleTopic(server.id), { type: 'status', status: 'stopped' });
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        appendLine(server.id, `[MultiCraft] Update failed: ${message}`, 'stderr');
+        setServerStatus(server.id, 'stopped');
+        publish(consoleTopic(server.id), { type: 'status', status: 'stopped', error: message });
+      }
+    })();
   })
 );

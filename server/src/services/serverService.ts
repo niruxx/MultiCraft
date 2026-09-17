@@ -57,6 +57,16 @@ export function setServerJar(id: string, jarFile: string, build: string | null) 
   prep('UPDATE servers SET jar_file = ?, build = ? WHERE id = ?').run(jarFile, build, id);
 }
 
+/** Used after an in-place update, where the Minecraft version and/or jar/build may have changed. */
+export function setServerVersion(id: string, version: string, jarFile: string | null, build: string | null) {
+  prep('UPDATE servers SET version = ?, jar_file = COALESCE(?, jar_file), build = ? WHERE id = ?').run(
+    version,
+    jarFile,
+    build,
+    id
+  );
+}
+
 export interface UpdateServerInput {
   name?: string;
   minMemoryMb?: number;

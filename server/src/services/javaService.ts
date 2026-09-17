@@ -4,6 +4,7 @@ import { promisify } from 'node:util';
 const execFileAsync = promisify(execFile);
 
 let cachedJavaPath: string | null | undefined;
+let cachedJavacPath: string | null | undefined;
 
 /** Resolves a usable `java` executable: $JAVA_HOME first, then whatever is on PATH. Cached after first success. */
 export async function findJava(): Promise<string | null> {
@@ -29,6 +30,33 @@ export async function findJava(): Promise<string | null> {
     }
   }
   cachedJavaPath = null;
+  return null;
+}
+
+/** Resolves a usable `javac` executable — needed only for building Spigot from source via BuildTools. */
+export async function findJavac(): Promise<string | null> {
+  if (cachedJavacPath !== undefined) return cachedJavacPath;
+
+  const candidates: string[] = [];
+  if (process.env.JAVA_HOME) {
+    candidates.push(
+      process.platform === 'win32'
+        ? `${process.env.JAVA_HOME}\\bin\\javac.exe`
+        : `${process.env.JAVA_HOME}/bin/javac`
+    );
+  }
+  candidates.push('javac');
+
+  for (const candidate of candidates) {
+    try {
+      await execFileAsync(candidate, ['-version']);
+      cachedJavacPath = candidate;
+      return candidate;
+    } catch {
+      // try next candidate
+    }
+  }
+  cachedJavacPath = null;
   return null;
 }
 

@@ -13,6 +13,7 @@ export function SettingsTab() {
   const [extraJavaArgs, setExtraJavaArgs] = useState('');
   const [extraArgs, setExtraArgs] = useState('');
   const [autoStart, setAutoStart] = useState(false);
+  const [serverIp, setServerIp] = useState('');
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
   const [saved, setSaved] = useState(false);
@@ -26,6 +27,12 @@ export function SettingsTab() {
     setExtraJavaArgs(server.extra_java_args);
     setExtraArgs(server.extra_args);
     setAutoStart(!!server.auto_start);
+    if (server.platform === 'java') {
+      api
+        .get<{ properties: PropertyEntry[] }>(`/servers/${server.id}/properties`)
+        .then((res) => setServerIp(res.properties.find((p) => p.key === 'server-ip')?.value ?? ''))
+        .catch(() => {});
+    }
   }, [server]);
 
   async function saveGeneral() {
@@ -42,6 +49,9 @@ export function SettingsTab() {
         extraArgs,
         autoStart,
       });
+      if (server!.platform === 'java') {
+        await api.put(`/servers/${server!.id}/properties`, { updates: { 'server-ip': serverIp } });
+      }
       await refresh();
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
@@ -65,6 +75,16 @@ export function SettingsTab() {
           <Field label="Port">
             <Input type="number" value={serverPort} onChange={(e) => setServerPort(Number(e.target.value))} disabled={!canWrite} />
           </Field>
+          {server.platform === 'java' && (
+            <Field label="Bind IP address (server-ip)">
+              <Input
+                value={serverIp}
+                onChange={(e) => setServerIp(e.target.value)}
+                disabled={!canWrite}
+                placeholder="0.0.0.0 (all interfaces)"
+              />
+            </Field>
+          )}
           <Field label="Min memory (MB)">
             <Input type="number" value={minMemoryMb} onChange={(e) => setMinMemoryMb(Number(e.target.value))} disabled={!canWrite} />
           </Field>
