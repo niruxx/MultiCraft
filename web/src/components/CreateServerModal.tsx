@@ -46,8 +46,6 @@ export function CreateServerModal({ open, onClose, onCreated }: { open: boolean;
     setLoader(LOADERS_BY_PLATFORM[platform][0].value);
   }, [platform]);
 
-  if (!open) return null;
-
   async function submit() {
     setError('');
     if (!name.trim()) return setError('Server name is required');

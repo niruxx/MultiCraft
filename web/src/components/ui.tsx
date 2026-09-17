@@ -1,26 +1,43 @@
+import { AnimatePresence, motion } from 'framer-motion';
 import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, SelectHTMLAttributes } from 'react';
+
+const springy = { type: 'spring' as const, stiffness: 420, damping: 32 };
 
 export function Button({
   variant = 'default',
   className = '',
+  children,
+  disabled,
   ...props
 }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'default' | 'primary' | 'danger' | 'ghost' }) {
   const base =
-    'inline-flex items-center justify-center gap-1.5 rounded-md text-sm font-medium px-3 py-1.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed';
+    'relative inline-flex items-center justify-center gap-1.5 rounded-lg text-sm font-medium px-3.5 py-1.5 transition-colors duration-150 disabled:opacity-40 disabled:cursor-not-allowed select-none';
   const variants: Record<string, string> = {
-    default: 'bg-surface-700 hover:bg-surface-600 text-slate-100',
-    primary: 'bg-accent-600 hover:bg-accent-500 text-surface-950 font-semibold',
+    default: 'bg-surface-800 hover:bg-surface-700 text-slate-100 shadow-inner-border',
+    primary:
+      'bg-gradient-to-br from-accent-400 to-accent-600 text-surface-950 font-semibold shadow-glow hover:shadow-glow-lg',
     danger: 'bg-red-600/90 hover:bg-red-500 text-white',
     ghost: 'bg-transparent hover:bg-surface-800 text-slate-300',
   };
-  return <button className={`${base} ${variants[variant]} ${className}`} {...props} />;
+  return (
+    <motion.button
+      whileHover={disabled ? undefined : { y: -1 }}
+      whileTap={disabled ? undefined : { scale: 0.96 }}
+      transition={springy}
+      className={`${base} ${variants[variant]} ${className}`}
+      disabled={disabled}
+      {...(props as any)}
+    >
+      {children}
+    </motion.button>
+  );
 }
 
 export function Input(props: InputHTMLAttributes<HTMLInputElement>) {
   return (
     <input
       {...props}
-      className={`w-full rounded-md bg-surface-800 border border-surface-600 px-3 py-1.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-accent-600/60 ${props.className ?? ''}`}
+      className={`w-full rounded-lg bg-surface-800/80 border border-surface-600 px-3 py-1.5 text-sm text-slate-100 placeholder-slate-500 outline-none transition-all duration-150 focus:border-accent-500/60 focus:ring-2 focus:ring-accent-500/25 hover:border-surface-500 ${props.className ?? ''}`}
     />
   );
 }
@@ -29,52 +46,113 @@ export function Select(props: SelectHTMLAttributes<HTMLSelectElement>) {
   return (
     <select
       {...props}
-      className={`w-full rounded-md bg-surface-800 border border-surface-600 px-3 py-1.5 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-accent-600/60 ${props.className ?? ''}`}
+      className={`w-full rounded-lg bg-surface-800/80 border border-surface-600 px-3 py-1.5 text-sm text-slate-100 outline-none transition-all duration-150 focus:border-accent-500/60 focus:ring-2 focus:ring-accent-500/25 hover:border-surface-500 ${props.className ?? ''}`}
     />
   );
 }
 
-export function Card({ children, className = '' }: { children: ReactNode; className?: string }) {
-  return <div className={`rounded-lg border border-surface-700 bg-surface-900 ${className}`}>{children}</div>;
+export function Card({
+  children,
+  className = '',
+  hover = false,
+  glass = true,
+}: {
+  children: ReactNode;
+  className?: string;
+  hover?: boolean;
+  glass?: boolean;
+}) {
+  return (
+    <motion.div
+      whileHover={hover ? { y: -2, transition: springy } : undefined}
+      className={`rounded-xl border border-surface-700/80 shadow-card ${glass ? 'glass' : 'bg-surface-900'} ${className}`}
+    >
+      {children}
+    </motion.div>
+  );
 }
 
-export function Badge({ children, tone = 'neutral' }: { children: ReactNode; tone?: 'neutral' | 'green' | 'red' | 'yellow' | 'blue' }) {
-  const tones: Record<string, string> = {
-    neutral: 'bg-surface-700 text-slate-300',
-    green: 'bg-accent-600/20 text-accent-500',
-    red: 'bg-red-600/20 text-red-400',
-    yellow: 'bg-yellow-500/20 text-yellow-400',
-    blue: 'bg-sky-500/20 text-sky-400',
+const BADGE_TONES: Record<string, string> = {
+  neutral: 'bg-surface-700/80 text-slate-300',
+  green: 'bg-accent-500/15 text-accent-400 ring-1 ring-inset ring-accent-500/25',
+  red: 'bg-red-500/15 text-red-400 ring-1 ring-inset ring-red-500/25',
+  yellow: 'bg-yellow-500/15 text-yellow-400 ring-1 ring-inset ring-yellow-500/25',
+  blue: 'bg-sky-500/15 text-sky-400 ring-1 ring-inset ring-sky-500/25',
+};
+
+export function Badge({
+  children,
+  tone = 'neutral',
+  pulse = false,
+}: {
+  children: ReactNode;
+  tone?: 'neutral' | 'green' | 'red' | 'yellow' | 'blue';
+  pulse?: boolean;
+}) {
+  const dotColor: Record<string, string> = {
+    neutral: 'bg-slate-400',
+    green: 'bg-accent-400',
+    red: 'bg-red-400',
+    yellow: 'bg-yellow-400',
+    blue: 'bg-sky-400',
   };
-  return <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${tones[tone]}`}>{children}</span>;
+  return (
+    <span className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium ${BADGE_TONES[tone]}`}>
+      {pulse && (
+        <span className="relative flex h-1.5 w-1.5">
+          <span className={`absolute inline-flex h-full w-full animate-ping-slow rounded-full ${dotColor[tone]}`} />
+          <span className={`relative inline-flex h-1.5 w-1.5 rounded-full ${dotColor[tone]}`} />
+        </span>
+      )}
+      {children}
+    </span>
+  );
 }
 
 export function Spinner({ className = 'h-4 w-4' }: { className?: string }) {
   return (
     <svg className={`animate-spin text-current ${className}`} viewBox="0 0 24 24" fill="none">
-      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+      <circle className="opacity-20" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+      <path className="opacity-90" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
     </svg>
   );
 }
 
+export function Skeleton({ className = 'h-4 w-full' }: { className?: string }) {
+  return <div className={`skeleton ${className}`} />;
+}
+
 export function Modal({ open, onClose, title, children }: { open: boolean; onClose: () => void; title: string; children: ReactNode }) {
-  if (!open) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={onClose}>
-      <div
-        className="w-full max-w-lg rounded-lg border border-surface-700 bg-surface-900 shadow-xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between border-b border-surface-700 px-4 py-3">
-          <h3 className="text-sm font-semibold text-slate-100">{title}</h3>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-200">
-            ✕
-          </button>
-        </div>
-        <div className="p-4">{children}</div>
-      </div>
-    </div>
+    <AnimatePresence>
+      {open && (
+        <motion.div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.18 }}
+          onClick={onClose}
+        >
+          <motion.div
+            className="glass w-full max-w-lg rounded-xl border border-surface-700/80 shadow-card"
+            initial={{ opacity: 0, scale: 0.95, y: 12 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.96, y: 8 }}
+            transition={springy}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-surface-700/80 px-4 py-3">
+              <h3 className="text-sm font-semibold text-slate-100">{title}</h3>
+              <button onClick={onClose} className="rounded-md p-1 text-slate-400 transition-colors hover:bg-surface-800 hover:text-slate-200">
+                ✕
+              </button>
+            </div>
+            <div className="p-4">{children}</div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }
 
@@ -88,6 +166,28 @@ export function Field({ label, children }: { label: string; children: ReactNode 
 }
 
 export function ErrorText({ children }: { children: ReactNode }) {
-  if (!children) return null;
-  return <p className="rounded-md bg-red-500/10 border border-red-500/30 px-3 py-2 text-sm text-red-400">{children}</p>;
+  return (
+    <AnimatePresence>
+      {Boolean(children) && (
+        <motion.p
+          initial={{ opacity: 0, height: 0 }}
+          animate={{ opacity: 1, height: 'auto' }}
+          exit={{ opacity: 0, height: 0 }}
+          className="overflow-hidden rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-400"
+        >
+          {children}
+        </motion.p>
+      )}
+    </AnimatePresence>
+  );
 }
+
+export const fadeInUp = {
+  initial: { opacity: 0, y: 10 },
+  animate: { opacity: 1, y: 0 },
+  exit: { opacity: 0, y: -6 },
+};
+
+export const staggerContainer = {
+  animate: { transition: { staggerChildren: 0.045 } },
+};

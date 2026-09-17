@@ -1,17 +1,20 @@
 import { useEffect, useState } from 'react';
+import { motion } from 'framer-motion';
 import { Layout } from '../components/Layout.js';
 import { Badge, Button, Card, ErrorText, Field, Input, Modal, Select } from '../components/ui.js';
+import { useToast } from '../components/Toast.js';
 import { api, ApiError } from '../api/client.js';
 import type { PublicUser, Role, ServerRecord } from '../api/types.js';
 import { useAuth } from '../state/AuthContext.js';
 
 export function UsersPage() {
   const { user: me } = useAuth();
+  const toast = useToast();
   const [users, setUsers] = useState<PublicUser[] | null>(null);
   const [servers, setServers] = useState<ServerRecord[]>([]);
-  const [error, setError] = useState('');
   const [createOpen, setCreateOpen] = useState(false);
-  const [editing, setEditing] = useState<PublicUser | null>(null);
+  const [editingUser, setEditingUser] = useState<PublicUser | null>(null);
+  const [editOpen, setEditOpen] = useState(false);
 
   async function load() {
     try {
@@ -22,28 +25,34 @@ export function UsersPage() {
       setUsers(usersRes.users);
       setServers(serversRes.servers);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Failed to load users');
+      toast.error(err instanceof ApiError ? err.message : 'Failed to load users');
     }
   }
 
   useEffect(() => {
     load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function deleteUser(user: PublicUser) {
     if (!window.confirm(`Delete user "${user.username}"?`)) return;
     try {
       await api.delete(`/users/${user.id}`);
+      toast.success(`Deleted "${user.username}"`);
       await load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Failed to delete user');
+      toast.error(err instanceof ApiError ? err.message : 'Failed to delete user');
     }
   }
 
   return (
     <Layout>
       <div className="mx-auto max-w-3xl px-6 py-8">
-        <div className="mb-6 flex items-center justify-between">
+        <motion.div
+          initial={{ opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-6 flex items-center justify-between"
+        >
           <div>
             <h1 className="text-2xl font-bold text-white">Users</h1>
             <p className="text-sm text-slate-400">Manage panel accounts and per-server access.</p>
@@ -51,16 +60,18 @@ export function UsersPage() {
           <Button variant="primary" onClick={() => setCreateOpen(true)}>
             + New user
           </Button>
-        </div>
-
-        <ErrorText>{error}</ErrorText>
+        </motion.div>
 
         {users === null ? (
           <p className="text-sm text-slate-500">Loading…</p>
         ) : (
           <Card className="divide-y divide-surface-800">
-            {users.map((u) => (
-              <div key={u.id} className="flex items-center gap-3 px-4 py-3">
+            {users.map((u, i) => (
+              <div
+                key={u.id}
+                style={{ animationDelay: `${Math.min(i, 20) * 18}ms` }}
+                className="animate-fade-in-up flex items-center gap-3 px-4 py-3"
+              >
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
                     <span className="font-medium text-slate-100">{u.username}</span>
@@ -74,7 +85,14 @@ export function UsersPage() {
                     </p>
                   )}
                 </div>
-                <Button onClick={() => setEditing(u)}>Edit</Button>
+                <Button
+                  onClick={() => {
+                    setEditingUser(u);
+                    setEditOpen(true);
+                  }}
+                >
+                  Edit
+                </Button>
                 {u.id !== me?.id && (
                   <Button variant="danger" onClick={() => deleteUser(u)}>
                     Delete
@@ -87,25 +105,31 @@ export function UsersPage() {
       </div>
 
       <CreateUserModal open={createOpen} onClose={() => setCreateOpen(false)} onSaved={load} />
-      {editing && <EditUserModal user={editing} servers={servers} onClose={() => setEditing(null)} onSaved={load} />}
+      <EditUserModal
+        open={editOpen}
+        user={editingUser}
+        servers={servers}
+        onClose={() => setEditOpen(false)}
+        onSaved={load}
+      />
     </Layout>
   );
 }
 
 function CreateUserModal({ open, onClose, onSaved }: { open: boolean; onClose: () => void; onSaved: () => void }) {
+  const toast = useToast();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [role, setRole] = useState<Role>('viewer');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  if (!open) return null;
-
   async function submit() {
     setError('');
     setSubmitting(true);
     try {
       await api.post('/users', { username, password, role });
+      toast.success(`Created user "${username}"`);
       onSaved();
       onClose();
       setUsername('');
@@ -149,23 +173,36 @@ function CreateUserModal({ open, onClose, onSaved }: { open: boolean; onClose: (
 }
 
 function EditUserModal({
+  open,
   user,
   servers,
   onClose,
   onSaved,
 }: {
-  user: PublicUser;
+  open: boolean;
+  user: PublicUser | null;
   servers: ServerRecord[];
   onClose: () => void;
   onSaved: () => void;
 }) {
-  const [role, setRole] = useState<Role>(user.role);
+  const toast = useToast();
+  const [role, setRole] = useState<Role>('viewer');
   const [password, setPassword] = useState('');
-  const [access, setAccess] = useState<string[]>(user.serverAccess ?? []);
+  const [access, setAccess] = useState<string[]>([]);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
+  // Re-sync local form state whenever a (possibly different) user is opened for editing.
+  useEffect(() => {
+    if (!user) return;
+    setRole(user.role);
+    setPassword('');
+    setAccess(user.serverAccess ?? []);
+    setError('');
+  }, [user]);
+
   async function submit() {
+    if (!user) return;
     setError('');
     setSubmitting(true);
     try {
@@ -174,6 +211,7 @@ function EditUserModal({
         password: password || undefined,
         serverAccess: access,
       });
+      toast.success(`Updated "${user.username}"`);
       onSaved();
       onClose();
     } catch (err) {
@@ -184,7 +222,7 @@ function EditUserModal({
   }
 
   return (
-    <Modal open onClose={onClose} title={`Edit ${user.username}`}>
+    <Modal open={open} onClose={onClose} title={user ? `Edit ${user.username}` : 'Edit user'}>
       <div className="space-y-4">
         <Field label="Role">
           <Select value={role} onChange={(e) => setRole(e.target.value as Role)}>

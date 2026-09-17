@@ -1,7 +1,9 @@
-import { NavLink, Navigate, Route, Routes, useNavigate } from 'react-router-dom';
+import { NavLink, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import { Layout } from '../components/Layout.js';
 import { StatusBadge } from '../components/StatusBadge.js';
 import { Button } from '../components/ui.js';
+import { useToast } from '../components/Toast.js';
 import { ServerDetailProvider, useServerDetail } from './server/ServerContext.js';
 import { ConsoleTab } from './server/ConsoleTab.js';
 import { PlayersTab } from './server/PlayersTab.js';
@@ -10,6 +12,8 @@ import { FilesTab } from './server/FilesTab.js';
 import { BackupsTab } from './server/BackupsTab.js';
 import { api, ApiError } from '../api/client.js';
 import { useAuth } from '../state/AuthContext.js';
+
+const PLATFORM_ICON: Record<string, string> = { java: '☕', bedrock: '🪨' };
 
 const TABS = [
   { to: 'console', label: 'Console' },
@@ -23,22 +27,31 @@ function ServerPageInner() {
   const { server, running } = useServerDetail();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const toast = useToast();
+  const location = useLocation();
 
   async function deleteServer() {
     if (!server) return;
     if (!window.confirm(`Permanently delete "${server.name}"? All server files and backups will be removed.`)) return;
     try {
       await api.delete(`/servers/${server.id}`);
+      toast.success(`Deleted "${server.name}"`);
       navigate('/');
     } catch (err) {
-      window.alert(err instanceof ApiError ? err.message : 'Failed to delete server');
+      toast.error(err instanceof ApiError ? err.message : 'Failed to delete server');
     }
   }
 
   if (!server) {
     return (
       <Layout>
-        <div className="px-6 py-8 text-sm text-slate-500">Loading server…</div>
+        <div className="flex h-screen items-center justify-center">
+          <motion.div
+            className="h-8 w-8 rounded-lg bg-brand-gradient bg-[length:200%_auto] shadow-glow"
+            animate={{ backgroundPosition: ['0% 50%', '100% 50%', '0% 50%'] }}
+            transition={{ duration: 1.4, repeat: Infinity, ease: 'easeInOut' }}
+          />
+        </div>
       </Layout>
     );
   }
@@ -46,11 +59,18 @@ function ServerPageInner() {
   return (
     <Layout>
       <div className="flex h-screen flex-col">
-        <div className="border-b border-surface-700 px-6 py-4">
+        <motion.div
+          initial={{ opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="glass border-b border-surface-700/80 px-6 py-4"
+        >
           <div className="mb-1 flex items-center gap-3">
             <Button variant="ghost" className="!px-2" onClick={() => navigate('/')}>
               ←
             </Button>
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-surface-800 text-base ring-1 ring-inset ring-surface-700">
+              {PLATFORM_ICON[server.platform]}
+            </div>
             <h1 className="text-lg font-bold text-white">{server.name}</h1>
             <StatusBadge status={server.status} />
             {user?.role === 'admin' && (
@@ -62,23 +82,41 @@ function ServerPageInner() {
           <p className="mb-3 text-xs text-slate-400">
             {server.platform === 'java' ? 'Java' : 'Bedrock'} · {server.loader} {server.version} · port {server.server_port}
           </p>
-          <nav className="flex gap-1">
+          <nav className="relative flex gap-1">
             {TABS.map((t) => (
-              <NavLink
-                key={t.to}
-                to={t.to}
-                className={({ isActive }) =>
-                  `rounded-t-md px-3 py-1.5 text-sm font-medium ${
-                    isActive ? 'bg-surface-800 text-accent-500' : 'text-slate-400 hover:text-slate-200'
-                  }`
-                }
-              >
-                {t.label}
+              <NavLink key={t.to} to={t.to} className="relative rounded-lg px-3 py-1.5 text-sm font-medium">
+                {({ isActive }) => (
+                  <>
+                    {isActive && (
+                      <motion.span
+                        layoutId="server-tab-active"
+                        className="absolute inset-0 rounded-lg bg-surface-800"
+                        transition={{ type: 'spring', stiffness: 500, damping: 38 }}
+                      />
+                    )}
+                    <span className={`relative z-10 ${isActive ? 'text-accent-400' : 'text-slate-400 hover:text-slate-200'}`}>
+                      {t.label}
+                    </span>
+                    {isActive && (
+                      <motion.span
+                        layoutId="server-tab-underline"
+                        className="absolute -bottom-[13px] left-2 right-2 h-0.5 rounded-full bg-accent-500"
+                        transition={{ type: 'spring', stiffness: 500, damping: 38 }}
+                      />
+                    )}
+                  </>
+                )}
               </NavLink>
             ))}
           </nav>
-        </div>
-        <div className="flex-1 overflow-y-auto bg-surface-950 px-6 py-5">
+        </motion.div>
+        <motion.div
+          key={location.pathname}
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.25 }}
+          className="flex-1 overflow-y-auto bg-surface-950 px-6 py-5"
+        >
           <Routes>
             <Route index element={<Navigate to="console" replace />} />
             <Route path="console" element={<ConsoleTab />} />
@@ -87,7 +125,7 @@ function ServerPageInner() {
             <Route path="files" element={<FilesTab />} />
             <Route path="backups" element={<BackupsTab />} />
           </Routes>
-        </div>
+        </motion.div>
       </div>
     </Layout>
   );

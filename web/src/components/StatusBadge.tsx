@@ -21,6 +21,20 @@ const LABEL: Record<ServerStatus, string> = {
   crashed: 'Crashed',
 };
 
+const PULSE: Record<ServerStatus, boolean> = {
+  installing: true,
+  install_failed: false,
+  stopped: false,
+  starting: true,
+  running: true,
+  stopping: true,
+  crashed: false,
+};
+
 export function StatusBadge({ status }: { status: ServerStatus }) {
-  return <Badge tone={TONE[status]}>{LABEL[status]}</Badge>;
+  return (
+    <Badge tone={TONE[status]} pulse={PULSE[status]}>
+      {LABEL[status]}
+    </Badge>
+  );
 }

@@ -1,17 +1,22 @@
 import { Navigate, Route, BrowserRouter, Routes } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import { AuthProvider, useAuth } from './state/AuthContext.js';
+import { ToastProvider } from './components/Toast.js';
 import { LoginPage } from './pages/LoginPage.js';
 import { SetupPage } from './pages/SetupPage.js';
 import { DashboardPage } from './pages/DashboardPage.js';
 import { ServerPage } from './pages/ServerPage.js';
 import { UsersPage } from './pages/UsersPage.js';
-import { Spinner } from './components/ui.js';
 import type { ReactNode } from 'react';
 
 function FullScreenLoader() {
   return (
-    <div className="flex h-screen items-center justify-center bg-surface-950 text-slate-400">
-      <Spinner className="h-6 w-6" />
+    <div className="flex h-screen items-center justify-center bg-surface-950">
+      <motion.div
+        className="h-9 w-9 rounded-lg bg-brand-gradient bg-[length:200%_auto] shadow-glow-lg"
+        animate={{ backgroundPosition: ['0% 50%', '100% 50%', '0% 50%'], rotate: [0, 6, -6, 0] }}
+        transition={{ duration: 1.6, repeat: Infinity, ease: 'easeInOut' }}
+      />
     </div>
   );
 }
@@ -73,7 +78,9 @@ export default function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <AppRoutes />
+        <ToastProvider>
+          <AppRoutes />
+        </ToastProvider>
       </AuthProvider>
     </BrowserRouter>
   );

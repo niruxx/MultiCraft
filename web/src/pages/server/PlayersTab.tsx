@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
 import { useServerDetail } from './ServerContext.js';
 import { api, ApiError } from '../../api/client.js';
 import type { PlayerInfo } from '../../api/types.js';
@@ -101,40 +102,50 @@ function PlayerTable({
 }) {
   if (players.length === 0) return <p className="text-sm text-slate-500">Nothing to show.</p>;
   return (
-    <Card className="divide-y divide-surface-700">
-      {players.map((p) => (
-        <div key={p.name} className="flex flex-wrap items-center gap-3 px-4 py-3">
-          <span className="font-medium text-slate-100">{p.name}</span>
-          <div className="flex gap-1.5">
-            {p.online && <Badge tone="green">online</Badge>}
-            {p.op && <Badge tone="blue">op</Badge>}
-            {p.whitelisted && <Badge tone="neutral">whitelisted</Badge>}
-            {p.banned && <Badge tone="red">banned</Badge>}
-          </div>
-          {canWrite && (
-            <div className="ml-auto flex flex-wrap gap-1.5">
-              <Button disabled={!running} onClick={() => onAction(p.name, p.op ? 'deop' : 'op')}>
-                {p.op ? 'De-op' : 'Op'}
-              </Button>
-              <Button disabled={!running} onClick={() => onAction(p.name, p.whitelisted ? 'whitelist-remove' : 'whitelist-add')}>
-                {p.whitelisted ? 'Unwhitelist' : 'Whitelist'}
-              </Button>
-              {p.online && (
-                <Button disabled={!running} onClick={() => onAction(p.name, 'kick')}>
-                  Kick
-                </Button>
-              )}
-              <Button
-                variant="danger"
-                disabled={!running || busyKey === `${p.name}:${p.banned ? 'pardon' : 'ban'}`}
-                onClick={() => onAction(p.name, p.banned ? 'pardon' : 'ban')}
-              >
-                {p.banned ? 'Pardon' : 'Ban'}
-              </Button>
+    <Card className="divide-y divide-surface-700/80 overflow-hidden">
+      <AnimatePresence initial={false}>
+        {players.map((p) => (
+          <motion.div
+            key={p.name}
+            layout
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ type: 'spring', stiffness: 400, damping: 34 }}
+            className="flex flex-wrap items-center gap-3 px-4 py-3"
+          >
+            <span className="font-medium text-slate-100">{p.name}</span>
+            <div className="flex gap-1.5">
+              {p.online && <Badge tone="green" pulse>online</Badge>}
+              {p.op && <Badge tone="blue">op</Badge>}
+              {p.whitelisted && <Badge tone="neutral">whitelisted</Badge>}
+              {p.banned && <Badge tone="red">banned</Badge>}
             </div>
-          )}
-        </div>
-      ))}
+            {canWrite && (
+              <div className="ml-auto flex flex-wrap gap-1.5">
+                <Button disabled={!running} onClick={() => onAction(p.name, p.op ? 'deop' : 'op')}>
+                  {p.op ? 'De-op' : 'Op'}
+                </Button>
+                <Button disabled={!running} onClick={() => onAction(p.name, p.whitelisted ? 'whitelist-remove' : 'whitelist-add')}>
+                  {p.whitelisted ? 'Unwhitelist' : 'Whitelist'}
+                </Button>
+                {p.online && (
+                  <Button disabled={!running} onClick={() => onAction(p.name, 'kick')}>
+                    Kick
+                  </Button>
+                )}
+                <Button
+                  variant="danger"
+                  disabled={!running || busyKey === `${p.name}:${p.banned ? 'pardon' : 'ban'}`}
+                  onClick={() => onAction(p.name, p.banned ? 'pardon' : 'ban')}
+                >
+                  {p.banned ? 'Pardon' : 'Ban'}
+                </Button>
+              </div>
+            )}
+          </motion.div>
+        ))}
+      </AnimatePresence>
     </Card>
   );
 }

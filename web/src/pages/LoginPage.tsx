@@ -1,8 +1,9 @@
 import { useState, type FormEvent } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import { useAuth } from '../state/AuthContext.js';
 import { ApiError } from '../api/client.js';
-import { Button, Card, ErrorText, Field, Input } from '../components/ui.js';
+import { Button, ErrorText, Field, Input } from '../components/ui.js';
 
 export function LoginPage() {
   const { login, user, setupRequired } = useAuth();
@@ -31,11 +32,29 @@ export function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-surface-950 px-4">
-      <Card className="w-full max-w-sm p-6">
+    <div className="relative flex min-h-screen items-center justify-center px-4">
+      <div className="pointer-events-none fixed inset-0 overflow-hidden">
+        <div className="grid-backdrop absolute inset-0" />
+        <motion.div
+          className="absolute -top-24 left-1/3 h-72 w-72 rounded-full bg-accent-500/15 blur-[100px]"
+          animate={{ y: [0, 20, 0] }}
+          transition={{ duration: 7, repeat: Infinity, ease: 'easeInOut' }}
+        />
+      </div>
+      <motion.div
+        initial={{ opacity: 0, y: 16, scale: 0.98 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ type: 'spring', stiffness: 280, damping: 26 }}
+        className="glass relative z-10 w-full max-w-sm rounded-2xl border border-surface-700/80 p-7 shadow-card"
+      >
         <div className="mb-6 text-center">
-          <div className="mx-auto mb-3 h-10 w-10 rounded-lg bg-gradient-to-br from-accent-500 to-accent-600" />
+          <motion.div
+            className="mx-auto mb-3.5 h-11 w-11 rounded-xl bg-brand-gradient bg-[length:200%_auto] shadow-glow"
+            animate={{ backgroundPosition: ['0% 50%', '100% 50%', '0% 50%'] }}
+            transition={{ duration: 5, repeat: Infinity, ease: 'easeInOut' }}
+          />
           <h1 className="text-xl font-bold text-white">Sign in to MultiCraft</h1>
+          <p className="mt-1 text-sm text-slate-400">Manage your Minecraft servers.</p>
         </div>
         <form onSubmit={onSubmit} className="space-y-4">
           <Field label="Username">
@@ -45,11 +64,11 @@ export function LoginPage() {
             <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
           </Field>
           <ErrorText>{error}</ErrorText>
-          <Button type="submit" variant="primary" className="w-full" disabled={submitting}>
+          <Button type="submit" variant="primary" className="w-full py-2" disabled={submitting}>
             {submitting ? 'Signing in…' : 'Sign in'}
           </Button>
         </form>
-      </Card>
+      </motion.div>
     </div>
   );
 }

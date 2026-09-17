@@ -3,6 +3,7 @@ import { useServerDetail } from './ServerContext.js';
 import { api, ApiError, downloadUrl } from '../../api/client.js';
 import type { BackupInfo, BackupSchedule } from '../../api/types.js';
 import { Button, Card, ErrorText, Field, Input } from '../../components/ui.js';
+import { useToast } from '../../components/Toast.js';
 
 function formatSize(bytes: number): string {
   const mb = bytes / (1024 * 1024);
@@ -18,6 +19,7 @@ const PRESETS = [
 
 export function BackupsTab() {
   const { serverId, canWrite } = useServerDetail();
+  const toast = useToast();
   const [backups, setBackups] = useState<BackupInfo[] | null>(null);
   const [schedule, setSchedule] = useState<BackupSchedule | null>(null);
   const [cronExpression, setCronExpression] = useState('0 3 * * *');
@@ -69,7 +71,7 @@ export function BackupsTab() {
     setError('');
     try {
       await api.post(`/servers/${serverId}/backups/${encodeURIComponent(fileName)}/restore`);
-      window.alert('Backup restored.');
+      toast.success('Backup restored');
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Failed to restore backup');
     } finally {
@@ -136,8 +138,12 @@ export function BackupsTab() {
           <p className="text-sm text-slate-500">No backups yet.</p>
         ) : (
           <div className="divide-y divide-surface-800">
-            {backups.map((b) => (
-              <div key={b.fileName} className="flex flex-wrap items-center gap-3 py-2">
+            {backups.map((b, i) => (
+              <div
+                key={b.fileName}
+                style={{ animationDelay: `${Math.min(i, 20) * 18}ms` }}
+                className="animate-fade-in-up flex flex-wrap items-center gap-3 py-2"
+              >
                 <span className="flex-1 truncate font-mono text-sm text-slate-200">{b.fileName}</span>
                 <span className="text-xs text-slate-500">{formatSize(b.sizeBytes)}</span>
                 <span className="text-xs text-slate-500">{new Date(b.createdAt).toLocaleString()}</span>

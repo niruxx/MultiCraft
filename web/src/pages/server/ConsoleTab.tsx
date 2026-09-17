@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { motion } from 'framer-motion';
 import { useServerDetail } from './ServerContext.js';
 import { useConsoleSocket } from '../../hooks/useConsoleSocket.js';
 import { api, ApiError } from '../../api/client.js';
-import { Button, Card, Input } from '../../components/ui.js';
+import { Button, Card, ErrorText, Input, Spinner } from '../../components/ui.js';
 
 function lineColor(stream: string, line: string): string {
   if (stream === 'stderr') return 'text-red-400';
@@ -116,27 +117,42 @@ export function ConsoleTab() {
           </>
         )}
         <div className="ml-auto flex items-center gap-4 text-xs text-slate-400">
-          <span className={connected ? 'text-accent-500' : 'text-red-400'}>{connected ? '● live' : '○ reconnecting'}</span>
+          <span className="inline-flex items-center gap-1.5">
+            <span className="relative flex h-2 w-2">
+              {connected && (
+                <span className="absolute inline-flex h-full w-full animate-ping-slow rounded-full bg-accent-400" />
+              )}
+              <span className={`relative inline-flex h-2 w-2 rounded-full ${connected ? 'bg-accent-400' : 'bg-red-400'}`} />
+            </span>
+            <span className={connected ? 'text-accent-500' : 'text-red-400'}>{connected ? 'live' : 'reconnecting'}</span>
+          </span>
           {stats.memoryMb !== null && <span>RAM {stats.memoryMb} MB</span>}
           {stats.cpuPercent !== null && <span>CPU {stats.cpuPercent}%</span>}
         </div>
       </div>
 
-      {actionError && <p className="rounded-md bg-red-500/10 border border-red-500/30 px-3 py-2 text-sm text-red-400">{actionError}</p>}
+      <ErrorText>{actionError}</ErrorText>
 
       {installProgress && (
         <Card className="p-3">
           <div className="mb-1 flex justify-between text-xs text-slate-400">
-            <span>{installProgress.message}</span>
+            <span className="inline-flex items-center gap-1.5">
+              <Spinner className="h-3 w-3 text-accent-400" />
+              {installProgress.message}
+            </span>
             <span>{installProgress.pct}%</span>
           </div>
           <div className="h-2 overflow-hidden rounded-full bg-surface-700">
-            <div className="h-full bg-accent-600 transition-all" style={{ width: `${installProgress.pct}%` }} />
+            <motion.div
+              className="h-full bg-gradient-to-r from-accent-500 to-accent-400"
+              animate={{ width: `${installProgress.pct}%` }}
+              transition={{ type: 'spring', stiffness: 120, damping: 20 }}
+            />
           </div>
         </Card>
       )}
 
-      <Card className="flex-1 overflow-hidden">
+      <Card className="flex-1 overflow-hidden !bg-black/40">
         <div
           ref={scrollRef}
           onScroll={(e) => {
@@ -149,7 +165,7 @@ export function ConsoleTab() {
             <p className="text-slate-500">No console output yet.</p>
           ) : (
             lines.map((l) => (
-              <div key={l.id} className={`whitespace-pre-wrap break-all ${lineColor(l.stream, l.line)}`}>
+              <div key={l.id} className={`animate-fade-in whitespace-pre-wrap break-all ${lineColor(l.stream, l.line)}`}>
                 {l.line}
               </div>
             ))

@@ -189,8 +189,12 @@ export function FilesTab() {
         ) : entries.length === 0 ? (
           <p className="px-4 py-3 text-sm text-slate-500">This folder is empty.</p>
         ) : (
-          entries.map((entry) => (
-            <div key={entry.path} className="flex items-center gap-3 px-4 py-2 hover:bg-surface-800/50">
+          entries.map((entry, i) => (
+            <div
+              key={entry.path}
+              style={{ animationDelay: `${Math.min(i, 20) * 18}ms` }}
+              className="animate-fade-in-up flex items-center gap-3 px-4 py-2 transition-colors hover:bg-surface-800/50"
+            >
               <button
                 className="flex flex-1 items-center gap-2 truncate text-left text-sm"
                 onClick={() => (entry.isDirectory ? setPath(entry.path) : openFile(entry))}
