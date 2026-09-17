@@ -2,6 +2,7 @@ import { Navigate, Route, BrowserRouter, Routes } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { AuthProvider, useAuth } from './state/AuthContext.js';
 import { ToastProvider } from './components/Toast.js';
+import { ConfirmProvider } from './components/ConfirmDialog.js';
 import { LoginPage } from './pages/LoginPage.js';
 import { SetupPage } from './pages/SetupPage.js';
 import { DashboardPage } from './pages/DashboardPage.js';
@@ -13,7 +14,7 @@ function FullScreenLoader() {
   return (
     <div className="flex h-screen items-center justify-center bg-surface-950">
       <motion.div
-        className="h-9 w-9 rounded-lg bg-brand-gradient shadow-glow"
+        className="h-9 w-9 rounded-lg bg-accent-500 shadow-glow"
         animate={{ opacity: [1, 0.5, 1] }}
         transition={{ duration: 1.3, repeat: Infinity, ease: 'easeInOut' }}
       />
@@ -79,7 +80,9 @@ export default function App() {
     <BrowserRouter>
       <AuthProvider>
         <ToastProvider>
-          <AppRoutes />
+          <ConfirmProvider>
+            <AppRoutes />
+          </ConfirmProvider>
         </ToastProvider>
       </AuthProvider>
     </BrowserRouter>

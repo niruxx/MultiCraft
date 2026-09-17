@@ -3,6 +3,7 @@ import { useServerDetail } from './ServerContext.js';
 import { api, ApiError } from '../../api/client.js';
 import type { InstalledPlugin } from '../../api/types.js';
 import { useToast } from '../../components/Toast.js';
+import { useConfirm } from '../../components/ConfirmDialog.js';
 import { PluginSearchModal } from '../../components/PluginSearchModal.js';
 import { Badge, Button, Card } from '../../components/ui.js';
 
@@ -14,6 +15,7 @@ function formatSize(bytes: number): string {
 export function PluginsTab() {
   const { serverId, canWrite } = useServerDetail();
   const toast = useToast();
+  const confirm = useConfirm();
   const [plugins, setPlugins] = useState<InstalledPlugin[] | null>(null);
   const [browsing, setBrowsing] = useState(false);
   const [busyFile, setBusyFile] = useState<string | null>(null);
@@ -47,7 +49,13 @@ export function PluginsTab() {
   }
 
   async function remove(plugin: InstalledPlugin) {
-    if (!window.confirm(`Delete ${plugin.displayName}? This can't be undone.`)) return;
+    const ok = await confirm({
+      title: 'Delete plugin',
+      message: `Delete ${plugin.displayName}? This can't be undone.`,
+      confirmLabel: 'Delete',
+      tone: 'danger',
+    });
+    if (!ok) return;
     setBusyFile(plugin.fileName);
     try {
       await api.delete(`/servers/${serverId}/plugins/${encodeURIComponent(plugin.fileName)}`);

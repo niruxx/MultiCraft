@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { Layout } from '../components/Layout.js';
 import { Badge, Button, Card, ErrorText, Field, Input, Modal, Select } from '../components/ui.js';
 import { useToast } from '../components/Toast.js';
+import { useConfirm } from '../components/ConfirmDialog.js';
 import { EnvironmentBackupCard } from '../components/EnvironmentBackupCard.js';
 import { FactoryResetCard } from '../components/FactoryResetCard.js';
 import { api, ApiError } from '../api/client.js';
@@ -12,6 +13,7 @@ import { useAuth } from '../state/AuthContext.js';
 export function UsersPage() {
   const { user: me } = useAuth();
   const toast = useToast();
+  const confirm = useConfirm();
   const [users, setUsers] = useState<PublicUser[] | null>(null);
   const [servers, setServers] = useState<ServerRecord[]>([]);
   const [createOpen, setCreateOpen] = useState(false);
@@ -37,7 +39,13 @@ export function UsersPage() {
   }, []);
 
   async function deleteUser(user: PublicUser) {
-    if (!window.confirm(`Delete user "${user.username}"?`)) return;
+    const ok = await confirm({
+      title: 'Delete user',
+      message: `Delete user "${user.username}"? This cannot be undone.`,
+      confirmLabel: 'Delete user',
+      tone: 'danger',
+    });
+    if (!ok) return;
     try {
       await api.delete(`/users/${user.id}`);
       toast.success(`Deleted "${user.username}"`);

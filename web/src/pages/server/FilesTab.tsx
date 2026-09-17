@@ -3,6 +3,7 @@ import { useServerDetail } from './ServerContext.js';
 import { api, ApiError, downloadUrl } from '../../api/client.js';
 import type { FileEntry } from '../../api/types.js';
 import { Button, Card, ErrorText, Input } from '../../components/ui.js';
+import { useConfirm } from '../../components/ConfirmDialog.js';
 
 function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -20,6 +21,7 @@ const EDITABLE_EXT = /\.(txt|properties|json|yml|yaml|conf|cfg|toml|log|md|sh|ba
 
 export function FilesTab() {
   const { serverId, canWrite } = useServerDetail();
+  const confirm = useConfirm();
   const [path, setPath] = useState('');
   const [entries, setEntries] = useState<FileEntry[] | null>(null);
   const [error, setError] = useState('');
@@ -86,7 +88,13 @@ export function FilesTab() {
   }
 
   async function deleteEntry(entry: FileEntry) {
-    if (!window.confirm(`Delete ${entry.name}? This cannot be undone.`)) return;
+    const ok = await confirm({
+      title: entry.isDirectory ? 'Delete folder' : 'Delete file',
+      message: `Delete ${entry.name}? This cannot be undone.`,
+      confirmLabel: 'Delete',
+      tone: 'danger',
+    });
+    if (!ok) return;
     try {
       await api.delete(`/servers/${serverId}/files?path=${encodeURIComponent(entry.path)}`);
       await load(path);
@@ -128,8 +136,16 @@ export function FilesTab() {
         <div className="flex items-center gap-3">
           <Button
             variant="ghost"
-            onClick={() => {
-              if (editorDirty && !window.confirm('Discard unsaved changes?')) return;
+            onClick={async () => {
+              if (editorDirty) {
+                const ok = await confirm({
+                  title: 'Discard changes',
+                  message: 'Discard unsaved changes to this file?',
+                  confirmLabel: 'Discard',
+                  tone: 'danger',
+                });
+                if (!ok) return;
+              }
               setEditingPath(null);
             }}
           >

@@ -4,6 +4,7 @@ import { Layout } from '../components/Layout.js';
 import { StatusBadge } from '../components/StatusBadge.js';
 import { Button } from '../components/ui.js';
 import { useToast } from '../components/Toast.js';
+import { useConfirm } from '../components/ConfirmDialog.js';
 import { ServerDetailProvider, useServerDetail } from './server/ServerContext.js';
 import { ConsoleTab } from './server/ConsoleTab.js';
 import { PlayersTab } from './server/PlayersTab.js';
@@ -26,11 +27,18 @@ function ServerPageInner() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const toast = useToast();
+  const confirm = useConfirm();
   const location = useLocation();
 
   async function deleteServer() {
     if (!server) return;
-    if (!window.confirm(`Permanently delete "${server.name}"? All server files and backups will be removed.`)) return;
+    const ok = await confirm({
+      title: 'Delete server',
+      message: `Permanently delete "${server.name}"? All server files and backups will be removed. This cannot be undone.`,
+      confirmLabel: 'Delete server',
+      tone: 'danger',
+    });
+    if (!ok) return;
     try {
       await api.delete(`/servers/${server.id}`);
       toast.success(`Deleted "${server.name}"`);
@@ -58,7 +66,7 @@ function ServerPageInner() {
       <Layout>
         <div className="flex h-screen items-center justify-center">
           <motion.div
-            className="h-8 w-8 rounded-lg bg-brand-gradient shadow-glow"
+            className="h-8 w-8 rounded-lg bg-accent-500 shadow-glow"
             animate={{ opacity: [1, 0.5, 1] }}
             transition={{ duration: 1.3, repeat: Infinity, ease: 'easeInOut' }}
           />

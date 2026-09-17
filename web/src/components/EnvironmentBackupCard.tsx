@@ -1,10 +1,12 @@
 import { useRef, useState } from 'react';
 import { api, ApiError, downloadUrl } from '../api/client.js';
 import { useToast } from './Toast.js';
+import { useConfirm } from './ConfirmDialog.js';
 import { Button, Card, Spinner } from './ui.js';
 
 export function EnvironmentBackupCard() {
   const toast = useToast();
+  const confirm = useConfirm();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [exporting, setExporting] = useState(false);
   const [importing, setImporting] = useState(false);
@@ -27,11 +29,20 @@ export function EnvironmentBackupCard() {
   }
 
   async function importEnvironment(file: File) {
-    if (
-      !window.confirm(
-        `Import "${file.name}"? This REPLACES everything in this MultiCraft install — all users, servers, and backups — with what's in the archive. The current data is kept as a timestamped backup on disk, but every account (including yours) will be replaced. Continue?`
-      )
-    ) {
+    const ok = await confirm({
+      title: 'Import environment',
+      message: (
+        <>
+          Import <span className="font-mono text-slate-100">{file.name}</span>? This{' '}
+          <strong className="text-red-400">replaces everything</strong> in this MultiCraft install — all users,
+          servers, and backups — with what's in the archive. The current data is kept as a timestamped backup on
+          disk, but every account (including yours) will be replaced.
+        </>
+      ),
+      confirmLabel: 'Import & replace everything',
+      tone: 'danger',
+    });
+    if (!ok) {
       if (fileInputRef.current) fileInputRef.current.value = '';
       return;
     }

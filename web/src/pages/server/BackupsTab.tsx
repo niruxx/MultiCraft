@@ -4,6 +4,7 @@ import { api, ApiError, downloadUrl } from '../../api/client.js';
 import type { BackupInfo, BackupSchedule } from '../../api/types.js';
 import { Button, Card, ErrorText, Field, Input } from '../../components/ui.js';
 import { useToast } from '../../components/Toast.js';
+import { useConfirm } from '../../components/ConfirmDialog.js';
 
 function formatSize(bytes: number): string {
   const mb = bytes / (1024 * 1024);
@@ -20,6 +21,7 @@ const PRESETS = [
 export function BackupsTab() {
   const { serverId, canWrite } = useServerDetail();
   const toast = useToast();
+  const confirm = useConfirm();
   const [backups, setBackups] = useState<BackupInfo[] | null>(null);
   const [schedule, setSchedule] = useState<BackupSchedule | null>(null);
   const [cronExpression, setCronExpression] = useState('0 3 * * *');
@@ -66,7 +68,13 @@ export function BackupsTab() {
   }
 
   async function restoreBackup(fileName: string) {
-    if (!window.confirm(`Restore "${fileName}"? This will replace all current server files. The server must be stopped.`)) return;
+    const ok = await confirm({
+      title: 'Restore backup',
+      message: `Restore "${fileName}"? This replaces all current server files. The server must be stopped.`,
+      confirmLabel: 'Restore',
+      tone: 'danger',
+    });
+    if (!ok) return;
     setBusyFile(fileName);
     setError('');
     try {
@@ -80,7 +88,13 @@ export function BackupsTab() {
   }
 
   async function deleteBackup(fileName: string) {
-    if (!window.confirm(`Delete backup "${fileName}"?`)) return;
+    const ok = await confirm({
+      title: 'Delete backup',
+      message: `Delete backup "${fileName}"? This cannot be undone.`,
+      confirmLabel: 'Delete',
+      tone: 'danger',
+    });
+    if (!ok) return;
     setBusyFile(fileName);
     try {
       await api.delete(`/servers/${serverId}/backups/${encodeURIComponent(fileName)}`);
@@ -110,7 +124,13 @@ export function BackupsTab() {
   }
 
   async function removeSchedule() {
-    if (!window.confirm('Turn off automated backups for this server?')) return;
+    const ok = await confirm({
+      title: 'Turn off automated backups',
+      message: 'Turn off automated backups for this server?',
+      confirmLabel: 'Turn off',
+      tone: 'danger',
+    });
+    if (!ok) return;
     try {
       await api.delete(`/servers/${serverId}/backups/schedule`);
       setSchedule(null);
