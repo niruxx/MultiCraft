@@ -13,9 +13,9 @@ function FullScreenLoader() {
   return (
     <div className="flex h-screen items-center justify-center bg-surface-950">
       <motion.div
-        className="h-9 w-9 rounded-lg bg-brand-gradient bg-[length:200%_auto] shadow-glow-lg"
-        animate={{ backgroundPosition: ['0% 50%', '100% 50%', '0% 50%'], rotate: [0, 6, -6, 0] }}
-        transition={{ duration: 1.6, repeat: Infinity, ease: 'easeInOut' }}
+        className="h-9 w-9 rounded-lg bg-brand-gradient shadow-glow"
+        animate={{ opacity: [1, 0.5, 1] }}
+        transition={{ duration: 1.3, repeat: Infinity, ease: 'easeInOut' }}
       />
     </div>
   );

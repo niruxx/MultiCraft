@@ -11,18 +11,17 @@ export function Button({
   ...props
 }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'default' | 'primary' | 'danger' | 'ghost' }) {
   const base =
-    'relative inline-flex items-center justify-center gap-1.5 rounded-lg text-sm font-medium px-3.5 py-1.5 transition-colors duration-150 disabled:opacity-40 disabled:cursor-not-allowed select-none';
+    'relative inline-flex items-center justify-center gap-1.5 rounded-lg text-sm font-medium px-3.5 py-1.5 border transition-colors duration-150 disabled:opacity-40 disabled:cursor-not-allowed select-none';
   const variants: Record<string, string> = {
-    default: 'bg-surface-800 hover:bg-surface-700 text-slate-100 shadow-inner-border',
-    primary:
-      'bg-gradient-to-br from-accent-400 to-accent-600 text-surface-950 font-semibold shadow-glow hover:shadow-glow-lg',
-    danger: 'bg-red-600/90 hover:bg-red-500 text-white',
-    ghost: 'bg-transparent hover:bg-surface-800 text-slate-300',
+    default: 'bg-surface-800/70 hover:bg-surface-700 border-surface-700 text-slate-100',
+    primary: 'bg-accent-500 hover:bg-accent-400 border-transparent text-surface-950 font-semibold',
+    danger: 'bg-red-500/15 hover:bg-red-500/25 border-red-500/30 text-red-400',
+    ghost: 'bg-transparent hover:bg-surface-800 border-transparent text-slate-300',
   };
   return (
     <motion.button
       whileHover={disabled ? undefined : { y: -1 }}
-      whileTap={disabled ? undefined : { scale: 0.96 }}
+      whileTap={disabled ? undefined : { scale: 0.97 }}
       transition={springy}
       className={`${base} ${variants[variant]} ${className}`}
       disabled={disabled}
@@ -65,7 +64,7 @@ export function Card({
   return (
     <motion.div
       whileHover={hover ? { y: -2, transition: springy } : undefined}
-      className={`rounded-xl border border-surface-700/80 shadow-card ${glass ? 'glass' : 'bg-surface-900'} ${className}`}
+      className={`rounded-xl border border-surface-700/70 shadow-flat ${glass ? 'glass' : 'bg-surface-900'} ${className}`}
     >
       {children}
     </motion.div>
@@ -73,11 +72,11 @@ export function Card({
 }
 
 const BADGE_TONES: Record<string, string> = {
-  neutral: 'bg-surface-700/80 text-slate-300',
-  green: 'bg-accent-500/15 text-accent-400 ring-1 ring-inset ring-accent-500/25',
-  red: 'bg-red-500/15 text-red-400 ring-1 ring-inset ring-red-500/25',
-  yellow: 'bg-yellow-500/15 text-yellow-400 ring-1 ring-inset ring-yellow-500/25',
-  blue: 'bg-sky-500/15 text-sky-400 ring-1 ring-inset ring-sky-500/25',
+  neutral: 'bg-surface-700/70 text-slate-300',
+  green: 'bg-accent-500/15 text-accent-400',
+  red: 'bg-red-500/15 text-red-400',
+  yellow: 'bg-yellow-500/15 text-yellow-400',
+  blue: 'bg-sky-500/15 text-sky-400',
 };
 
 export function Badge({
@@ -145,7 +144,7 @@ export function Modal({
     <AnimatePresence>
       {open && (
         <motion.div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -153,7 +152,7 @@ export function Modal({
           onClick={onClose}
         >
           <motion.div
-            className={`glass flex max-h-[85vh] w-full ${MODAL_SIZE[size]} flex-col rounded-xl border border-surface-700/80 shadow-card`}
+            className={`glass flex max-h-[85vh] w-full ${MODAL_SIZE[size]} flex-col rounded-xl border border-surface-700/70 shadow-card`}
             initial={{ opacity: 0, scale: 0.95, y: 12 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.96, y: 8 }}

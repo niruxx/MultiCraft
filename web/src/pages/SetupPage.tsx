@@ -113,11 +113,7 @@ export function SetupPage() {
               className="glass rounded-2xl border border-surface-700/80 p-7 shadow-card"
             >
               <div className="mb-6 text-center">
-                <motion.div
-                  className="mx-auto mb-4 h-12 w-12 rounded-2xl bg-brand-gradient bg-[length:200%_auto] shadow-glow-lg"
-                  animate={{ backgroundPosition: ['0% 50%', '100% 50%', '0% 50%'] }}
-                  transition={{ duration: 5, repeat: Infinity, ease: 'easeInOut' }}
-                />
+                <div className="mx-auto mb-4 h-12 w-12 rounded-2xl bg-brand-gradient shadow-glow" />
                 <h1 className="text-2xl font-bold text-white">
                   Welcome to <span className="text-gradient">MultiCraft</span>
                 </h1>
@@ -210,7 +206,7 @@ export function SetupPage() {
                 initial={{ scale: 0, rotate: -45 }}
                 animate={{ scale: 1, rotate: 0 }}
                 transition={{ type: 'spring', stiffness: 300, damping: 18, delay: 0.1 }}
-                className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-accent-500/15 text-2xl text-accent-400 ring-1 ring-inset ring-accent-500/30"
+                className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-accent-500/15 text-2xl text-accent-400 border border-accent-500/30"
               >
                 ✓
               </motion.div>

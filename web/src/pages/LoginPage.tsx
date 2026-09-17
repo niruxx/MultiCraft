@@ -50,11 +50,7 @@ export function LoginPage() {
         className="glass relative z-10 w-full max-w-sm rounded-2xl border border-surface-700/80 p-7 shadow-card"
       >
         <div className="mb-6 text-center">
-          <motion.div
-            className="mx-auto mb-3.5 h-11 w-11 rounded-xl bg-brand-gradient bg-[length:200%_auto] shadow-glow"
-            animate={{ backgroundPosition: ['0% 50%', '100% 50%', '0% 50%'] }}
-            transition={{ duration: 5, repeat: Infinity, ease: 'easeInOut' }}
-          />
+          <div className="mx-auto mb-3.5 h-11 w-11 rounded-xl bg-brand-gradient shadow-glow" />
           <div className="flex items-center justify-center gap-2">
             <h1 className="text-xl font-bold text-white">Sign in to MultiCraft</h1>
             <Badge tone="neutral">v{APP_VERSION}</Badge>

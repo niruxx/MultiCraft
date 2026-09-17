@@ -31,16 +31,17 @@ export default {
         },
       },
       boxShadow: {
-        glow: '0 0 0 1px rgba(52,224,161,0.15), 0 8px 24px -4px rgba(34,211,165,0.25)',
-        'glow-lg': '0 0 40px -8px rgba(34,211,165,0.35)',
-        card: '0 1px 0 0 rgba(255,255,255,0.03) inset, 0 12px 32px -12px rgba(0,0,0,0.5)',
-        'inner-border': 'inset 0 0 0 1px rgba(255,255,255,0.06)',
+        // Flat, neutral elevation — no colored glow. Depth comes from blur + a hairline
+        // border, not drop shadows, to keep surfaces reading flat rather than skeuomorphic.
+        flat: '0 1px 2px rgba(0,0,0,0.2)',
+        card: '0 4px 20px -6px rgba(0,0,0,0.35)',
+        glow: '0 4px 20px -4px rgba(34,211,165,0.28)',
       },
       backgroundImage: {
         'brand-gradient': 'linear-gradient(115deg, #34e0a1 0%, #22d3ee 50%, #818cf8 100%)',
-        'radial-fade': 'radial-gradient(60% 60% at 50% 0%, rgba(34,211,165,0.16) 0%, rgba(8,9,13,0) 70%)',
+        'radial-fade': 'radial-gradient(60% 60% at 50% 0%, rgba(34,211,165,0.12) 0%, rgba(8,9,13,0) 70%)',
         'grid-pattern':
-          'linear-gradient(to right, rgba(255,255,255,0.035) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.035) 1px, transparent 1px)',
+          'linear-gradient(to right, rgba(255,255,255,0.03) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.03) 1px, transparent 1px)',
       },
       keyframes: {
         'fade-in': { from: { opacity: 0 }, to: { opacity: 1 } },

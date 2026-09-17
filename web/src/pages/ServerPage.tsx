@@ -58,9 +58,9 @@ function ServerPageInner() {
       <Layout>
         <div className="flex h-screen items-center justify-center">
           <motion.div
-            className="h-8 w-8 rounded-lg bg-brand-gradient bg-[length:200%_auto] shadow-glow"
-            animate={{ backgroundPosition: ['0% 50%', '100% 50%', '0% 50%'] }}
-            transition={{ duration: 1.4, repeat: Infinity, ease: 'easeInOut' }}
+            className="h-8 w-8 rounded-lg bg-brand-gradient shadow-glow"
+            animate={{ opacity: [1, 0.5, 1] }}
+            transition={{ duration: 1.3, repeat: Infinity, ease: 'easeInOut' }}
           />
         </div>
       </Layout>
@@ -79,7 +79,7 @@ function ServerPageInner() {
             <Button variant="ghost" className="!px-2" onClick={() => navigate('/')}>
               ←
             </Button>
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-surface-800 text-base ring-1 ring-inset ring-surface-700">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-surface-800 text-base border border-surface-700">
               {PLATFORM_ICON[server.platform]}
             </div>
             <h1 className="text-lg font-bold text-white">{server.name}</h1>

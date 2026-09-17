@@ -83,7 +83,7 @@ export function DashboardPage() {
         ) : servers.length === 0 ? (
           <Card className="p-12 text-center">
             <motion.div
-              className="mx-auto mb-4 h-14 w-14 rounded-2xl bg-brand-gradient bg-[length:200%_auto] shadow-glow"
+              className="mx-auto mb-4 h-14 w-14 rounded-2xl bg-brand-gradient shadow-glow"
               animate={{ y: [0, -8, 0] }}
               transition={{ duration: 3.5, repeat: Infinity, ease: 'easeInOut' }}
             />
@@ -100,7 +100,7 @@ export function DashboardPage() {
             {servers.map((server) => (
               <motion.div key={server.id} variants={fadeInUp}>
                 <Card hover className="flex items-center gap-4 p-4">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-surface-800 text-lg ring-1 ring-inset ring-surface-700">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-surface-800 text-lg border border-surface-700">
                     {PLATFORM_ICON[server.platform]}
                   </div>
                   <Link to={`/servers/${server.id}`} className="min-w-0 flex-1">
