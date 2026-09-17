@@ -154,7 +154,7 @@ export function Modal({
           onClick={onClose}
         >
           <motion.div
-            className={`glass flex max-h-[85vh] w-full ${MODAL_SIZE[size]} flex-col rounded-xl border border-surface-700/70 shadow-card`}
+            className={`flex max-h-[85vh] w-full ${MODAL_SIZE[size]} flex-col rounded-xl border border-surface-700/70 bg-surface-900 shadow-card`}
             initial={{ opacity: 0, scale: 0.95, y: 12 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.96, y: 8 }}
