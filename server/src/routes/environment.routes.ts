@@ -9,13 +9,18 @@ import {
   assertNoServersRunning,
   exportEnvironment,
   importEnvironment,
+  resetEnvironment,
   validateEnvironmentArchive,
 } from '../services/environmentBackupService.js';
-import { logAudit } from '../services/userService.js';
+import { authenticate, logAudit } from '../services/userService.js';
 import { logger } from '../utils/logger.js';
 
 export const environmentRouter = Router();
 environmentRouter.use(requireAuth, requireRole('admin'));
+
+/** Exact phrase the client must send back to confirm a factory reset — defense in depth
+ * beyond the UI's own confirmation steps, in case the API is ever called directly. */
+export const RESET_CONFIRM_PHRASE = 'DELETE EVERYTHING';
 
 // Uploads can be large (a full environment including worlds), so stream straight to disk
 // rather than buffering in memory like the smaller file-manager uploads do.
@@ -62,5 +67,35 @@ environmentRouter.post(
     } finally {
       fs.rm(file.path, { force: true }, () => {});
     }
+  })
+);
+
+environmentRouter.post(
+  '/reset',
+  asyncHandler(async (req, res) => {
+    const { confirmText, password } = req.body ?? {};
+
+    if (confirmText !== RESET_CONFIRM_PHRASE) {
+      throw new HttpError(400, `Type "${RESET_CONFIRM_PHRASE}" exactly to confirm`);
+    }
+    if (typeof password !== 'string' || !password) {
+      throw new HttpError(400, 'Enter your password to confirm');
+    }
+    if (!authenticate(req.auth!.username, password)) {
+      throw new HttpError(401, 'Incorrect password');
+    }
+
+    assertNoServersRunning();
+
+    logAudit(req.auth!.sub, req.auth!.username, 'environment.reset');
+    const result = await resetEnvironment();
+
+    res.json({
+      ok: true,
+      message: 'Factory reset applied. MultiCraft is restarting now — you\'ll land on the first-run setup wizard.',
+      previousDataDirBackup: result.previousDataDirBackup,
+    });
+
+    setTimeout(() => process.exit(0), 400);
   })
 );

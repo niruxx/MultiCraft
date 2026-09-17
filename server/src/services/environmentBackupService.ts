@@ -71,6 +71,43 @@ export function assertNoServersRunning(): void {
 }
 
 /**
+ * Shared "swap the whole data directory for something else" machinery, used by both import
+ * and factory-reset. `stagingDir` must already contain the complete replacement contents.
+ *
+ * Point of no return: node:sqlite can't reopen a closed database, so once we close it the app
+ * can no longer serve normal requests (or a normal HTTP error response) regardless of whether
+ * the file swap below succeeds. Any failure from here on is handled by restoring the original
+ * files as best we can and forcing a restart, rather than returning an error.
+ */
+async function swapDataDir(stagingDir: string, actionLabel: string): Promise<{ previousDataDirBackup: string }> {
+  const previousDataDirBackup = `${DATA_DIR}-${actionLabel}-${timestampSlug()}`;
+
+  closeDatabase();
+
+  try {
+    await renameWithRetry(DATA_DIR, previousDataDirBackup);
+  } catch (err) {
+    fs.rmSync(stagingDir, { recursive: true, force: true });
+    logger.error(`Environment ${actionLabel} failed before any files were touched; restarting to recover`, err);
+    process.exit(1);
+  }
+
+  try {
+    await renameWithRetry(stagingDir, DATA_DIR);
+  } catch (err) {
+    await renameWithRetry(previousDataDirBackup, DATA_DIR).catch((rollbackErr) => {
+      logger.error(`CRITICAL: ${actionLabel} rollback failed, data directory may be missing`, rollbackErr);
+    });
+    fs.rmSync(stagingDir, { recursive: true, force: true });
+    logger.error(`Environment ${actionLabel} failed applying new files; rolled back and restarting to recover`, err);
+    process.exit(1);
+  }
+
+  logger.info(`Environment ${actionLabel} applied. Previous data kept at ${previousDataDirBackup}`);
+  return { previousDataDirBackup };
+}
+
+/**
  * Replaces the entire data directory with the contents of an uploaded archive, then exits
  * the process so the next start reopens a fresh database against the restored files. The
  * previous data directory is kept alongside (renamed, not deleted) as a safety net.
@@ -79,7 +116,6 @@ export function assertNoServersRunning(): void {
  */
 export async function importEnvironment(zipPath: string): Promise<{ previousDataDirBackup: string }> {
   const stagingDir = `${DATA_DIR}-import-staging-${timestampSlug()}`;
-  const preImportBackupDir = `${DATA_DIR}-pre-import-${timestampSlug()}`;
 
   fs.mkdirSync(stagingDir, { recursive: true });
   try {
@@ -89,31 +125,22 @@ export async function importEnvironment(zipPath: string): Promise<{ previousData
     throw new HttpError(400, `Could not extract the archive (${err instanceof Error ? err.message : err})`);
   }
 
-  // Point of no return: node:sqlite can't reopen a closed database, so once we close it the
-  // app can no longer serve normal requests (or a normal HTTP error response) regardless of
-  // whether the file swap below succeeds. Any failure from here on is handled by restoring
-  // the original files as best we can and forcing a restart, rather than returning an error.
-  closeDatabase();
+  return swapDataDir(stagingDir, 'pre-import');
+}
 
-  try {
-    await renameWithRetry(DATA_DIR, preImportBackupDir);
-  } catch (err) {
-    fs.rmSync(stagingDir, { recursive: true, force: true });
-    logger.error('Environment import failed before any files were touched; restarting to recover', err);
-    process.exit(1);
-  }
+/**
+ * Factory reset: wipes every user account, every server (including its world files), and
+ * every backup, replacing the data directory with an empty one. The panel comes back up
+ * showing the first-run setup wizard. The previous data directory is kept alongside
+ * (renamed, not deleted) so it can be recovered by hand if this was triggered by mistake.
+ *
+ * Callers MUST have already re-verified the acting admin's password and confirmed no
+ * servers are running.
+ */
+export async function resetEnvironment(): Promise<{ previousDataDirBackup: string }> {
+  const stagingDir = `${DATA_DIR}-reset-staging-${timestampSlug()}`;
+  fs.mkdirSync(path.join(stagingDir, 'servers'), { recursive: true });
+  fs.mkdirSync(path.join(stagingDir, 'backups'), { recursive: true });
 
-  try {
-    await renameWithRetry(stagingDir, DATA_DIR);
-  } catch (err) {
-    await renameWithRetry(preImportBackupDir, DATA_DIR).catch((rollbackErr) => {
-      logger.error('CRITICAL: import rollback failed, data directory may be missing', rollbackErr);
-    });
-    fs.rmSync(stagingDir, { recursive: true, force: true });
-    logger.error('Environment import failed applying new files; rolled back and restarting to recover', err);
-    process.exit(1);
-  }
-
-  logger.info(`Environment import applied. Previous data kept at ${preImportBackupDir}`);
-  return { previousDataDirBackup: preImportBackupDir };
+  return swapDataDir(stagingDir, 'pre-reset');
 }

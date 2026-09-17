@@ -18,6 +18,7 @@ A self-hosted, web-based control panel for creating and running Minecraft server
 - **Resources monitor** — live CPU/RAM sparkline charts, host machine totals, and disk usage for each server.
 - **Multi-user accounts with roles** — `admin` (full control + user management), `moderator` (manage assigned servers), `viewer` (read-only on assigned servers). Non-admins can be scoped to specific servers.
 - **Environment backup & restore** — admins can export the *entire* install (database, every server, all backups) as one zip from the Users page, and import it into a fresh install to migrate or restore everything at once. See [Backing up and restoring the whole environment](#backing-up-and-restoring-the-whole-environment).
+- **Factory reset** — a "Danger zone" on the Users page lets an admin wipe every account, server, and backup and return to the first-run setup wizard, gated behind a multi-step confirmation (what's deleted, a typed confirmation phrase, and your password).
 
 ## Architecture
 
@@ -179,7 +180,11 @@ Then `launchctl load ~/Library/LaunchAgents/com.multicraft.panel.plist`.
 
 ## Wiping the database and starting fresh
 
-Everything MultiCraft knows — user accounts, server records, every Minecraft server's files, and all backups — lives under `server/data/` (or wherever `MULTICRAFT_DATA_DIR` points). Deleting its contents resets MultiCraft to a brand-new install: the next page load shows the first-run setup wizard again.
+Everything MultiCraft knows — user accounts, server records, every Minecraft server's files, and all backups — lives under `server/data/` (or wherever `MULTICRAFT_DATA_DIR` points). Wiping it resets MultiCraft to a brand-new install: the next page load shows the first-run setup wizard again.
+
+**Easiest: do it from the UI.** As an admin, open the **Users** page and scroll to the **Danger zone** card → **Delete everything & start fresh**. It walks you through three confirmations (what gets deleted, typing `DELETE EVERYTHING`, and your password), then wipes every account, every server and its worlds, and every backup, and restarts the panel into the setup wizard. Your previous data isn't deleted outright — it's kept on disk as a timestamped `data-pre-reset-…` folder in case you didn't mean it, though restoring it means stopping MultiCraft and renaming that folder back to `data` by hand.
+
+The manual, file-level equivalent (useful if the panel won't start at all, or you're scripting it) is below.
 
 **This deletes all Minecraft worlds and backups too.** Back up `server/data/` first if there's anything in it you might want later (right-click → copy, or `cp -r`/`Copy-Item`).
 

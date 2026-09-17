@@ -4,6 +4,7 @@ import { Layout } from '../components/Layout.js';
 import { Badge, Button, Card, ErrorText, Field, Input, Modal, Select } from '../components/ui.js';
 import { useToast } from '../components/Toast.js';
 import { EnvironmentBackupCard } from '../components/EnvironmentBackupCard.js';
+import { FactoryResetCard } from '../components/FactoryResetCard.js';
 import { api, ApiError } from '../api/client.js';
 import type { PublicUser, Role, ServerRecord } from '../api/types.js';
 import { useAuth } from '../state/AuthContext.js';
@@ -105,6 +106,10 @@ export function UsersPage() {
             ))}
           </Card>
         )}
+
+        <div className="mt-8">
+          <FactoryResetCard />
+        </div>
       </div>
 
       <CreateUserModal open={createOpen} onClose={() => setCreateOpen(false)} onSaved={load} />
