@@ -1,0 +1,177 @@
+import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useServerDetail } from './ServerContext.js';
+import { useConsoleSocket } from '../../hooks/useConsoleSocket.js';
+import { api, ApiError } from '../../api/client.js';
+import { Button, Card, Input } from '../../components/ui.js';
+
+function lineColor(stream: string, line: string): string {
+  if (stream === 'stderr') return 'text-red-400';
+  if (stream === 'system') return 'text-sky-400';
+  if (/\bWARN\b/.test(line)) return 'text-yellow-400';
+  if (/\bERROR\b/.test(line)) return 'text-red-400';
+  return 'text-slate-300';
+}
+
+export function ConsoleTab() {
+  const { serverId, canWrite, refresh } = useServerDetail();
+  const { lines, status, stats, connected, installProgress } = useConsoleSocket(serverId);
+  const [command, setCommand] = useState('');
+  const [history, setHistory] = useState<string[]>([]);
+  const [historyIdx, setHistoryIdx] = useState(-1);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [autoScroll, setAutoScroll] = useState(true);
+
+  useEffect(() => {
+    if (autoScroll && scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [lines, autoScroll]);
+
+  async function submitCommand(e: FormEvent) {
+    e.preventDefault();
+    const trimmed = command.trim();
+    if (!trimmed) return;
+    setHistory((h) => [...h, trimmed]);
+    setHistoryIdx(-1);
+    setCommand('');
+    try {
+      await api.post(`/servers/${serverId}/command`, { command: trimmed });
+    } catch {
+      // errors already appear in the console output stream
+    }
+  }
+
+  function onKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (history.length === 0) return;
+      const next = historyIdx === -1 ? history.length - 1 : Math.max(0, historyIdx - 1);
+      setHistoryIdx(next);
+      setCommand(history[next]);
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      if (historyIdx === -1) return;
+      const next = historyIdx + 1;
+      if (next >= history.length) {
+        setHistoryIdx(-1);
+        setCommand('');
+      } else {
+        setHistoryIdx(next);
+        setCommand(history[next]);
+      }
+    }
+  }
+
+  const [actionError, setActionError] = useState('');
+  const [busy, setBusy] = useState(false);
+  async function lifecycleAction(action: 'start' | 'stop' | 'restart') {
+    setBusy(true);
+    setActionError('');
+    try {
+      await api.post(`/servers/${serverId}/${action}`);
+      await refresh();
+    } catch (err) {
+      setActionError(err instanceof ApiError ? err.message : `Failed to ${action}`);
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function killServer() {
+    setBusy(true);
+    setActionError('');
+    try {
+      await api.post(`/servers/${serverId}/stop`, { force: true });
+      await refresh();
+    } catch (err) {
+      setActionError(err instanceof ApiError ? err.message : 'Failed to kill server');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const isRunningLike = status === 'running' || status === 'starting';
+
+  return (
+    <div className="flex h-[calc(100vh-8.5rem)] flex-col gap-3">
+      <div className="flex flex-wrap items-center gap-3">
+        {canWrite && (
+          <>
+            {status === 'stopped' || status === 'crashed' || status === 'install_failed' ? (
+              <Button variant="primary" disabled={busy} onClick={() => lifecycleAction('start')}>
+                Start
+              </Button>
+            ) : (
+              <>
+                <Button disabled={busy || !isRunningLike} onClick={() => lifecycleAction('restart')}>
+                  Restart
+                </Button>
+                <Button variant="danger" disabled={busy || !isRunningLike} onClick={() => lifecycleAction('stop')}>
+                  Stop
+                </Button>
+                <Button variant="ghost" disabled={busy || !isRunningLike} onClick={killServer}>
+                  Force kill
+                </Button>
+              </>
+            )}
+          </>
+        )}
+        <div className="ml-auto flex items-center gap-4 text-xs text-slate-400">
+          <span className={connected ? 'text-accent-500' : 'text-red-400'}>{connected ? '● live' : '○ reconnecting'}</span>
+          {stats.memoryMb !== null && <span>RAM {stats.memoryMb} MB</span>}
+          {stats.cpuPercent !== null && <span>CPU {stats.cpuPercent}%</span>}
+        </div>
+      </div>
+
+      {actionError && <p className="rounded-md bg-red-500/10 border border-red-500/30 px-3 py-2 text-sm text-red-400">{actionError}</p>}
+
+      {installProgress && (
+        <Card className="p-3">
+          <div className="mb-1 flex justify-between text-xs text-slate-400">
+            <span>{installProgress.message}</span>
+            <span>{installProgress.pct}%</span>
+          </div>
+          <div className="h-2 overflow-hidden rounded-full bg-surface-700">
+            <div className="h-full bg-accent-600 transition-all" style={{ width: `${installProgress.pct}%` }} />
+          </div>
+        </Card>
+      )}
+
+      <Card className="flex-1 overflow-hidden">
+        <div
+          ref={scrollRef}
+          onScroll={(e) => {
+            const el = e.currentTarget;
+            setAutoScroll(el.scrollHeight - el.scrollTop - el.clientHeight < 40);
+          }}
+          className="console-view h-full overflow-y-auto px-4 py-3 text-[13px] leading-relaxed"
+        >
+          {lines.length === 0 ? (
+            <p className="text-slate-500">No console output yet.</p>
+          ) : (
+            lines.map((l) => (
+              <div key={l.id} className={`whitespace-pre-wrap break-all ${lineColor(l.stream, l.line)}`}>
+                {l.line}
+              </div>
+            ))
+          )}
+        </div>
+      </Card>
+
+      {canWrite && (
+        <form onSubmit={submitCommand} className="flex gap-2">
+          <Input
+            value={command}
+            onChange={(e) => setCommand(e.target.value)}
+            onKeyDown={onKeyDown}
+            placeholder={isRunningLike ? 'Type a command…' : 'Server is not running'}
+            disabled={!isRunningLike}
+            className="console-view"
+          />
+          <Button type="submit" disabled={!isRunningLike || !command.trim()}>
+            Send
+          </Button>
+        </form>
+      )}
+    </div>
+  );
+}

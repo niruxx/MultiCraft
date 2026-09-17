@@ -1,0 +1,19 @@
+{
+  "name": "multicraft",
+  "private": true,
+  "version": "0.1.0",
+  "description": "MultiCraft - a self-hosted web panel for creating and managing Minecraft Java & Bedrock servers.",
+  "workspaces": [
+    "server",
+    "web"
+  ],
+  "scripts": {
+    "dev": "concurrently -k -n API,WEB -c blue,green \"npm:dev --workspace=server\" \"npm:dev --workspace=web\"",
+    "build": "npm run build --workspace=server && npm run build --workspace=web",
+    "start": "npm run start --workspace=server",
+    "setup": "npm install"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  }
+}

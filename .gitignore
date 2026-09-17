@@ -1,0 +1,19 @@
+node_modules/
+dist/
+build/
+*.log
+.env
+.env.local
+
+# Runtime data (server jars, worlds, backups, database)
+data/
+!data/.gitkeep
+
+# Editor
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+*.tsbuildinfo
