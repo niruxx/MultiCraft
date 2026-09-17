@@ -53,7 +53,7 @@ All server data (the SQLite database, every Minecraft server's files, and backup
 | **Java 21+** (Java servers only) | `winget install EclipseAdoptium.Temurin.21.JDK` | `sudo apt install -y openjdk-21-jre-headless` (or `-jdk` if you'll build Spigot) | `brew install openjdk@21` then `sudo ln -sfn $(brew --prefix openjdk@21)/libexec/openjdk.jdk /Library/Java/JavaVirtualMachines/openjdk-21.jdk` |
 | **Git** (Spigot builds only) | `winget install Git.Git` | `sudo apt install -y git` | `brew install git` (or the Xcode Command Line Tools) |
 
-Verify with `node -v`, `java -version`, and `git --version`.
+Verify with `node -v`, `java -version`, and `git --version`. Running on Arch, Fedora, or openSUSE? See the per-distro package commands in [Running 24/7 → systemd](#option-b--systemd-linux-recommended-for-serversvps).
 
 ### 2. Get the code
 
@@ -117,7 +117,45 @@ Useful commands: `pm2 logs multicraft`, `pm2 restart multicraft`, `pm2 stop mult
 
 ### Option B — systemd (Linux, recommended for servers/VPS)
 
-Create `/etc/systemd/system/multicraft.service`:
+This is the same procedure on Arch, Debian/Ubuntu, Fedora/RHEL, openSUSE, or anything else running systemd — only the package-manager command in step 1 changes. Run everything below as a regular user with `sudo` access; don't run MultiCraft itself as root.
+
+**1. Install prerequisites**
+
+| Distro | Command |
+|---|---|
+| **Arch / Manjaro** | `sudo pacman -Syu --needed nodejs npm git jdk21-openjdk` |
+| **Debian / Ubuntu** | `curl -fsSL https://deb.nodesource.com/setup_22.x \| sudo bash -` then `sudo apt install -y nodejs git openjdk-21-jre-headless` |
+| **Fedora / RHEL** | `sudo dnf install -y nodejs npm git java-21-openjdk-headless` |
+| **openSUSE** | `sudo zypper install -y nodejs22 npm22 git java-21-openjdk-headless` |
+
+Only install a JDK/JRE if you'll run Java-edition (Vanilla/Paper/Purpur/Spigot) servers — skip it for a Bedrock-only panel. Building Spigot needs the full `-jdk` package (e.g. `jdk21-openjdk` on Arch), not just the headless JRE. Verify with `node -v` (needs 22.5+) and `java -version`.
+
+**2. Create a dedicated system user**
+
+Running the panel as its own unprivileged user (rather than your login user or root) means a bug in a Minecraft server it manages can't touch the rest of the system.
+
+```bash
+sudo useradd --system --create-home --home-dir /opt/multicraft --shell "$(command -v nologin)" multicraft
+```
+
+(`nologin` lives at `/usr/sbin/nologin` on Debian/Ubuntu but `/usr/bin/nologin` on Arch/Fedora/openSUSE — `command -v nologin` finds whichever one applies.)
+
+**3. Get the code and hand it to that user**
+
+```bash
+sudo git clone <this-repo-url> /opt/multicraft/app
+sudo chown -R multicraft:multicraft /opt/multicraft
+```
+
+(No git remote yet? `sudo cp -r /path/to/your/MultiCraft/checkout /opt/multicraft/app` instead, then `chown` as above.)
+
+**4. Install dependencies and build, as that user**
+
+```bash
+sudo -u multicraft bash -c 'cd /opt/multicraft/app && npm run setup && npm run build'
+```
+
+**5. Create the systemd unit** at `/etc/systemd/system/multicraft.service`:
 
 ```ini
 [Unit]
@@ -126,25 +164,41 @@ After=network.target
 
 [Service]
 Type=simple
-WorkingDirectory=/opt/MultiCraft
+WorkingDirectory=/opt/multicraft/app
 ExecStart=/usr/bin/npm start
+# If `which npm` printed something else (e.g. an nvm install), use that path instead.
 Restart=on-failure
 User=multicraft
 Environment=PORT=8642
-# Environment=MULTICRAFT_DATA_DIR=/var/lib/multicraft
+Environment=MULTICRAFT_DATA_DIR=/opt/multicraft/data
 
 [Install]
 WantedBy=multi-user.target
 ```
 
-Then:
+`MULTICRAFT_DATA_DIR` keeps the database, every server's files, and backups outside the git checkout — see [Moving `server/data/` outside the repo](#moving-serverdata-outside-the-repo-recommended-for-production). Create it once: `sudo -u multicraft mkdir -p /opt/multicraft/data`.
+
+**6. Enable and start it**
 
 ```bash
 sudo systemctl daemon-reload
 sudo systemctl enable --now multicraft
-sudo systemctl status multicraft
-journalctl -u multicraft -f      # follow logs
+sudo systemctl status multicraft      # should show "active (running)"
+journalctl -u multicraft -f           # follow logs; Ctrl+C to stop watching
 ```
+
+Open `http://<server-ip>:8642` from another machine to reach the panel.
+
+**7. Open the ports you need**
+
+The panel's own port (`8642` by default) only needs to be reachable by whoever administers it — consider putting it behind a reverse proxy with HTTPS and/or restricting it to a VPN rather than exposing it publicly. Each *Minecraft* server you create needs its own port open to players: the port you set when creating it (default `25565/tcp` for Java, `19132/udp` for Bedrock).
+
+- **Arch** ships with no firewall enabled by default. If you've installed one:
+  - `ufw`: `sudo ufw allow 8642/tcp && sudo ufw allow 25565/tcp && sudo ufw allow 19132/udp`
+  - `firewalld`: `sudo firewall-cmd --permanent --add-port=8642/tcp --add-port=25565/tcp --add-port=19132/udp && sudo firewall-cmd --reload`
+  - plain `nftables`/`iptables`: add the equivalent `ACCEPT` rules for those ports in your existing ruleset.
+- **Debian/Ubuntu** (`ufw`) and **Fedora/RHEL/openSUSE** (`firewalld`) — use the matching command above.
+- If the machine is behind a home router, also forward those same ports to it there.
 
 ### Option C — Windows Service (via NSSM)
 
