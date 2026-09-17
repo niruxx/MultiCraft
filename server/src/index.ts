@@ -10,6 +10,7 @@ import { usersRouter } from './routes/users.routes.js';
 import { serversRouter } from './routes/servers.routes.js';
 import { filesRouter } from './routes/files.routes.js';
 import { backupsRouter } from './routes/backups.routes.js';
+import { systemRouter } from './routes/system.routes.js';
 import { verifyToken } from './auth/tokens.js';
 import { userHasServerAccess } from './services/userService.js';
 import { getServer, listServers } from './services/serverService.js';
@@ -34,6 +35,7 @@ app.use('/api/users', usersRouter);
 app.use('/api/servers/:serverId/files', filesRouter);
 app.use('/api/servers/:serverId/backups', backupsRouter);
 app.use('/api/servers', serversRouter);
+app.use('/api/system', systemRouter);
 
 app.get('/api/health', (_req, res) => res.json({ ok: true }));
 

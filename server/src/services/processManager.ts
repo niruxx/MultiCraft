@@ -7,11 +7,11 @@ import { findJava } from './javaService.js';
 import { readProcessStats, clearStatsSample, type ProcessStats } from './statsService.js';
 import { handleLogLine, resetOnlinePlayers } from './playerService.js';
 import { publish, consoleTopic } from './wsHub.js';
+import * as consoleLog from './consoleLogService.js';
 import { logger } from '../utils/logger.js';
 import { HttpError } from '../utils/asyncHandler.js';
 import type { ServerRecord } from '../types/index.js';
 
-const LOG_BUFFER_LIMIT = 3000;
 const JAVA_READY_RE = /Done \(/i;
 const BEDROCK_READY_RE = /Server started\./i;
 const GRACEFUL_STOP_TIMEOUT_MS = 60_000;
@@ -19,7 +19,6 @@ const STATS_INTERVAL_MS = 4000;
 
 interface RunningInstance {
   child: ChildProcessWithoutNullStreams;
-  logBuffer: string[];
   startedAt: number;
   manualStop: boolean;
   statsTimer?: NodeJS.Timeout;
@@ -30,12 +29,7 @@ interface RunningInstance {
 const running = new Map<string, RunningInstance>();
 
 function appendLog(serverId: string, line: string, stream: 'stdout' | 'stderr' | 'system') {
-  const instance = running.get(serverId);
-  if (instance) {
-    instance.logBuffer.push(line);
-    if (instance.logBuffer.length > LOG_BUFFER_LIMIT) instance.logBuffer.shift();
-  }
-  publish(consoleTopic(serverId), { type: 'log', stream, line, at: Date.now() });
+  consoleLog.appendLine(serverId, line, stream);
 
   const event = handleLogLine(serverId, line);
   if (event) publish(consoleTopic(serverId), { type: 'player', action: event.type, name: event.name });
@@ -66,8 +60,8 @@ function buildJavaCommand(server: ServerRecord, javaPath: string): { cmd: string
 }
 
 function buildBedrockCommand(server: ServerRecord, dir: string): { cmd: string; args: string[] } {
-  const executable = process.platform === 'win32' ? 'bedrock_server.exe' : './bedrock_server';
-  const exePath = path.join(dir, process.platform === 'win32' ? 'bedrock_server.exe' : 'bedrock_server');
+  const exeName = process.platform === 'win32' ? 'bedrock_server.exe' : 'bedrock_server';
+  const exePath = path.join(dir, exeName);
   if (!fs.existsSync(exePath)) {
     throw new HttpError(400, 'Bedrock server executable not found; the install may have failed');
   }
@@ -88,6 +82,12 @@ export async function startServer(serverId: string): Promise<void> {
   let args: string[];
   const spawnEnv = { ...process.env };
 
+  appendLog(
+    serverId,
+    `[MultiCraft] Host environment: ${process.platform} (${process.arch})`,
+    'system'
+  );
+
   if (server.platform === 'java') {
     const javaPath = await findJava();
     if (!javaPath) {
@@ -98,8 +98,14 @@ export async function startServer(serverId: string): Promise<void> {
     }
     // Auto-accept EULA is handled at server-creation time (eula.txt is written there).
     ({ cmd, args } = buildJavaCommand(server, javaPath));
+    appendLog(serverId, `[MultiCraft] Launching with ${javaPath} ${args.join(' ')}`, 'system');
   } else {
     ({ cmd, args } = buildBedrockCommand(server, dir));
+    appendLog(
+      serverId,
+      `[MultiCraft] Launching ${process.platform === 'win32' ? 'Windows' : 'Linux'} Bedrock binary: ${cmd}`,
+      'system'
+    );
   }
 
   resetOnlinePlayers(serverId);
@@ -114,7 +120,6 @@ export async function startServer(serverId: string): Promise<void> {
 
   const instance: RunningInstance = {
     child,
-    logBuffer: [],
     startedAt: Date.now(),
     manualStop: false,
     lastStats: { memoryMb: null, cpuPercent: null },
@@ -205,7 +210,7 @@ export function getRuntimeInfo(serverId: string) {
 }
 
 export function getLogBuffer(serverId: string): string[] {
-  return running.get(serverId)?.logBuffer ?? [];
+  return consoleLog.getBuffer(serverId);
 }
 
 /** Called at server shutdown so child MC processes don't become orphaned. */

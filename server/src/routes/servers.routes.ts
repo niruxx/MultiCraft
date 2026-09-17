@@ -23,7 +23,9 @@ import {
 import { getPlayerRoster } from '../services/playerService.js';
 import { getUserServerAccess, logAudit } from '../services/userService.js';
 import { publish, consoleTopic } from '../services/wsHub.js';
+import { appendLine } from '../services/consoleLogService.js';
 import { findJava, getJavaVersion } from '../services/javaService.js';
+import { instanceDir } from '../utils/paths.js';
 import type { Loader, Platform, Role } from '../types/index.js';
 
 export const serversRouter = Router();
@@ -106,29 +108,37 @@ serversRouter.post(
       createdBy: req.auth!.sub,
     });
 
-    if (platform === 'java') writeEula(record.id, true);
+    appendLine(record.id, `[MultiCraft] Creating server "${record.name}" (${loader} ${version}, ${platform})`);
+    if (platform === 'java') {
+      writeEula(record.id, true);
+      appendLine(record.id, "[MultiCraft] Wrote eula.txt (eula=true, accepted by user at creation)");
+    }
 
     logAudit(req.auth!.sub, req.auth!.username, 'server.create', record.id, `${loader} ${version}`);
     res.status(201).json({ server: record });
 
-    // Install runs in the background; progress is streamed over the console websocket topic.
+    // Install runs in the background; verbose progress is streamed over the console websocket topic,
+    // the same way `npm install --verbose` streams line-by-line progress to a terminal.
     void (async () => {
-      const { instanceDir } = await import('../utils/paths.js');
       try {
-        const result = await installServer(platform, loader, version, instanceDir(record.id), (pct, message) => {
-          publish(consoleTopic(record.id), { type: 'install_progress', pct, message });
-        });
+        const result = await installServer(
+          platform,
+          loader,
+          version,
+          instanceDir(record.id),
+          (pct, message) => publish(consoleTopic(record.id), { type: 'install_progress', pct, message }),
+          (line) => appendLine(record.id, line)
+        );
         if (result.jarFile) setServerJar(record.id, result.jarFile, result.build);
         else if (result.executable) setServerJar(record.id, result.executable, result.build);
+        appendLine(record.id, '[MultiCraft] Installation finished — server is ready to start');
         setServerStatus(record.id, 'stopped');
         publish(consoleTopic(record.id), { type: 'status', status: 'stopped' });
       } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        appendLine(record.id, `[MultiCraft] Installation failed: ${message}`, 'stderr');
         setServerStatus(record.id, 'install_failed');
-        publish(consoleTopic(record.id), {
-          type: 'status',
-          status: 'install_failed',
-          error: err instanceof Error ? err.message : String(err),
-        });
+        publish(consoleTopic(record.id), { type: 'status', status: 'install_failed', error: message });
       }
     })();
   })

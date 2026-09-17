@@ -1,12 +1,22 @@
-import { type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../state/AuthContext.js';
 import { Badge } from './ui.js';
+import { api } from '../api/client.js';
+import type { SystemInfo } from '../api/types.js';
 
 export function Layout({ children }: { children: ReactNode }) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const [system, setSystem] = useState<SystemInfo | null>(null);
+
+  useEffect(() => {
+    api
+      .get<SystemInfo>('/system')
+      .then(setSystem)
+      .catch(() => setSystem(null));
+  }, []);
 
   return (
     <div className="flex min-h-screen bg-surface-950">
@@ -39,6 +49,12 @@ export function Layout({ children }: { children: ReactNode }) {
           >
             Sign out
           </button>
+          {system && (
+            <p className="mt-2 truncate text-[11px] text-slate-500" title={`Node ${system.nodeVersion} on ${system.hostname}`}>
+              {system.platformLabel} · {system.arch}
+              {system.java.available ? ' · Java detected' : ' · Java not found'}
+            </p>
+          )}
         </div>
       </aside>
       <main className="flex-1 overflow-y-auto">{children}</main>

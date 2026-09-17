@@ -84,3 +84,12 @@ export interface PropertyEntry {
   key: string;
   value: string;
 }
+
+export interface SystemInfo {
+  platform: string;
+  platformLabel: string;
+  arch: string;
+  hostname: string;
+  nodeVersion: string;
+  java: { available: boolean; version: string | null };
+}
