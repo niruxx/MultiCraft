@@ -144,3 +144,19 @@ export interface UpdateCheckResult {
   updateAvailable: boolean;
   note?: string;
 }
+
+export interface MapMeta {
+  generatedAt: string;
+  widthPx: number;
+  heightPx: number;
+  blocksPerPixel: number;
+  minBlockX: number;
+  minBlockZ: number;
+  chunksRendered: number;
+  regionsScanned: number;
+}
+
+export interface MapState {
+  capable: boolean;
+  meta: MapMeta | null;
+}

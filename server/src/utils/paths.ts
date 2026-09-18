@@ -12,6 +12,7 @@ export const DB_PATH = path.join(DATA_DIR, 'multicraft.db');
 export const INSTANCES_DIR = path.join(DATA_DIR, 'servers');
 export const BACKUPS_DIR = path.join(DATA_DIR, 'backups');
 export const JAVA_RUNTIMES_DIR = path.join(DATA_DIR, 'runtimes');
+export const MAP_CACHE_DIR = path.join(DATA_DIR, 'map-cache');
 export const WEB_DIST_DIR = path.resolve(SERVER_ROOT, '..', 'web', 'dist');
 
 export function instanceDir(serverId: string): string {
@@ -24,6 +25,15 @@ export function pluginsDir(serverId: string): string {
 
 export function backupDir(serverId: string): string {
   return path.join(BACKUPS_DIR, serverId);
+}
+
+/** Where a server's rendered map PNG + metadata live — outside instanceDir so it's never
+ *  swept into that server's own zip backups. */
+export function mapCachePath(serverId: string): { image: string; meta: string } {
+  return {
+    image: path.join(MAP_CACHE_DIR, `${serverId}.png`),
+    meta: path.join(MAP_CACHE_DIR, `${serverId}.json`),
+  };
 }
 
 /**

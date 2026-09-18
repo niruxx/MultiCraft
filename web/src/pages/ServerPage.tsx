@@ -12,6 +12,7 @@ import { PlayersTab } from './server/PlayersTab.js';
 import { OperatorTab } from './server/OperatorTab.js';
 import { WhitelistTab } from './server/WhitelistTab.js';
 import { PluginsTab } from './server/PluginsTab.js';
+import { MapsTab } from './server/MapsTab.js';
 import { SettingsTab } from './server/SettingsTab.js';
 import { FilesTab } from './server/FilesTab.js';
 import { BackupsTab } from './server/BackupsTab.js';
@@ -55,6 +56,7 @@ function ServerPageInner() {
     { to: 'operator', label: 'Operator' },
     { to: 'whitelist', label: 'Whitelist' },
     ...(server && PLUGIN_CAPABLE_LOADERS.includes(server.loader) ? [{ to: 'plugins', label: 'Plugins' }] : []),
+    { to: 'maps', label: 'Maps' },
     { to: 'settings', label: 'Settings' },
     { to: 'files', label: 'Files' },
     { to: 'backups', label: 'Backups' },
@@ -142,6 +144,7 @@ function ServerPageInner() {
             <Route path="operator" element={<OperatorTab />} />
             <Route path="whitelist" element={<WhitelistTab />} />
             {PLUGIN_CAPABLE_LOADERS.includes(server.loader) && <Route path="plugins" element={<PluginsTab />} />}
+            <Route path="maps" element={<MapsTab />} />
             <Route path="settings" element={<SettingsTab />} />
             <Route path="files" element={<FilesTab />} />
             <Route path="backups" element={<BackupsTab />} />
