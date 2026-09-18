@@ -62,11 +62,9 @@ export function MapsTab() {
     return (
       <Card className="p-8 text-center">
         <div className="mx-auto mb-3 text-3xl">🗺️</div>
-        <p className="mb-1 font-semibold text-ink-200">Bedrock world maps aren't supported yet</p>
+        <p className="mb-1 font-semibold text-ink-200">Maps aren't available for this server</p>
         <p className="mx-auto max-w-md text-sm text-ink-500">
-          Bedrock stores worlds in a LevelDB database with a custom compression format that doesn't have a
-          lightweight reader available yet. 2D maps currently work for Java servers (Vanilla, Paper, Purpur, and
-          Spigot) — Bedrock support is planned as a follow-up.
+          2D maps work for Java servers (Vanilla, Paper, Purpur, Spigot) and Bedrock servers.
         </p>
       </Card>
     );
