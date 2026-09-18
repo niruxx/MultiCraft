@@ -151,7 +151,9 @@ export async function installServer(
   instanceDir: string,
   onProgress?: ProgressFn,
   onLog?: LogFn,
-  steamAppId?: string
+  steamAppId?: string,
+  steamLogin?: string,
+  steamExtraFlags?: string
 ): Promise<InstallResult> {
   fs.mkdirSync(instanceDir, { recursive: true });
   onLog?.(`==> Installing ${loader} ${version} (${platform}) into ${instanceDir}`);
@@ -169,7 +171,8 @@ export async function installServer(
       await installTerraria(instanceDir, onLog);
     } else {
       onProgress?.(0, `Installing Steam app ${steamAppId} via steamcmd`);
-      await steamAppUpdate(steamAppId, instanceDir, onLog, true);
+      const extraFlags = steamExtraFlags ? steamExtraFlags.split(' ').filter(Boolean) : [];
+      await steamAppUpdate(steamAppId, instanceDir, onLog, true, steamLogin ?? 'anonymous', extraFlags);
     }
     const preset = findPreset(steamAppId);
     const executable = preset ? (process.platform === 'win32' ? preset.executable.win32 : preset.executable.linux) : null;

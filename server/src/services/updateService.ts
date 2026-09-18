@@ -11,7 +11,6 @@ import {
   installServer,
   type ProgressFn,
 } from './downloadService.js';
-import { steamAppUpdate } from './steamCmdService.js';
 import { logger } from '../utils/logger.js';
 import type { ServerRecord } from '../types/index.js';
 
@@ -140,10 +139,21 @@ export async function performUpdate(
 
   if (server.platform === 'steam') {
     if (!server.steam_app_id) throw new Error('This server has no Steam App ID recorded');
-    onLog?.('==> Updating Steam server in place (steamcmd only touches its own tracked depot files)');
-    await steamAppUpdate(server.steam_app_id, dir, onLog, true);
-    onProgress?.(100, 'Updated');
-    return { version: server.version, build: null, jarFile: server.jar_file };
+    onLog?.('==> Updating Steam server in place (only files the game’s own installer tracks are touched)');
+    // Delegates to installServer so Terraria's terraria.org special case (see downloadService.ts)
+    // is applied consistently on update too, not just on first install.
+    const result = await installServer(
+      server.platform,
+      server.loader,
+      server.version,
+      dir,
+      onProgress,
+      onLog,
+      server.steam_app_id,
+      server.steam_login,
+      server.steam_extra_flags
+    );
+    return { version: server.version, build: null, jarFile: result.jarFile ?? server.jar_file };
   }
 
   if (server.platform === 'bedrock') {

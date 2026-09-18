@@ -14,6 +14,8 @@ export function SettingsTab() {
   const [extraArgs, setExtraArgs] = useState('');
   const [autoStart, setAutoStart] = useState(false);
   const [serverIp, setServerIp] = useState('');
+  const [steamLogin, setSteamLogin] = useState('anonymous');
+  const [steamExtraFlags, setSteamExtraFlags] = useState('');
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
   const [saved, setSaved] = useState(false);
@@ -27,6 +29,8 @@ export function SettingsTab() {
     setExtraJavaArgs(server.extra_java_args);
     setExtraArgs(server.extra_args);
     setAutoStart(!!server.auto_start);
+    setSteamLogin(server.steam_login || 'anonymous');
+    setSteamExtraFlags(server.steam_extra_flags || '');
     if (server.platform === 'java') {
       api
         .get<{ properties: PropertyEntry[] }>(`/servers/${server.id}/properties`)
@@ -48,6 +52,7 @@ export function SettingsTab() {
         extraJavaArgs,
         extraArgs,
         autoStart,
+        ...(server!.platform === 'steam' ? { steamLogin: steamLogin.trim() || 'anonymous', steamExtraFlags } : {}),
       });
       if (server!.platform === 'java') {
         await api.put(`/servers/${server!.id}/properties`, { updates: { 'server-ip': serverIp } });
@@ -103,7 +108,30 @@ export function SettingsTab() {
           <Field label={server.platform === 'steam' ? 'Extra launch args' : 'Extra server args'}>
             <Input value={extraArgs} onChange={(e) => setExtraArgs(e.target.value)} disabled={!canWrite} />
           </Field>
+          {server.platform === 'steam' && (
+            <>
+              <Field label="Steam login">
+                <Input value={steamLogin} onChange={(e) => setSteamLogin(e.target.value)} disabled={!canWrite} placeholder="anonymous" />
+              </Field>
+              <Field label="Extra steamcmd flags">
+                <Input
+                  value={steamExtraFlags}
+                  onChange={(e) => setSteamExtraFlags(e.target.value)}
+                  disabled={!canWrite}
+                  placeholder="e.g. -beta staging"
+                />
+              </Field>
+            </>
+          )}
         </div>
+        {server.platform === 'steam' && (
+          <p className="mt-2 text-xs text-ink-500">
+            Steam login and extra flags apply the next time this server is installed or updated via steamcmd (not
+            retroactively). Login defaults to <span className="font-mono">anonymous</span>; a real{' '}
+            <span className="font-mono">username password</span> is needed for games that require an owned license —
+            interactive Steam Guard prompts aren't supported.
+          </p>
+        )}
         <label className="mt-4 flex items-center gap-2 text-sm text-ink-300">
           <input type="checkbox" checked={autoStart} onChange={(e) => setAutoStart(e.target.checked)} disabled={!canWrite} />
           Automatically start this server when the panel boots

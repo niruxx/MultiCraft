@@ -51,6 +51,8 @@ export interface ServerRecord {
   created_at: string;
   created_by: string | null;
   steam_app_id: string | null;
+  steam_login: string;
+  steam_extra_flags: string;
 }
 
 export interface BackupSchedule {

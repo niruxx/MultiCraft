@@ -10,6 +10,7 @@ import { Badge, Button, Card, ErrorText, Spinner } from '../../components/ui.js'
 const PRESERVED_BY_PLATFORM: Record<string, string[]> = {
   bedrock: ['worlds/', 'server.properties', 'allowlist.json', 'permissions.json'],
   java: ['world saves', 'server.properties', 'whitelist.json / ops.json / banned-*.json'],
+  steam: ['save data (anything outside the game’s depot manifest)', 'config files you’ve edited via the Files tab'],
 };
 
 export function UpdateTab() {
@@ -62,7 +63,7 @@ export function UpdateTab() {
   }
 
   if (!server) return null;
-  const preserved = PRESERVED_BY_PLATFORM[server.platform];
+  const preserved = PRESERVED_BY_PLATFORM[server.platform] ?? [];
 
   return (
     <div className="space-y-6">

@@ -11,7 +11,7 @@ import { api, ApiError } from '../api/client.js';
 import type { ServerRecord } from '../api/types.js';
 import { useAuth } from '../state/AuthContext.js';
 
-const PLATFORM_ICON: Record<string, string> = { java: '☕', bedrock: '🪨' };
+const PLATFORM_ICON: Record<string, string> = { java: '☕', bedrock: '🪨', steam: '🎮' };
 
 export function DashboardPage() {
   const { user } = useAuth();

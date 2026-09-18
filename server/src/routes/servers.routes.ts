@@ -109,6 +109,8 @@ serversRouter.post(
       acceptEula,
       steamAppId,
       customExecutable,
+      steamLogin,
+      steamExtraFlags,
     } = req.body ?? {};
 
     if (typeof name !== 'string' || !name.trim()) throw new HttpError(400, 'Server name is required');
@@ -153,6 +155,8 @@ serversRouter.post(
       extraArgs: typeof extraArgs === 'string' ? extraArgs : '',
       createdBy: req.auth!.sub,
       steamAppId: platform === 'steam' ? steamAppId : null,
+      steamLogin: platform === 'steam' && typeof steamLogin === 'string' && steamLogin.trim() ? steamLogin.trim() : 'anonymous',
+      steamExtraFlags: platform === 'steam' && typeof steamExtraFlags === 'string' ? steamExtraFlags.trim() : '',
     });
 
     appendLine(record.id, `[MultiCraft] Creating server "${record.name}" (${loader} ${version}, ${platform})`);
@@ -175,7 +179,9 @@ serversRouter.post(
           instanceDir(record.id),
           (pct, message) => publish(consoleTopic(record.id), { type: 'install_progress', pct, message }),
           (line) => appendLine(record.id, line),
-          platform === 'steam' ? steamAppId : undefined
+          platform === 'steam' ? steamAppId : undefined,
+          record.steam_login,
+          record.steam_extra_flags
         );
         if (platform === 'steam' && !preset && typeof customExecutable === 'string') {
           // Custom (non-preset) App ID: the install step has no way to know the launch
@@ -225,7 +231,8 @@ serversRouter.patch(
     requireWrite(req);
     const server = getServer(req.params.serverId);
     if (!server) throw new HttpError(404, 'Server not found');
-    const { name, minMemoryMb, maxMemoryMb, serverPort, extraJavaArgs, extraArgs, autoStart } = req.body ?? {};
+    const { name, minMemoryMb, maxMemoryMb, serverPort, extraJavaArgs, extraArgs, autoStart, steamLogin, steamExtraFlags } =
+      req.body ?? {};
     updateServerRecord(server.id, {
       name,
       minMemoryMb: minMemoryMb !== undefined ? Number(minMemoryMb) : undefined,
@@ -234,6 +241,8 @@ serversRouter.patch(
       extraJavaArgs,
       extraArgs,
       autoStart,
+      steamLogin: typeof steamLogin === 'string' ? steamLogin : undefined,
+      steamExtraFlags: typeof steamExtraFlags === 'string' ? steamExtraFlags : undefined,
     });
     logAudit(req.auth!.sub, req.auth!.username, 'server.update', server.id);
     res.json({ server: getServer(server.id) });

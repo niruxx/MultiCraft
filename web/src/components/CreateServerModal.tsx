@@ -31,6 +31,9 @@ export function CreateServerModal({ open, onClose, onCreated }: { open: boolean;
   const [steamGameChoice, setSteamGameChoice] = useState<string>(CUSTOM_STEAM_GAME);
   const [customAppId, setCustomAppId] = useState('');
   const [customExecutable, setCustomExecutable] = useState('');
+  const [steamLogin, setSteamLogin] = useState('anonymous');
+  const [steamExtraFlags, setSteamExtraFlags] = useState('');
+  const [showSteamAdvanced, setShowSteamAdvanced] = useState(false);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -98,6 +101,8 @@ export function CreateServerModal({ open, onClose, onCreated }: { open: boolean;
         acceptEula,
         steamAppId: platform === 'steam' ? (selectedSteamGame ? selectedSteamGame.appId : customAppId.trim()) : undefined,
         customExecutable: platform === 'steam' && !selectedSteamGame ? customExecutable.trim() : undefined,
+        steamLogin: platform === 'steam' ? steamLogin.trim() || 'anonymous' : undefined,
+        steamExtraFlags: platform === 'steam' ? steamExtraFlags.trim() : undefined,
       });
       onCreated(server);
       onClose();
@@ -177,6 +182,43 @@ export function CreateServerModal({ open, onClose, onCreated }: { open: boolean;
             SIGTERM to stop it (falling back to a forced stop after 60s) and mark it "running" as soon as the
             process starts. Config files are edited via the Files tab.
           </p>
+        )}
+
+        {platform === 'steam' && (
+          <div>
+            <button
+              type="button"
+              className="text-xs text-accent-500 hover:underline"
+              onClick={() => setShowSteamAdvanced((v) => !v)}
+            >
+              {showSteamAdvanced ? '−' : '+'} Advanced SteamCMD options
+            </button>
+            {showSteamAdvanced && (
+              <div className="mt-3 grid grid-cols-2 gap-3">
+                <Field label="Steam login">
+                  <Input
+                    value={steamLogin}
+                    onChange={(e) => setSteamLogin(e.target.value)}
+                    placeholder="anonymous"
+                  />
+                </Field>
+                <Field label="Extra steamcmd flags">
+                  <Input
+                    value={steamExtraFlags}
+                    onChange={(e) => setSteamExtraFlags(e.target.value)}
+                    placeholder="e.g. -beta staging"
+                  />
+                </Field>
+                <p className="col-span-2 text-[11px] text-ink-600">
+                  Login defaults to <span className="font-mono">anonymous</span>. Games that require an owned Steam
+                  license need real credentials here (<span className="font-mono">username password</span>) —
+                  interactive Steam Guard prompts aren't supported, so accounts that require one may hang or fail.
+                  Extra flags are appended to the steamcmd command line (after <span className="font-mono">app_update</span>,
+                  before <span className="font-mono">+quit</span>).
+                </p>
+              </div>
+            )}
+          </div>
         )}
 
         {platform !== 'steam' && (

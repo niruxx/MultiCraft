@@ -10,6 +10,7 @@ import { logger } from '../utils/logger.js';
 export function runMigrations(db: DatabaseSync): void {
   addSteamAppIdColumn(db);
   dropPlatformCheckConstraint(db);
+  addSteamCmdColumns(db);
 }
 
 function addSteamAppIdColumn(db: DatabaseSync): void {
@@ -17,6 +18,19 @@ function addSteamAppIdColumn(db: DatabaseSync): void {
   if (hasColumn) return;
   logger.info('Migrating database: adding servers.steam_app_id column');
   db.exec('ALTER TABLE servers ADD COLUMN steam_app_id TEXT');
+}
+
+function addSteamCmdColumns(db: DatabaseSync): void {
+  const hasLogin = db.prepare("SELECT 1 FROM pragma_table_info('servers') WHERE name = 'steam_login'").get();
+  if (!hasLogin) {
+    logger.info("Migrating database: adding servers.steam_login column");
+    db.exec("ALTER TABLE servers ADD COLUMN steam_login TEXT NOT NULL DEFAULT 'anonymous'");
+  }
+  const hasFlags = db.prepare("SELECT 1 FROM pragma_table_info('servers') WHERE name = 'steam_extra_flags'").get();
+  if (!hasFlags) {
+    logger.info('Migrating database: adding servers.steam_extra_flags column');
+    db.exec("ALTER TABLE servers ADD COLUMN steam_extra_flags TEXT NOT NULL DEFAULT ''");
+  }
 }
 
 // SQLite can't ALTER a CHECK constraint in place — the only way to loosen one is to rebuild the

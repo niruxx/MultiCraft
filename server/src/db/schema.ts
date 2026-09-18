@@ -32,7 +32,17 @@ CREATE TABLE IF NOT EXISTS servers (
   status TEXT NOT NULL DEFAULT 'installing',
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   created_by TEXT REFERENCES users(id),
-  steam_app_id TEXT -- Steam App ID actually installed, for platform = 'steam' servers
+  steam_app_id TEXT, -- Steam App ID actually installed, for platform = 'steam' servers
+  steam_login TEXT NOT NULL DEFAULT 'anonymous', -- raw value passed after "+login" (e.g. "anonymous" or "user pass")
+  steam_extra_flags TEXT NOT NULL DEFAULT '' -- extra steamcmd CLI flags spliced into the install/update invocation
+);
+
+-- Simple global key/value settings, admin-editable (e.g. where to source the SteamCMD tarball
+-- from). Lives in the same SQLite file as everything else, so it's automatically included in the
+-- existing "export the whole environment" backup/restore feature with no extra code.
+CREATE TABLE IF NOT EXISTS system_settings (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS backup_schedules (

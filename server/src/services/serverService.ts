@@ -16,6 +16,8 @@ export interface CreateServerInput {
   extraArgs?: string;
   createdBy: string;
   steamAppId?: string | null;
+  steamLogin?: string;
+  steamExtraFlags?: string;
 }
 
 export function createServerRecord(input: CreateServerInput): ServerRecord {
@@ -24,8 +26,8 @@ export function createServerRecord(input: CreateServerInput): ServerRecord {
   fs.mkdirSync(backupDir(id), { recursive: true });
   prep(
     `INSERT INTO servers
-      (id, name, platform, loader, version, min_memory_mb, max_memory_mb, server_port, extra_java_args, extra_args, status, created_by, steam_app_id)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'installing', ?, ?)`
+      (id, name, platform, loader, version, min_memory_mb, max_memory_mb, server_port, extra_java_args, extra_args, status, created_by, steam_app_id, steam_login, steam_extra_flags)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'installing', ?, ?, ?, ?)`
   ).run(
     id,
     input.name,
@@ -38,7 +40,9 @@ export function createServerRecord(input: CreateServerInput): ServerRecord {
     input.extraJavaArgs ?? '',
     input.extraArgs ?? '',
     input.createdBy,
-    input.steamAppId ?? null
+    input.steamAppId ?? null,
+    input.steamLogin ?? 'anonymous',
+    input.steamExtraFlags ?? ''
   );
   return getServer(id)!;
 }
@@ -77,6 +81,8 @@ export interface UpdateServerInput {
   extraJavaArgs?: string;
   extraArgs?: string;
   autoStart?: boolean;
+  steamLogin?: string;
+  steamExtraFlags?: string;
 }
 
 export function updateServerRecord(id: string, input: UpdateServerInput) {
@@ -85,7 +91,7 @@ export function updateServerRecord(id: string, input: UpdateServerInput) {
   prep(
     `UPDATE servers SET
       name = ?, min_memory_mb = ?, max_memory_mb = ?, server_port = ?,
-      extra_java_args = ?, extra_args = ?, auto_start = ?
+      extra_java_args = ?, extra_args = ?, auto_start = ?, steam_login = ?, steam_extra_flags = ?
      WHERE id = ?`
   ).run(
     input.name ?? current.name,
@@ -95,6 +101,8 @@ export function updateServerRecord(id: string, input: UpdateServerInput) {
     input.extraJavaArgs ?? current.extra_java_args,
     input.extraArgs ?? current.extra_args,
     input.autoStart === undefined ? current.auto_start : input.autoStart ? 1 : 0,
+    input.steamLogin ?? current.steam_login,
+    input.steamExtraFlags ?? current.steam_extra_flags,
     id
   );
 }

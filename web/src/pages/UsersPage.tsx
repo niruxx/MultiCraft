@@ -5,6 +5,7 @@ import { Badge, Button, Card, ErrorText, Field, Input, Modal, Select } from '../
 import { useToast } from '../components/Toast.js';
 import { useConfirm } from '../components/ConfirmDialog.js';
 import { EnvironmentBackupCard } from '../components/EnvironmentBackupCard.js';
+import { SteamCmdSettingsCard } from '../components/SteamCmdSettingsCard.js';
 import { FactoryResetCard } from '../components/FactoryResetCard.js';
 import { api, ApiError } from '../api/client.js';
 import type { PublicUser, Role, ServerRecord } from '../api/types.js';
@@ -73,6 +74,7 @@ export function UsersPage() {
         </motion.div>
 
         <EnvironmentBackupCard />
+        <SteamCmdSettingsCard />
 
         {users === null ? (
           <p className="text-sm text-ink-500">Loading…</p>

@@ -56,6 +56,10 @@ SteamCMD itself is downloaded automatically (once, shared across all Steam-based
 | openSUSE | `sudo zypper install libstdc++6-32bit glibc-32bit` |
 | Arch | Enable `[multilib]` in `/etc/pacman.conf` first, then `sudo pacman -S lib32-gcc-libs` |
 
+**Where SteamCMD comes from** is configurable from the Users page (admin-only, "SteamCMD" section): leave it blank for the default (download the official archive from Valve automatically), point it at a URL to use a mirror instead, point it at a local archive file to extract it with no network access at all, or point it at a directory that already has SteamCMD extracted in it to use that install as-is.
+
+**Per-server SteamCMD options**: each server has a "Steam login" (defaults to `anonymous`; a real `username password` is needed for games that require an owned license — interactive Steam Guard prompts aren't supported) and "Extra steamcmd flags" field (raw arguments spliced into the install/update command line), both editable under Advanced options when creating a server and again later on its Settings tab.
+
 `install.sh` offers to install these for you (opt-in, defaults to no) — see [Installation](#installation).
 
 ## Requirements
