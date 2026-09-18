@@ -45,6 +45,18 @@ All server data (the SQLite database, every Minecraft server's files, and backup
 
 ## Installation
 
+### Quick install (Linux)
+
+On Debian/Ubuntu, Arch/Manjaro, or Fedora/RHEL, `install.sh` does steps 1–3 below for you — detects your distro, installs Node.js 22.5+/git/(optionally) Java, runs `npm run setup` and `npm run build`, verifies the panel actually responds, and asks whether to set it up as a systemd service that starts on boot:
+
+```bash
+git clone <this-repo-url> MultiCraft
+cd MultiCraft
+./install.sh
+```
+
+Pass `-y` to accept every default non-interactively (installs Java, skips the systemd prompt). Skip to [Running MultiCraft](#running-multicraft) once it finishes, or keep reading for the manual steps (also what the script does under the hood, if you want to follow along or you're on Windows/macOS/another distro).
+
 ### 1. Install the prerequisites
 
 | | Windows | Linux (Debian/Ubuntu) | macOS |

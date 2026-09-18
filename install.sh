@@ -1,0 +1,333 @@
+#!/usr/bin/env bash
+#
+# MultiCraft installer for Linux (Debian/Ubuntu, Arch/Manjaro, Fedora/RHEL — openSUSE too,
+# best-effort). Installs prerequisites (Node.js 22.5+, git, optionally Java), builds the app,
+# and optionally sets it up as a systemd service that starts on boot.
+#
+# Usage: run from inside a cloned MultiCraft checkout:
+#   ./install.sh
+#
+# Non-interactive (accepts every default — Java yes, systemd no):
+#   ./install.sh -y
+#
+set -euo pipefail
+
+# ---------------------------------------------------------------------------
+# Output helpers
+# ---------------------------------------------------------------------------
+if [[ -t 1 ]]; then
+  RED=$'\033[0;31m'; GREEN=$'\033[0;32m'; YELLOW=$'\033[1;33m'; BLUE=$'\033[0;34m'; BOLD=$'\033[1m'; NC=$'\033[0m'
+else
+  RED=''; GREEN=''; YELLOW=''; BLUE=''; BOLD=''; NC=''
+fi
+info()  { printf '%s==>%s %s\n' "$BLUE" "$NC" "$*"; }
+ok()    { printf '%s✓%s %s\n' "$GREEN" "$NC" "$*"; }
+warn()  { printf '%s!%s %s\n' "$YELLOW" "$NC" "$*"; }
+err()   { printf '%s✗%s %s\n' "$RED" "$NC" "$*" >&2; }
+die()   { err "$*"; exit 1; }
+heading() { printf '\n%s%s%s\n' "$BOLD" "$*" "$NC"; }
+
+NONINTERACTIVE=0
+for arg in "$@"; do
+  case "$arg" in
+    -y|--yes) NONINTERACTIVE=1 ;;
+    -h|--help)
+      echo "Usage: $0 [-y|--yes]"
+      echo "  -y, --yes   Non-interactive: accept every default (installs Java, skips systemd)."
+      exit 0
+      ;;
+  esac
+done
+
+# confirm "question" [default: y|n]  — returns 0 for yes, 1 for no
+confirm() {
+  local prompt="$1" default="${2:-y}" reply suffix
+  if [[ "$NONINTERACTIVE" == "1" || ! -t 0 ]]; then
+    [[ "$default" == "y" ]] && { ok "$prompt -> yes (default)"; return 0; }
+    ok "$prompt -> no (default)"; return 1
+  fi
+  suffix="[Y/n]"; [[ "$default" == "n" ]] && suffix="[y/N]"
+  read -r -p "$prompt $suffix " reply || reply=""
+  reply="${reply:-$default}"
+  [[ "$reply" =~ ^[Yy] ]]
+}
+
+# ---------------------------------------------------------------------------
+# Sanity checks
+# ---------------------------------------------------------------------------
+heading "MultiCraft installer"
+
+[[ "$(uname -s)" == "Linux" ]] || die "This script is for Linux (Debian/Ubuntu, Arch/Manjaro, Fedora/RHEL). Detected: $(uname -s)."
+
+if [[ $EUID -eq 0 ]]; then
+  SUDO=""
+  warn "Running as root. Package installation is fine, but consider running MultiCraft itself as a"
+  warn "normal user — the systemd service below will run as whichever user runs this script."
+else
+  command -v sudo >/dev/null 2>&1 || die "sudo is required to install system packages (or re-run this script as root)."
+  SUDO="sudo"
+fi
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -f "$SCRIPT_DIR/package.json" ]] && grep -q '"name": *"multicraft"' "$SCRIPT_DIR/package.json" 2>/dev/null; then
+  PROJECT_DIR="$SCRIPT_DIR"
+else
+  die "Run this from inside a MultiCraft checkout (e.g. 'git clone <repo-url> MultiCraft && cd MultiCraft && ./install.sh')."
+fi
+ok "Project directory: $PROJECT_DIR"
+
+# ---------------------------------------------------------------------------
+# Distro detection
+# ---------------------------------------------------------------------------
+DISTRO_FAMILY="unknown"
+DISTRO_NAME="Linux"
+if [[ -f /etc/os-release ]]; then
+  # shellcheck disable=SC1091
+  . /etc/os-release
+  DISTRO_NAME="${PRETTY_NAME:-$ID}"
+  case " ${ID:-} ${ID_LIKE:-} " in
+    *debian*|*ubuntu*) DISTRO_FAMILY="debian" ;;
+    *arch*|*manjaro*)  DISTRO_FAMILY="arch" ;;
+    *fedora*|*rhel*|*centos*) DISTRO_FAMILY="fedora" ;;
+    *suse*|*opensuse*) DISTRO_FAMILY="opensuse" ;;
+  esac
+fi
+[[ "$DISTRO_FAMILY" == "unknown" ]] && warn "Couldn't auto-detect a supported distro (found: $DISTRO_NAME). I'll try, but you may need to install Node.js 22.5+, git, and Java yourself."
+ok "Detected: $DISTRO_NAME ($DISTRO_FAMILY)"
+
+if [[ "$DISTRO_FAMILY" == "debian" ]]; then
+  info "Refreshing apt package lists…"
+  $SUDO apt-get update -y
+fi
+
+# ---------------------------------------------------------------------------
+# Prerequisite checks/installs
+# ---------------------------------------------------------------------------
+node_version_ok() {
+  command -v node >/dev/null 2>&1 || return 1
+  node -e '
+    const [maj, min] = process.versions.node.split(".").map(Number);
+    process.exit(maj > 22 || (maj === 22 && min >= 5) ? 0 : 1);
+  ' 2>/dev/null
+}
+
+install_node() {
+  case "$DISTRO_FAMILY" in
+    debian)
+      info "Installing Node.js 22.x via NodeSource…"
+      curl -fsSL https://deb.nodesource.com/setup_22.x | $SUDO -E bash -
+      $SUDO apt-get install -y nodejs
+      ;;
+    arch)
+      info "Installing Node.js via pacman…"
+      $SUDO pacman -Sy --needed --noconfirm nodejs npm
+      ;;
+    fedora)
+      info "Installing Node.js via dnf…"
+      $SUDO dnf install -y nodejs npm
+      if ! node_version_ok; then
+        warn "dnf's nodejs is older than 22.5 — falling back to NodeSource…"
+        curl -fsSL https://rpm.nodesource.com/setup_22.x | $SUDO bash -
+        $SUDO dnf install -y nodejs
+      fi
+      ;;
+    opensuse)
+      info "Installing Node.js via zypper…"
+      $SUDO zypper --non-interactive install nodejs22 npm22
+      ;;
+    *)
+      die "Don't know how to install Node.js on this distro. Install Node.js 22.5+ yourself (see nodejs.org or nvm) and re-run."
+      ;;
+  esac
+}
+
+install_git() {
+  case "$DISTRO_FAMILY" in
+    debian)   $SUDO apt-get install -y git ;;
+    arch)     $SUDO pacman -Sy --needed --noconfirm git ;;
+    fedora)   $SUDO dnf install -y git ;;
+    opensuse) $SUDO zypper --non-interactive install git ;;
+    *) die "Don't know how to install git on this distro. Install it yourself and re-run." ;;
+  esac
+}
+
+install_java() {
+  case "$DISTRO_FAMILY" in
+    debian)   $SUDO apt-get install -y openjdk-21-jdk ;;
+    arch)     $SUDO pacman -Sy --needed --noconfirm jdk21-openjdk ;;
+    fedora)   $SUDO dnf install -y java-21-openjdk-devel ;;
+    opensuse) $SUDO zypper --non-interactive install java-21-openjdk-devel ;;
+    *) die "Don't know how to install Java on this distro. Install a JDK 21+ yourself and re-run." ;;
+  esac
+}
+
+heading "Step 1/4 — Prerequisites"
+
+if ! command -v curl >/dev/null 2>&1; then
+  info "curl not found (needed for the Node.js installer and health checks), installing…"
+  case "$DISTRO_FAMILY" in
+    debian)   $SUDO apt-get install -y curl ;;
+    arch)     $SUDO pacman -Sy --needed --noconfirm curl ;;
+    fedora)   $SUDO dnf install -y curl ;;
+    opensuse) $SUDO zypper --non-interactive install curl ;;
+    *) die "curl is required. Install it yourself and re-run." ;;
+  esac
+  ok "curl installed"
+fi
+
+if node_version_ok; then
+  ok "Node.js $(node -v) already installed"
+else
+  if command -v node >/dev/null 2>&1; then
+    warn "Found Node.js $(node -v), but MultiCraft needs 22.5+ (for built-in node:sqlite)."
+  else
+    info "Node.js not found."
+  fi
+  install_node
+  node_version_ok || die "Node.js is still older than 22.5 after installing. Install it manually (nodejs.org or nvm) and re-run."
+  ok "Node.js $(node -v) installed"
+fi
+
+if command -v git >/dev/null 2>&1; then
+  ok "git already installed"
+else
+  info "git not found, installing…"
+  install_git
+  ok "git installed"
+fi
+
+if command -v java >/dev/null 2>&1; then
+  ok "Java already installed ($(java -version 2>&1 | head -1))"
+else
+  if confirm "Install Java 21 (needed to run Vanilla/Paper/Purpur/Spigot servers — skip if you only plan to run Bedrock)?" y; then
+    install_java
+    ok "Java installed"
+  else
+    warn "Skipping Java. You can install it later — see the README's per-distro commands."
+  fi
+fi
+
+# ---------------------------------------------------------------------------
+# Install dependencies and build
+# ---------------------------------------------------------------------------
+heading "Step 2/4 — Installing dependencies and building"
+
+cd "$PROJECT_DIR"
+info "npm run setup (installs root, server, and web workspace dependencies)…"
+npm run setup
+info "npm run build (server/dist + web/dist)…"
+npm run build
+
+[[ -f "$PROJECT_DIR/server/dist/index.js" ]] || die "Build finished but server/dist/index.js is missing — check the build output above."
+[[ -f "$PROJECT_DIR/web/dist/index.html" ]] || die "Build finished but web/dist/index.html is missing — check the build output above."
+ok "Build complete"
+
+# ---------------------------------------------------------------------------
+# Run once, verify it actually serves the UI, then stop it
+# ---------------------------------------------------------------------------
+heading "Step 3/4 — Verifying"
+
+VERIFY_PORT="${PORT:-8642}"
+# Run the compiled server directly (what `npm start` does under the hood) rather than through
+# the npm wrapper, so $! is the actual Node process and killing it doesn't leave an orphan.
+( cd "$PROJECT_DIR/server" && exec env PORT="$VERIFY_PORT" node dist/index.js ) >/tmp/multicraft-install-check.log 2>&1 &
+VERIFY_PID=$!
+trap 'kill "$VERIFY_PID" >/dev/null 2>&1 || true' EXIT
+
+sleep 3
+if curl -fsS "http://localhost:$VERIFY_PORT/api/health" >/dev/null 2>&1; then
+  ok "Health check passed (http://localhost:$VERIFY_PORT/api/health)"
+else
+  kill "$VERIFY_PID" >/dev/null 2>&1 || true
+  trap - EXIT
+  err "MultiCraft didn't respond on port $VERIFY_PORT. Recent log output:"
+  tail -n 30 /tmp/multicraft-install-check.log || true
+  die "Fix the error above and re-run this script."
+fi
+
+kill "$VERIFY_PID" >/dev/null 2>&1 || true
+wait "$VERIFY_PID" 2>/dev/null || true
+trap - EXIT
+
+# ---------------------------------------------------------------------------
+# Optional: systemd service
+# ---------------------------------------------------------------------------
+heading "Step 4/4 — Run on boot?"
+
+if ! command -v systemctl >/dev/null 2>&1; then
+  warn "systemd isn't available on this system — skipping the service setup."
+  warn "Use pm2 instead (see the README's 'Running 24/7' section)."
+else
+  if confirm "Set up a systemd service so MultiCraft starts automatically and restarts on boot/crash?" n; then
+    SERVICE_FILE="/etc/systemd/system/multicraft.service"
+    RUN_USER="$(id -un)"
+    RUN_GROUP="$(id -gn)"
+    NPM_PATH="$(command -v npm)"
+
+    if [[ -f "$SERVICE_FILE" ]]; then
+      confirm "$SERVICE_FILE already exists — overwrite it?" n || { warn "Leaving the existing service file untouched."; SERVICE_FILE=""; }
+    fi
+
+    if [[ -n "$SERVICE_FILE" ]]; then
+      read -r -p "Port for MultiCraft to listen on [8642]: " SERVICE_PORT || true
+      SERVICE_PORT="${SERVICE_PORT:-8642}"
+
+      info "Writing $SERVICE_FILE (runs as $RUN_USER)…"
+      $SUDO tee "$SERVICE_FILE" >/dev/null <<EOF
+[Unit]
+Description=MultiCraft panel
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=$PROJECT_DIR
+ExecStart=$NPM_PATH start
+Restart=on-failure
+User=$RUN_USER
+Group=$RUN_GROUP
+Environment=PORT=$SERVICE_PORT
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+      $SUDO systemctl daemon-reload
+      $SUDO systemctl enable --now multicraft
+
+      sleep 2
+      if systemctl is-active --quiet multicraft; then
+        ok "multicraft.service is active"
+        if curl -fsS "http://localhost:$SERVICE_PORT/api/health" >/dev/null 2>&1; then
+          ok "Confirmed reachable at http://localhost:$SERVICE_PORT"
+        else
+          warn "Service is running but didn't answer on port $SERVICE_PORT yet — give it a moment, then check 'journalctl -u multicraft -f'."
+        fi
+      else
+        err "Service didn't start. Check: journalctl -u multicraft -e"
+      fi
+
+      echo
+      echo "Manage it with:"
+      echo "  sudo systemctl status multicraft"
+      echo "  sudo systemctl restart multicraft"
+      echo "  sudo systemctl stop multicraft"
+      echo "  journalctl -u multicraft -f"
+    fi
+  else
+    ok "Skipping systemd. Start it manually whenever you want it running:"
+    echo "  cd $PROJECT_DIR && npm start"
+    echo "(See the README's 'Running 24/7' section for pm2 as a lighter-weight always-on option.)"
+  fi
+fi
+
+# ---------------------------------------------------------------------------
+# Summary
+# ---------------------------------------------------------------------------
+heading "Done"
+echo "MultiCraft is installed at: $PROJECT_DIR"
+echo "Panel URL (once running):  http://<this-machine's-ip>:${SERVICE_PORT:-${VERIFY_PORT:-8642}}"
+echo
+echo "Reminders:"
+echo "  - The panel's own port only needs to be reachable by admins — consider a reverse proxy/VPN for it."
+echo "  - Each Minecraft server you create needs its own port opened (25565/tcp for Java, 19132/udp for Bedrock)."
+echo "  - See the README for firewall commands (ufw/firewalld) and moving data outside the checkout."

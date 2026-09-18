@@ -1,2 +1,6 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+
+# Shell scripts must always have LF line endings — a CRLF shebang line breaks on Linux
+# ("bad interpreter") regardless of what OS someone last committed from.
+*.sh text eol=lf
