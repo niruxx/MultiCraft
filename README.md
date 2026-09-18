@@ -292,7 +292,21 @@ Cross-platform reminder: importing an environment created on a different OS won'
 
 ## Updating MultiCraft
 
-Updating means replacing the application code while leaving `server/data/` completely alone. The steps below never touch that directory — but a couple of common commands (below) *do* wipe it if you're not careful, so read the warning first. If you want an extra safety net regardless, [export the environment](#backing-up-and-restoring-the-whole-environment) first — it's a one-click way to get everything back if an update ever goes sideways.
+Updating means replacing the application code while leaving `server/data/` completely alone.
+
+### Option A — `update.sh` (recommended)
+
+```bash
+./update.sh
+```
+
+This does the whole update for you, safely: backs up `server/data/` to a timestamped `.tar.gz` *before* touching anything, records the current commit so the code can be rolled back too, pulls with `git pull --ff-only` (refuses to guess through a merge — it stops and tells you what to do instead of forcing anything), rebuilds, and offers to start the new build once to confirm `/api/health` responds before it touches your live service. If that check fails, it offers to roll straight back to the exact commit you were on and rebuilds that instead. Nothing here ever deletes or modifies `server/data/`.
+
+Flags: `./update.sh -y` runs it non-interactively (stashes local changes if any, tests the build, restarts a detected `multicraft.service` on success). `./update.sh --rollback` skips updating entirely and just restores the last pre-update commit it recorded, if you find a problem after the fact.
+
+If you want an extra safety net on top of this regardless, [export the environment](#backing-up-and-restoring-the-whole-environment) first too.
+
+### Option B — manual
 
 ```bash
 git pull                     # or however you fetch the new version
