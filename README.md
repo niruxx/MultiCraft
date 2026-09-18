@@ -1,10 +1,11 @@
 # MultiCraft
 
-A self-hosted, web-based control panel for creating and running Minecraft servers — Java Edition (Vanilla, Paper, Purpur, Spigot) and Bedrock Edition. Create servers from your browser, manage players and plugins, edit settings and files, run console commands live, monitor resource usage, and schedule automatic backups and updates.
+A self-hosted, web-based control panel for creating and running Minecraft servers — Java Edition (Vanilla, Paper, Purpur, Spigot) and Bedrock Edition — plus other SteamCMD-based dedicated game servers (Palworld, Project Zomboid, Valheim, Terraria, and any other Steam App ID). Create servers from your browser, manage players and plugins, edit settings and files, run console commands live, monitor resource usage, and schedule automatic backups and updates.
 
 ## Features
 
-- **Server creation** — pick a platform (Java/Bedrock) and loader (Vanilla, Paper, Purpur, Spigot, or Bedrock Dedicated Server), choose a version from the live catalog, and MultiCraft downloads and installs it for you. Spigot is compiled from source on the host via BuildTools (requires a full JDK + git).
+- **Server creation** — pick a platform (Java/Bedrock/Steam) and loader (Vanilla, Paper, Purpur, Spigot, Bedrock Dedicated Server, or a SteamCMD game), choose a version from the live catalog, and MultiCraft downloads and installs it for you. Spigot is compiled from source on the host via BuildTools (requires a full JDK + git).
+- **Steam-based servers** — curated presets for Palworld, Project Zomboid, Valheim, and Terraria (correct App ID, default port, and shutdown behavior pre-filled), plus a free-form "Other" option for any Steam App ID. See [Steam-based servers](#steam-based-servers) below.
 - **Process control** — start, stop, restart, and force-kill servers; auto-start on panel boot.
 - **Live console** — real-time console output over WebSocket, with a command input, history (↑/↓), and verbose install/update progress streaming.
 - **Players** — see online/known players, op/de-op, whitelist, kick, and ban.
@@ -30,15 +31,39 @@ MultiCraft/
 
 - **Database**: SQLite via Node's built-in `node:sqlite` — no external DB server, no native compilation.
 - **Auth**: HMAC-signed session tokens + `scrypt` password hashing, both from Node's built-in `node:crypto` — no bcrypt/JWT native deps.
-- **Process management**: server processes are plain child processes (`java -jar ...` or `bedrock_server`); console I/O and player join/leave events are parsed from stdout and streamed to the browser over WebSocket.
-- **Downloads**: Vanilla via Mojang's version manifest, Paper via the PaperMC Fill API, Purpur via the PurpurMC API, Spigot via BuildTools (SpigotMC), Bedrock via Mojang's official download-links endpoint. Plugin search/install uses the Modrinth API.
-- **Updates**: Java loaders are updated by re-installing into the existing server directory (the installer only ever writes the jar, so world/config files are untouched); Bedrock is updated by extracting the new release over the existing directory while explicitly skipping `worlds/`, `server.properties`, `allowlist.json`, `whitelist.json`, and `permissions.json`.
+- **Process management**: server processes are plain child processes (`java -jar ...`, `bedrock_server`, or a game's own dedicated-server binary via steamcmd); console I/O and player join/leave events are parsed from stdout and streamed to the browser over WebSocket.
+- **Downloads**: Vanilla via Mojang's version manifest, Paper via the PaperMC Fill API, Purpur via the PurpurMC API, Spigot via BuildTools (SpigotMC), Bedrock via Mojang's official download-links endpoint, Steam-based games via SteamCMD (downloaded automatically on first use). Plugin search/install uses the Modrinth API.
+- **Updates**: Java loaders are updated by re-installing into the existing server directory (the installer only ever writes the jar, so world/config files are untouched); Bedrock is updated by extracting the new release over the existing directory while explicitly skipping `worlds/`, `server.properties`, `allowlist.json`, `whitelist.json`, and `permissions.json`; Steam-based games are updated by re-running `steamcmd +app_update`, which only touches files tracked by the game's own depot manifest.
+
+## Steam-based servers
+
+MultiCraft can also host dedicated servers for non-Minecraft games distributed via SteamCMD. When you create a server, choose the **Steam** platform, then pick a game:
+
+- **Palworld** — App ID 2394010, default port 8211/UDP. Its dedicated server doesn't reliably respond to a clean stop signal (Pocketpair's own guidance is that graceful shutdown needs RCON), so MultiCraft force-stops it after a short grace period on Stop — its own periodic autosave is what's preserved, not a save-on-exit.
+- **Project Zomboid** — App ID 380870, default port 16261/UDP. Stops cleanly via its own console `save`/`quit` sequence.
+- **Valheim** — App ID 896660, default port 2456/UDP. Stops via SIGINT (Valheim only saves its world on SIGINT, not SIGTERM).
+- **Terraria** — App ID 105600, default port 7777/TCP. Always started with `-autocreate`/`-world` so it never blocks waiting for interactive console input.
+- **Other (custom App ID)** — enter any Steam App ID plus the relative path to its server executable. MultiCraft doesn't know a custom game's launch/shutdown behavior, so it sends SIGTERM (falling back to a forced stop after 60s) and marks it "running" as soon as the process starts.
+
+Config files for Steam-based servers aren't parsed or edited by MultiCraft directly — use the **Files** tab to open whatever config file the game writes (INI, JSON, or otherwise). The Players, Operator, Whitelist, and Maps tabs are Minecraft-specific and don't apply to Steam-based servers.
+
+SteamCMD itself is downloaded automatically (once, shared across all Steam-based servers) the first time you create one. On Linux, steamcmd is a 32-bit binary and needs matching 32-bit runtime libraries that most 64-bit-only servers don't have installed by default:
+
+| Distro | Command |
+|---|---|
+| Debian/Ubuntu | `sudo dpkg --add-architecture i386 && sudo apt-get update && sudo apt-get install lib32gcc-s1 lib32stdc++6` |
+| Fedora | `sudo dnf install glibc.i686 libstdc++.i686` |
+| openSUSE | `sudo zypper install libstdc++6-32bit glibc-32bit` |
+| Arch | Enable `[multilib]` in `/etc/pacman.conf` first, then `sudo pacman -S lib32-gcc-libs` |
+
+`install.sh` offers to install these for you (opt-in, defaults to no) — see [Installation](#installation).
 
 ## Requirements
 
 - **Node.js 22.5+** (for built-in `node:sqlite`) — Node 24 recommended.
-- **Java 21+** on PATH (or `JAVA_HOME` set) — required to run Vanilla/Paper/Purpur/Spigot servers. Not needed for Bedrock-only use.
+- **Java 21+** on PATH (or `JAVA_HOME` set) — required to run Vanilla/Paper/Purpur/Spigot servers. Not needed for Bedrock- or Steam-only use.
 - **A full JDK + git** — only if you plan to create Spigot servers (BuildTools compiles Spigot from source on the host).
+- **32-bit runtime libraries** on Linux — only if you plan to create Steam-based servers (steamcmd itself is a 32-bit binary). See [Steam-based servers](#steam-based-servers) below.
 - Windows, Linux, or macOS.
 
 All server data (the SQLite database, every Minecraft server's files, and backups) lives under **`server/data/`** by default — this whole directory is git-ignored and is the only thing you need to preserve across updates, backups, or migrations. See [Moving `server/data/` outside the repo](#moving-serverdata-outside-the-repo-recommended-for-production) below.

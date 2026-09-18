@@ -15,6 +15,7 @@ export interface CreateServerInput {
   extraJavaArgs?: string;
   extraArgs?: string;
   createdBy: string;
+  steamAppId?: string | null;
 }
 
 export function createServerRecord(input: CreateServerInput): ServerRecord {
@@ -23,8 +24,8 @@ export function createServerRecord(input: CreateServerInput): ServerRecord {
   fs.mkdirSync(backupDir(id), { recursive: true });
   prep(
     `INSERT INTO servers
-      (id, name, platform, loader, version, min_memory_mb, max_memory_mb, server_port, extra_java_args, extra_args, status, created_by)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'installing', ?)`
+      (id, name, platform, loader, version, min_memory_mb, max_memory_mb, server_port, extra_java_args, extra_args, status, created_by, steam_app_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'installing', ?, ?)`
   ).run(
     id,
     input.name,
@@ -36,7 +37,8 @@ export function createServerRecord(input: CreateServerInput): ServerRecord {
     input.serverPort,
     input.extraJavaArgs ?? '',
     input.extraArgs ?? '',
-    input.createdBy
+    input.createdBy,
+    input.steamAppId ?? null
   );
   return getServer(id)!;
 }

@@ -5,6 +5,8 @@ import AdmZip from 'adm-zip';
 import { logger } from '../utils/logger.js';
 import { downloadFile, fetchJson, formatBytes, type LogFn } from '../utils/download.js';
 import { findJava, findJavac } from './javaService.js';
+import { steamAppUpdate } from './steamCmdService.js';
+import { findPreset } from './steamGames.js';
 import type { Loader, Platform } from '../types/index.js';
 
 const MOJANG_MANIFEST = 'https://launchermeta.mojang.com/mc/game/version_manifest_v2.json';
@@ -14,6 +16,9 @@ const BEDROCK_LINKS_API =
   'https://net-secondary.web.minecraft-services.net/api/v1.0/download/links';
 const BUILD_TOOLS_URL =
   'https://hub.spigotmc.org/jenkins/job/BuildTools/lastSuccessfulBuild/artifact/target/BuildTools.jar';
+const TERRARIA_APP_ID = '105600';
+const TERRARIA_NAMES_API = 'https://terraria.org/api/get/dedicated-servers-names';
+const TERRARIA_DOWNLOAD_API = 'https://terraria.org/api/download/pc-dedicated-server';
 
 export interface VersionOption {
   version: string;
@@ -31,7 +36,7 @@ function describeHost(): string {
 }
 
 /** Runs a child process, streaming every stdout/stderr line through onLog in real time. */
-function runStreamed(cmd: string, args: string[], cwd: string, onLog?: LogFn): Promise<void> {
+export function runStreamed(cmd: string, args: string[], cwd: string, onLog?: LogFn): Promise<void> {
   return new Promise((resolve, reject) => {
     const child = spawn(cmd, args, { cwd, windowsHide: true });
     child.stdout.setEncoding('utf8');
@@ -74,6 +79,11 @@ export async function listAvailableVersions(loader: Loader): Promise<VersionOpti
     // Bedrock dedicated server only ships the latest build; expose it as a single "latest" option.
     return [{ version: 'latest', recommended: true }];
   }
+  if (loader === 'steam') {
+    // steamcmd always installs the latest depot state via +app_update; there's no meaningful
+    // per-version picker for these games.
+    return [{ version: 'latest', recommended: true }];
+  }
   throw new Error(`Unknown loader: ${loader}`);
 }
 
@@ -83,6 +93,56 @@ export interface InstallResult {
   executable: string | null; // relative path to bedrock_server executable (Bedrock only)
 }
 
+/** Downloads Terraria's dedicated server directly from terraria.org (no Steam login needed) and
+ *  flattens the right platform's files (TerrariaServer.exe / TerrariaServer.bin.x86_64 / the
+ *  macOS .app bundle) up to instanceDir's root, discarding the other two platforms' copies. The
+ *  zip's top-level folder is named after the current version (e.g. "1458/"), so this discovers
+ *  that name at extraction time rather than assuming one. */
+async function installTerraria(instanceDir: string, onLog?: LogFn): Promise<void> {
+  onLog?.(
+    "==> Terraria's SteamCMD depot requires an owned Steam account for anonymous downloads to actually " +
+      'work, so fetching the dedicated server directly from terraria.org instead'
+  );
+  const names = await fetchJson<string[]>(TERRARIA_NAMES_API, onLog);
+  const fileName = names[0];
+  if (!fileName) throw new Error('Could not determine the latest Terraria dedicated server version from terraria.org');
+
+  const zipPath = path.join(instanceDir, '_terraria_server.zip');
+  onLog?.(`==> Downloading ${fileName}`);
+  await downloadFile(`${TERRARIA_DOWNLOAD_API}/${fileName}`, zipPath, undefined, onLog);
+
+  const stagingDir = path.join(instanceDir, '_terraria_staging');
+  fs.rmSync(stagingDir, { recursive: true, force: true });
+  onLog?.('==> Extracting Terraria dedicated server');
+  new AdmZip(zipPath).extractAllTo(stagingDir, true);
+  fs.rmSync(zipPath, { force: true });
+
+  const versionDirs = fs.readdirSync(stagingDir).filter((n) => fs.statSync(path.join(stagingDir, n)).isDirectory());
+  const versionDir = versionDirs[0];
+  if (!versionDir) throw new Error('Terraria server zip did not contain the expected version folder');
+
+  const platformFolder = process.platform === 'win32' ? 'Windows' : process.platform === 'darwin' ? 'Mac' : 'Linux';
+  const sourceDir = path.join(stagingDir, versionDir, platformFolder);
+  if (!fs.existsSync(sourceDir)) {
+    throw new Error(`Terraria server zip had no "${platformFolder}" folder for this host's platform`);
+  }
+  onLog?.(`==> Placing ${platformFolder} server files into the server directory`);
+  fs.cpSync(sourceDir, instanceDir, { recursive: true });
+  fs.rmSync(stagingDir, { recursive: true, force: true });
+
+  if (process.platform === 'win32') {
+    // Unlike the Linux/Mac builds (which bundle the self-contained FNA runtime), the Windows
+    // server .exe links against the old Microsoft XNA Framework 4.0 redistributable and does not
+    // bundle it — it's not present after this extraction and must be installed separately, or the
+    // server will fail immediately with a FileNotFoundException for Microsoft.Xna.Framework.
+    onLog?.(
+      '==> NOTE: the Windows Terraria server needs the Microsoft XNA Framework 4.0 Redistributable ' +
+        'installed separately (it is not bundled in the server download) — search for "Microsoft XNA ' +
+        'Framework Redistributable 4.0" and install it, or run this server on Linux instead, before starting it.'
+    );
+  }
+}
+
 /** Downloads and installs the requested server software into `instanceDir`, logging verbosely as it goes. */
 export async function installServer(
   platform: Platform,
@@ -90,11 +150,43 @@ export async function installServer(
   version: string,
   instanceDir: string,
   onProgress?: ProgressFn,
-  onLog?: LogFn
+  onLog?: LogFn,
+  steamAppId?: string
 ): Promise<InstallResult> {
   fs.mkdirSync(instanceDir, { recursive: true });
   onLog?.(`==> Installing ${loader} ${version} (${platform}) into ${instanceDir}`);
   onLog?.(`==> Host environment detected: ${describeHost()}`);
+
+  if (platform === 'steam') {
+    if (!steamAppId) throw new Error('steamAppId is required to install a Steam-platform server');
+    if (steamAppId === TERRARIA_APP_ID) {
+      // App 105600 is Terraria's full paid client depot — anonymous steamcmd login can request
+      // it but has no license to actually download the content, and steamcmd doesn't fail loudly
+      // when that happens (it reports "Success!" with nothing actually extracted). Community
+      // practice (LinuxGSM, various server wrappers) is to fetch the dedicated server zip
+      // directly from terraria.org instead, which needs no login at all.
+      onProgress?.(0, 'Downloading Terraria dedicated server from terraria.org');
+      await installTerraria(instanceDir, onLog);
+    } else {
+      onProgress?.(0, `Installing Steam app ${steamAppId} via steamcmd`);
+      await steamAppUpdate(steamAppId, instanceDir, onLog, true);
+    }
+    const preset = findPreset(steamAppId);
+    const executable = preset ? (process.platform === 'win32' ? preset.executable.win32 : preset.executable.linux) : null;
+    if (preset?.needsExecuteBit && process.platform !== 'win32' && executable) {
+      try {
+        fs.chmodSync(path.join(instanceDir, executable), 0o755);
+        onLog?.(`  chmod +x ${executable} OK`);
+      } catch (err) {
+        logger.warn(`Failed to chmod ${executable}`, err);
+      }
+    }
+    onLog?.('==> Install complete');
+    onProgress?.(100, 'Installed');
+    // Custom (non-preset) App IDs have no known executable — the route layer fills jar_file in
+    // directly from the user-supplied path in that case.
+    return { jarFile: executable, build: null, executable: null };
+  }
 
   if (loader === 'vanilla') {
     onProgress?.(0, 'Resolving vanilla version metadata');

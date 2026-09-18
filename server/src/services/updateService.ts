@@ -11,6 +11,7 @@ import {
   installServer,
   type ProgressFn,
 } from './downloadService.js';
+import { steamAppUpdate } from './steamCmdService.js';
 import { logger } from '../utils/logger.js';
 import type { ServerRecord } from '../types/index.js';
 
@@ -24,6 +25,19 @@ export interface UpdateCheckResult {
 }
 
 export async function checkForUpdate(server: ServerRecord): Promise<UpdateCheckResult> {
+  if (server.platform === 'steam') {
+    // steamcmd has no cheap "is a newer build available" query short of a full app_update run —
+    // always offer to re-run it, same precedent as Spigot's no-version-tracked-builds case.
+    return {
+      currentVersion: server.version,
+      currentBuild: null,
+      latestVersion: server.version,
+      latestBuild: null,
+      updateAvailable: true,
+      note: 'Steam servers have no version-tracked builds — updating re-runs steamcmd to pull the latest depot state.',
+    };
+  }
+
   if (server.platform === 'bedrock') {
     const latest = await getLatestBedrockDownload();
     return {
@@ -123,6 +137,14 @@ export async function performUpdate(
   onLog?: LogFn
 ): Promise<UpdateResult> {
   const dir = instanceDir(server.id);
+
+  if (server.platform === 'steam') {
+    if (!server.steam_app_id) throw new Error('This server has no Steam App ID recorded');
+    onLog?.('==> Updating Steam server in place (steamcmd only touches its own tracked depot files)');
+    await steamAppUpdate(server.steam_app_id, dir, onLog, true);
+    onProgress?.(100, 'Updated');
+    return { version: server.version, build: null, jarFile: server.jar_file };
+  }
 
   if (server.platform === 'bedrock') {
     onLog?.('==> Updating Bedrock Dedicated Server in place');

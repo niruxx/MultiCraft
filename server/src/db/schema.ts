@@ -18,8 +18,8 @@ CREATE TABLE IF NOT EXISTS user_server_access (
 CREATE TABLE IF NOT EXISTS servers (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
-  platform TEXT NOT NULL CHECK (platform IN ('java', 'bedrock')),
-  loader TEXT NOT NULL, -- vanilla | paper | purpur | bedrock
+  platform TEXT NOT NULL, -- java | bedrock | steam (validated at the application layer, like loader)
+  loader TEXT NOT NULL, -- vanilla | paper | purpur | spigot | bedrock | steam
   version TEXT NOT NULL,
   build TEXT,
   jar_file TEXT,
@@ -31,7 +31,8 @@ CREATE TABLE IF NOT EXISTS servers (
   auto_start BOOLEAN NOT NULL DEFAULT 0,
   status TEXT NOT NULL DEFAULT 'installing',
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
-  created_by TEXT REFERENCES users(id)
+  created_by TEXT REFERENCES users(id),
+  steam_app_id TEXT -- Steam App ID actually installed, for platform = 'steam' servers
 );
 
 CREATE TABLE IF NOT EXISTS backup_schedules (

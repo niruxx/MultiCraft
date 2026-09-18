@@ -13,6 +13,7 @@ export const INSTANCES_DIR = path.join(DATA_DIR, 'servers');
 export const BACKUPS_DIR = path.join(DATA_DIR, 'backups');
 export const JAVA_RUNTIMES_DIR = path.join(DATA_DIR, 'runtimes');
 export const MAP_CACHE_DIR = path.join(DATA_DIR, 'map-cache');
+export const STEAMCMD_DIR = path.join(DATA_DIR, 'steamcmd');
 export const WEB_DIST_DIR = path.resolve(SERVER_ROOT, '..', 'web', 'dist');
 
 export function instanceDir(serverId: string): string {

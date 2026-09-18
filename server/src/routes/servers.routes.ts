@@ -1,7 +1,8 @@
 import { Router, type Request } from 'express';
+import fs from 'node:fs';
+import os from 'node:os';
 import { asyncHandler, HttpError } from '../utils/asyncHandler.js';
 import { requireAuth, requireRole, requireServerAccess } from '../auth/middleware.js';
-import os from 'node:os';
 import {
   createServerRecord,
   deleteServerRecord,
@@ -29,8 +30,9 @@ import { publish, consoleTopic } from '../services/wsHub.js';
 import { appendLine } from '../services/consoleLogService.js';
 import { findJava, getJavaVersion } from '../services/javaService.js';
 import { getDiskUsage } from '../services/diskUsageService.js';
-import { instanceDir } from '../utils/paths.js';
-import type { Loader, Platform, Role } from '../types/index.js';
+import { instanceDir, safeJoin } from '../utils/paths.js';
+import { STEAM_GAME_PRESETS, findPreset } from '../services/steamGames.js';
+import { isSteamPlatform, type Loader, type Platform, type Role } from '../types/index.js';
 
 export const serversRouter = Router();
 serversRouter.use(requireAuth);
@@ -57,11 +59,27 @@ serversRouter.get(
   '/catalog/versions',
   asyncHandler(async (req, res) => {
     const loader = req.query.loader as Loader;
-    if (!['vanilla', 'paper', 'purpur', 'bedrock'].includes(loader)) {
-      throw new HttpError(400, 'loader must be one of vanilla, paper, purpur, bedrock');
+    if (!['vanilla', 'paper', 'purpur', 'spigot', 'bedrock', 'steam'].includes(loader)) {
+      throw new HttpError(400, 'loader must be one of vanilla, paper, purpur, spigot, bedrock, steam');
     }
     const versions = await listAvailableVersions(loader);
     res.json({ versions });
+  })
+);
+
+serversRouter.get(
+  '/catalog/steam-games',
+  asyncHandler(async (_req, res) => {
+    res.json({
+      games: STEAM_GAME_PRESETS.map(({ id, label, appId, defaultPort, portProtocol, notes }) => ({
+        id,
+        label,
+        appId,
+        defaultPort,
+        portProtocol,
+        notes: notes ?? null,
+      })),
+    });
   })
 );
 
@@ -89,14 +107,38 @@ serversRouter.post(
       extraJavaArgs,
       extraArgs,
       acceptEula,
+      steamAppId,
+      customExecutable,
     } = req.body ?? {};
 
     if (typeof name !== 'string' || !name.trim()) throw new HttpError(400, 'Server name is required');
-    if (!['java', 'bedrock'].includes(platform)) throw new HttpError(400, 'Invalid platform');
-    if (!['vanilla', 'paper', 'purpur', 'bedrock'].includes(loader)) throw new HttpError(400, 'Invalid loader');
+    if (!['java', 'bedrock', 'steam'].includes(platform)) throw new HttpError(400, 'Invalid platform');
+    if (!['vanilla', 'paper', 'purpur', 'spigot', 'bedrock', 'steam'].includes(loader)) {
+      throw new HttpError(400, 'Invalid loader');
+    }
     if (typeof version !== 'string' || !version) throw new HttpError(400, 'Version is required');
     if (platform === 'java' && acceptEula !== true) {
       throw new HttpError(400, "You must accept Mojang's EULA to create a Java server");
+    }
+
+    let preset: ReturnType<typeof findPreset> | undefined;
+    if (platform === 'steam') {
+      if (typeof steamAppId !== 'string' || !/^\d+$/.test(steamAppId)) {
+        throw new HttpError(400, 'steamAppId is required for Steam servers and must be a numeric Steam App ID');
+      }
+      preset = findPreset(steamAppId);
+      if (!preset && (typeof customExecutable !== 'string' || !customExecutable.trim())) {
+        throw new HttpError(400, "customExecutable is required when steamAppId isn't one of the curated presets");
+      }
+      if (!preset) {
+        // Traversal check only — the real instance directory doesn't exist yet, but safeJoin's
+        // escape check is purely path math and works against any base.
+        try {
+          safeJoin(instanceDir('__validate__'), customExecutable.trim());
+        } catch {
+          throw new HttpError(400, 'customExecutable must be a relative path inside the server directory');
+        }
+      }
     }
 
     const record = createServerRecord({
@@ -106,10 +148,11 @@ serversRouter.post(
       version,
       minMemoryMb: Number(minMemoryMb) || 1024,
       maxMemoryMb: Number(maxMemoryMb) || 2048,
-      serverPort: Number(serverPort) || (platform === 'bedrock' ? 19132 : 25565),
+      serverPort: Number(serverPort) || preset?.defaultPort || (platform === 'bedrock' ? 19132 : 25565),
       extraJavaArgs: typeof extraJavaArgs === 'string' ? extraJavaArgs : '',
       extraArgs: typeof extraArgs === 'string' ? extraArgs : '',
       createdBy: req.auth!.sub,
+      steamAppId: platform === 'steam' ? steamAppId : null,
     });
 
     appendLine(record.id, `[MultiCraft] Creating server "${record.name}" (${loader} ${version}, ${platform})`);
@@ -131,8 +174,25 @@ serversRouter.post(
           version,
           instanceDir(record.id),
           (pct, message) => publish(consoleTopic(record.id), { type: 'install_progress', pct, message }),
-          (line) => appendLine(record.id, line)
+          (line) => appendLine(record.id, line),
+          platform === 'steam' ? steamAppId : undefined
         );
+        if (platform === 'steam' && !preset && typeof customExecutable === 'string') {
+          // Custom (non-preset) App ID: the install step has no way to know the launch
+          // executable itself, so record the user-supplied relative path now that the files exist.
+          const exePath = safeJoin(instanceDir(record.id), customExecutable.trim());
+          if (!fs.existsSync(exePath)) {
+            throw new Error(`Custom executable not found after install: ${customExecutable.trim()}`);
+          }
+          if (process.platform !== 'win32') {
+            try {
+              fs.chmodSync(exePath, 0o755);
+            } catch {
+              // best-effort; startup will surface a clear error if the file truly can't be executed
+            }
+          }
+          result.jarFile = customExecutable.trim();
+        }
         if (result.jarFile) setServerJar(record.id, result.jarFile, result.build);
         else if (result.executable) setServerJar(record.id, result.executable, result.build);
         appendLine(record.id, '[MultiCraft] Installation finished — server is ready to start');
@@ -262,6 +322,9 @@ serversRouter.get(
   '/:serverId/players',
   requireServerAccess(),
   asyncHandler(async (req, res) => {
+    const server = getServer(req.params.serverId);
+    if (!server) throw new HttpError(404, 'Server not found');
+    if (isSteamPlatform(server.platform)) throw new HttpError(400, 'Steam-platform servers have no player roster');
     res.json({ players: getPlayerRoster(req.params.serverId) });
   })
 );
@@ -282,6 +345,9 @@ serversRouter.post(
   asyncHandler(async (req, res) => {
     requireWrite(req);
     const { serverId, name, action } = req.params;
+    const server = getServer(serverId);
+    if (!server) throw new HttpError(404, 'Server not found');
+    if (isSteamPlatform(server.platform)) throw new HttpError(400, 'Steam-platform servers have no operator/player commands');
     const builder = PLAYER_ACTIONS[action];
     if (!builder) throw new HttpError(400, `Unknown player action: ${action}`);
     if (!isRunning(serverId)) {

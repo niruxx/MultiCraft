@@ -85,18 +85,22 @@ export function SettingsTab() {
               />
             </Field>
           )}
-          <Field label="Min memory (MB)">
-            <Input type="number" value={minMemoryMb} onChange={(e) => setMinMemoryMb(Number(e.target.value))} disabled={!canWrite} />
-          </Field>
-          <Field label="Max memory (MB)">
-            <Input type="number" value={maxMemoryMb} onChange={(e) => setMaxMemoryMb(Number(e.target.value))} disabled={!canWrite} />
-          </Field>
+          {server.platform !== 'steam' && (
+            <>
+              <Field label="Min memory (MB)">
+                <Input type="number" value={minMemoryMb} onChange={(e) => setMinMemoryMb(Number(e.target.value))} disabled={!canWrite} />
+              </Field>
+              <Field label="Max memory (MB)">
+                <Input type="number" value={maxMemoryMb} onChange={(e) => setMaxMemoryMb(Number(e.target.value))} disabled={!canWrite} />
+              </Field>
+            </>
+          )}
           {server.platform === 'java' && (
             <Field label="Extra JVM args">
               <Input value={extraJavaArgs} onChange={(e) => setExtraJavaArgs(e.target.value)} disabled={!canWrite} placeholder="-XX:+UseG1GC" />
             </Field>
           )}
-          <Field label="Extra server args">
+          <Field label={server.platform === 'steam' ? 'Extra launch args' : 'Extra server args'}>
             <Input value={extraArgs} onChange={(e) => setExtraArgs(e.target.value)} disabled={!canWrite} />
           </Field>
         </div>
@@ -118,7 +122,17 @@ export function SettingsTab() {
         )}
       </Card>
 
-      <PropertiesEditor serverId={server.id} canWrite={canWrite} />
+      {server.platform === 'steam' ? (
+        <Card className="p-4">
+          <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-ink-400">Config files</h2>
+          <p className="text-sm text-ink-400">
+            This game's config files aren't edited here — open the Files tab to view or edit whatever config file
+            it writes (INI, JSON, or otherwise).
+          </p>
+        </Card>
+      ) : (
+        <PropertiesEditor serverId={server.id} canWrite={canWrite} />
+      )}
     </div>
   );
 }

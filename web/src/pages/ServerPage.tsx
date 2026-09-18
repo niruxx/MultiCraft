@@ -20,9 +20,9 @@ import { ResourcesTab } from './server/ResourcesTab.js';
 import { UpdateTab } from './server/UpdateTab.js';
 import { api, ApiError } from '../api/client.js';
 import { useAuth } from '../state/AuthContext.js';
-import { PLUGIN_CAPABLE_LOADERS } from '../api/types.js';
+import { PLUGIN_CAPABLE_LOADERS, isSteamPlatform } from '../api/types.js';
 
-const PLATFORM_ICON: Record<string, string> = { java: '☕', bedrock: '🪨' };
+const PLATFORM_ICON: Record<string, string> = { java: '☕', bedrock: '🪨', steam: '🎮' };
 
 function ServerPageInner() {
   const { server, running } = useServerDetail();
@@ -50,13 +50,15 @@ function ServerPageInner() {
     }
   }
 
+  const steamServer = !!server && isSteamPlatform(server.platform);
+
   const tabs = [
     { to: 'console', label: 'Console' },
-    { to: 'players', label: 'Players' },
-    { to: 'operator', label: 'Operator' },
-    { to: 'whitelist', label: 'Whitelist' },
+    ...(steamServer ? [] : [{ to: 'players', label: 'Players' }]),
+    ...(steamServer ? [] : [{ to: 'operator', label: 'Operator' }]),
+    ...(steamServer ? [] : [{ to: 'whitelist', label: 'Whitelist' }]),
     ...(server && PLUGIN_CAPABLE_LOADERS.includes(server.loader) ? [{ to: 'plugins', label: 'Plugins' }] : []),
-    { to: 'maps', label: 'Maps' },
+    ...(steamServer ? [] : [{ to: 'maps', label: 'Maps' }]),
     { to: 'settings', label: 'Settings' },
     { to: 'files', label: 'Files' },
     { to: 'backups', label: 'Backups' },
@@ -100,7 +102,8 @@ function ServerPageInner() {
             )}
           </div>
           <p className="mb-3 text-xs text-ink-400">
-            {server.platform === 'java' ? 'Java' : 'Bedrock'} · {server.loader} {server.version} · port {server.server_port}
+            {server.platform === 'java' ? 'Java' : server.platform === 'bedrock' ? 'Bedrock' : 'Steam'} ·{' '}
+            {server.loader} {server.version} · port {server.server_port}
           </p>
           <nav className="relative flex flex-wrap gap-1">
             {tabs.map((t) => (
@@ -140,11 +143,11 @@ function ServerPageInner() {
           <Routes>
             <Route index element={<Navigate to="console" replace />} />
             <Route path="console" element={<ConsoleTab />} />
-            <Route path="players" element={<PlayersTab />} />
-            <Route path="operator" element={<OperatorTab />} />
-            <Route path="whitelist" element={<WhitelistTab />} />
+            {!steamServer && <Route path="players" element={<PlayersTab />} />}
+            {!steamServer && <Route path="operator" element={<OperatorTab />} />}
+            {!steamServer && <Route path="whitelist" element={<WhitelistTab />} />}
             {PLUGIN_CAPABLE_LOADERS.includes(server.loader) && <Route path="plugins" element={<PluginsTab />} />}
-            <Route path="maps" element={<MapsTab />} />
+            {!steamServer && <Route path="maps" element={<MapsTab />} />}
             <Route path="settings" element={<SettingsTab />} />
             <Route path="files" element={<FilesTab />} />
             <Route path="backups" element={<BackupsTab />} />

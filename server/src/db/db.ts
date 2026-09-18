@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import { DatabaseSync, type StatementSync } from 'node:sqlite';
 import { DATA_DIR, DB_PATH } from '../utils/paths.js';
 import { SCHEMA_SQL } from './schema.js';
+import { runMigrations } from './migrations.js';
 import { logger } from '../utils/logger.js';
 
 fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -10,6 +11,7 @@ export const db = new DatabaseSync(DB_PATH);
 db.exec('PRAGMA journal_mode = WAL;');
 db.exec('PRAGMA foreign_keys = ON;');
 db.exec(SCHEMA_SQL);
+runMigrations(db);
 
 logger.info(`Database ready at ${DB_PATH}`);
 

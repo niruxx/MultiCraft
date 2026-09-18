@@ -11,7 +11,7 @@ import {
   whitelistCommand,
 } from '../services/whitelistService.js';
 import { logAudit } from '../services/userService.js';
-import type { Role } from '../types/index.js';
+import { isSteamPlatform, type Role } from '../types/index.js';
 
 export const whitelistRouter = Router({ mergeParams: true });
 whitelistRouter.use(requireAuth, requireServerAccess());
@@ -27,6 +27,7 @@ function requireWrite(req: Request) {
 function requireServer(serverId: string) {
   const server = getServer(serverId);
   if (!server) throw new HttpError(404, 'Server not found');
+  if (isSteamPlatform(server.platform)) throw new HttpError(400, 'Steam-platform servers have no allowlist concept');
   return server;
 }
 

@@ -161,6 +161,37 @@ install_java() {
   esac
 }
 
+# steamcmd is a 32-bit binary and needs matching 32-bit runtime libraries, which aren't installed
+# on a typical 64-bit-only server by default. Best-effort per distro; non-fatal if it fails since
+# it's only needed for Steam-platform (Palworld/Zomboid/Valheim/Terraria/etc) servers.
+install_steamcmd_deps() {
+  case "$DISTRO_FAMILY" in
+    debian)
+      $SUDO dpkg --add-architecture i386
+      $SUDO apt-get update -y
+      $SUDO apt-get install -y lib32gcc-s1 lib32stdc++6
+      ;;
+    fedora)
+      $SUDO dnf install -y glibc.i686 libstdc++.i686
+      ;;
+    opensuse)
+      $SUDO zypper --non-interactive install libstdc++6-32bit glibc-32bit
+      ;;
+    arch)
+      if ! grep -q '^\[multilib\]' /etc/pacman.conf; then
+        warn "steamcmd needs the [multilib] repo enabled in /etc/pacman.conf, which this installer won't edit automatically."
+        warn "Uncomment [multilib] and its Include line in /etc/pacman.conf, run 'sudo pacman -Sy', then install lib32-gcc-libs yourself."
+        return 1
+      fi
+      $SUDO pacman -Sy --needed --noconfirm lib32-gcc-libs
+      ;;
+    *)
+      warn "Don't know how to install steamcmd's 32-bit runtime deps on this distro — install them manually if you plan to use Steam-platform servers."
+      return 1
+      ;;
+  esac
+}
+
 heading "Step 1/4 — Prerequisites"
 
 if ! command -v curl >/dev/null 2>&1; then
@@ -205,6 +236,16 @@ else
   else
     warn "Skipping Java. You can install it later — see the README's per-distro commands."
   fi
+fi
+
+if confirm "Install 32-bit runtime libraries needed by steamcmd (for Palworld/Zomboid/Valheim/Terraria/other Steam-based servers — skip if you won't use those)?" n; then
+  if install_steamcmd_deps; then
+    ok "steamcmd dependencies installed"
+  else
+    warn "steamcmd dependency install failed or needs manual steps — see messages above. You can retry later, or install them yourself before creating a Steam-platform server (see the README)."
+  fi
+else
+  info "Skipping steamcmd dependencies. Install them later if you want to run Steam-based game servers — see the README."
 fi
 
 # ---------------------------------------------------------------------------

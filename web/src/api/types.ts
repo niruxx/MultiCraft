@@ -8,10 +8,24 @@ export interface PublicUser {
   serverAccess?: string[];
 }
 
-export type Platform = 'java' | 'bedrock';
-export type Loader = 'vanilla' | 'paper' | 'purpur' | 'spigot' | 'bedrock';
+export type Platform = 'java' | 'bedrock' | 'steam';
+export type Loader = 'vanilla' | 'paper' | 'purpur' | 'spigot' | 'bedrock' | 'steam';
 
 export const PLUGIN_CAPABLE_LOADERS: Loader[] = ['paper', 'purpur', 'spigot'];
+
+/** Steam-platform servers have no Minecraft-specific players/operator/whitelist/map concept. */
+export function isSteamPlatform(platform: Platform): boolean {
+  return platform === 'steam';
+}
+
+export interface SteamGameOption {
+  id: string;
+  label: string;
+  appId: string;
+  defaultPort: number;
+  portProtocol: 'tcp' | 'udp';
+  notes: string | null;
+}
 
 export type ServerStatus =
   | 'installing'
@@ -40,6 +54,7 @@ export interface ServerRecord {
   status: ServerStatus;
   created_at: string;
   created_by: string | null;
+  steam_app_id: string | null;
 }
 
 export interface RuntimeInfo {

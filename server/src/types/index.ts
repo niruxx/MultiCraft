@@ -11,11 +11,17 @@ export interface User {
 
 export type PublicUser = Omit<User, 'password_hash' | 'password_salt'>;
 
-export type Platform = 'java' | 'bedrock';
-export type Loader = 'vanilla' | 'paper' | 'purpur' | 'spigot' | 'bedrock';
+export type Platform = 'java' | 'bedrock' | 'steam';
+export type Loader = 'vanilla' | 'paper' | 'purpur' | 'spigot' | 'bedrock' | 'steam';
 
 /** Loaders that support the Bukkit plugin API (a /plugins directory of jars). */
 export const PLUGIN_CAPABLE_LOADERS: Loader[] = ['paper', 'purpur', 'spigot'];
+
+/** Steam-platform servers (Palworld, Valheim, etc.) have no Minecraft-specific concept of
+ *  players/operators/whitelist/world maps — those tabs and routes are hidden/rejected for them. */
+export function isSteamPlatform(platform: Platform): boolean {
+  return platform === 'steam';
+}
 
 export type ServerStatus =
   | 'installing'
@@ -44,6 +50,7 @@ export interface ServerRecord {
   status: ServerStatus;
   created_at: string;
   created_by: string | null;
+  steam_app_id: string | null;
 }
 
 export interface BackupSchedule {
