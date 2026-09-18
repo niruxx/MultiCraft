@@ -133,3 +133,17 @@ function shutdown(signal: string) {
 
 process.on('SIGINT', () => shutdown('SIGINT'));
 process.on('SIGTERM', () => shutdown('SIGTERM'));
+
+// Last-resort safety net: an uncaught error anywhere (a stray unhandled stream 'error' event,
+// a rejected promise nobody awaited, etc.) would otherwise crash the whole panel — every
+// managed server's process supervision included — with nothing but Node's raw stack trace on
+// stderr, or nothing at all if stderr isn't being captured. Log it clearly, then exit; a process
+// manager (systemd/pm2) restarting a fresh, logged crash beats a silent, undiagnosable one.
+process.on('uncaughtException', (err) => {
+  logger.error('FATAL: uncaught exception — the panel is exiting so a process manager can restart it', err);
+  process.exit(1);
+});
+process.on('unhandledRejection', (reason) => {
+  logger.error('FATAL: unhandled promise rejection — the panel is exiting so a process manager can restart it', reason);
+  process.exit(1);
+});
