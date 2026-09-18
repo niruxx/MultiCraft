@@ -79,6 +79,18 @@ export function ConsoleTab() {
       setBusy(false);
     }
   }
+  async function retryInstall() {
+    setBusy(true);
+    setActionError('');
+    try {
+      await api.post(`/servers/${serverId}/retry-install`);
+      await refresh();
+    } catch (err) {
+      setActionError(err instanceof ApiError ? err.message : 'Failed to retry install');
+    } finally {
+      setBusy(false);
+    }
+  }
   async function killServer() {
     setBusy(true);
     setActionError('');
@@ -99,7 +111,11 @@ export function ConsoleTab() {
       <div className="flex flex-wrap items-center gap-3">
         {canWrite && (
           <>
-            {status === 'stopped' || status === 'crashed' || status === 'install_failed' ? (
+            {status === 'install_failed' ? (
+              <Button variant="primary" disabled={busy} onClick={retryInstall}>
+                Retry install
+              </Button>
+            ) : status === 'stopped' || status === 'crashed' ? (
               <Button variant="primary" disabled={busy} onClick={() => lifecycleAction('start')}>
                 Start
               </Button>

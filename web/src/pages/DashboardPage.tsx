@@ -38,13 +38,13 @@ export function DashboardPage() {
 
   const canCreate = user?.role === 'admin' || user?.role === 'moderator';
 
-  async function quickAction(id: string, action: 'start' | 'stop' | 'restart') {
+  async function quickAction(id: string, action: 'start' | 'stop' | 'restart' | 'retry-install') {
     setBusyId(id);
     try {
       await api.post(`/servers/${id}/${action}`);
       await load();
     } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : `Failed to ${action} server`);
+      toast.error(err instanceof ApiError ? err.message : `Failed to ${action.replace('-', ' ')} server`);
     } finally {
       setBusyId(null);
     }
@@ -112,13 +112,17 @@ export function DashboardPage() {
                       <StatusBadge status={server.status} />
                     </div>
                     <p className="mt-0.5 text-xs text-ink-400">
-                      {server.platform === 'java' ? 'Java' : 'Bedrock'} · {server.loader} {server.version} · port{' '}
-                      {server.server_port}
+                      {server.platform === 'java' ? 'Java' : server.platform === 'bedrock' ? 'Bedrock' : 'Steam'} ·{' '}
+                      {server.loader} {server.version} · port {server.server_port}
                     </p>
                   </Link>
                   {canCreate && (
                     <div className="flex shrink-0 gap-2">
-                      {server.status === 'stopped' || server.status === 'crashed' ? (
+                      {server.status === 'install_failed' ? (
+                        <Button disabled={busyId === server.id} onClick={() => quickAction(server.id, 'retry-install')}>
+                          Retry install
+                        </Button>
+                      ) : server.status === 'stopped' || server.status === 'crashed' ? (
                         <Button disabled={busyId === server.id} onClick={() => quickAction(server.id, 'start')}>
                           Start
                         </Button>

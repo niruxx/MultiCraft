@@ -32,7 +32,7 @@ import { findJava, getJavaVersion } from '../services/javaService.js';
 import { getDiskUsage } from '../services/diskUsageService.js';
 import { instanceDir, safeJoin } from '../utils/paths.js';
 import { STEAM_GAME_PRESETS, findPreset } from '../services/steamGames.js';
-import { isSteamPlatform, type Loader, type Platform, type Role } from '../types/index.js';
+import { isSteamPlatform, type Loader, type Platform, type Role, type ServerRecord } from '../types/index.js';
 
 export const serversRouter = Router();
 serversRouter.use(requireAuth);
@@ -43,6 +43,60 @@ function canWrite(role: Role): boolean {
 
 function requireWrite(req: Request) {
   if (!canWrite(req.auth!.role)) throw new HttpError(403, 'Viewers cannot perform this action');
+}
+
+/**
+ * Runs (or re-runs) a server's install in the background, streaming verbose progress over the
+ * console websocket topic the same way `npm install --verbose` streams to a terminal. Shared by
+ * the initial create flow and the retry-install endpoint so both behave identically.
+ *
+ * For a custom (non-preset) Steam App ID, `jar_file` must already hold the intended relative
+ * executable path *before* this runs (set at creation time) — installServer's steam branch has
+ * no way to know it, so this only verifies the file actually exists afterward.
+ */
+async function runServerInstall(server: ServerRecord): Promise<void> {
+  try {
+    const result = await installServer(
+      server.platform,
+      server.loader,
+      server.version,
+      instanceDir(server.id),
+      (pct, message) => publish(consoleTopic(server.id), { type: 'install_progress', pct, message }),
+      (line) => appendLine(server.id, line),
+      server.platform === 'steam' ? server.steam_app_id ?? undefined : undefined,
+      server.steam_login,
+      server.steam_extra_flags
+    );
+
+    const preset = server.platform === 'steam' ? findPreset(server.steam_app_id) : undefined;
+    if (server.platform === 'steam' && !preset) {
+      if (!server.jar_file) throw new Error('No custom executable path is recorded for this server');
+      const exePath = safeJoin(instanceDir(server.id), server.jar_file);
+      if (!fs.existsSync(exePath)) {
+        throw new Error(`Custom executable not found after install: ${server.jar_file}`);
+      }
+      if (process.platform !== 'win32') {
+        try {
+          fs.chmodSync(exePath, 0o755);
+        } catch {
+          // best-effort; startup will surface a clear error if the file truly can't be executed
+        }
+      }
+    } else if (result.jarFile) {
+      setServerJar(server.id, result.jarFile, result.build);
+    } else if (result.executable) {
+      setServerJar(server.id, result.executable, result.build);
+    }
+
+    appendLine(server.id, '[MultiCraft] Installation finished — server is ready to start');
+    setServerStatus(server.id, 'stopped');
+    publish(consoleTopic(server.id), { type: 'status', status: 'stopped' });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    appendLine(server.id, `[MultiCraft] Installation failed: ${message}`, 'stderr');
+    setServerStatus(server.id, 'install_failed');
+    publish(consoleTopic(server.id), { type: 'status', status: 'install_failed', error: message });
+  }
 }
 
 serversRouter.get(
@@ -159,6 +213,14 @@ serversRouter.post(
       steamExtraFlags: platform === 'steam' && typeof steamExtraFlags === 'string' ? steamExtraFlags.trim() : '',
     });
 
+    if (platform === 'steam' && !preset && typeof customExecutable === 'string') {
+      // Custom (non-preset) App ID: installServer has no way to know the intended launch
+      // executable itself, so persist the user-supplied relative path now — before install even
+      // runs — so it survives a failed install and any later retry, not just a successful one.
+      setServerJar(record.id, customExecutable.trim(), null);
+      record.jar_file = customExecutable.trim();
+    }
+
     appendLine(record.id, `[MultiCraft] Creating server "${record.name}" (${loader} ${version}, ${platform})`);
     if (platform === 'java') {
       writeEula(record.id, true);
@@ -168,49 +230,28 @@ serversRouter.post(
     logAudit(req.auth!.sub, req.auth!.username, 'server.create', record.id, `${loader} ${version}`);
     res.status(201).json({ server: record });
 
-    // Install runs in the background; verbose progress is streamed over the console websocket topic,
-    // the same way `npm install --verbose` streams line-by-line progress to a terminal.
-    void (async () => {
-      try {
-        const result = await installServer(
-          platform,
-          loader,
-          version,
-          instanceDir(record.id),
-          (pct, message) => publish(consoleTopic(record.id), { type: 'install_progress', pct, message }),
-          (line) => appendLine(record.id, line),
-          platform === 'steam' ? steamAppId : undefined,
-          record.steam_login,
-          record.steam_extra_flags
-        );
-        if (platform === 'steam' && !preset && typeof customExecutable === 'string') {
-          // Custom (non-preset) App ID: the install step has no way to know the launch
-          // executable itself, so record the user-supplied relative path now that the files exist.
-          const exePath = safeJoin(instanceDir(record.id), customExecutable.trim());
-          if (!fs.existsSync(exePath)) {
-            throw new Error(`Custom executable not found after install: ${customExecutable.trim()}`);
-          }
-          if (process.platform !== 'win32') {
-            try {
-              fs.chmodSync(exePath, 0o755);
-            } catch {
-              // best-effort; startup will surface a clear error if the file truly can't be executed
-            }
-          }
-          result.jarFile = customExecutable.trim();
-        }
-        if (result.jarFile) setServerJar(record.id, result.jarFile, result.build);
-        else if (result.executable) setServerJar(record.id, result.executable, result.build);
-        appendLine(record.id, '[MultiCraft] Installation finished — server is ready to start');
-        setServerStatus(record.id, 'stopped');
-        publish(consoleTopic(record.id), { type: 'status', status: 'stopped' });
-      } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        appendLine(record.id, `[MultiCraft] Installation failed: ${message}`, 'stderr');
-        setServerStatus(record.id, 'install_failed');
-        publish(consoleTopic(record.id), { type: 'status', status: 'install_failed', error: message });
-      }
-    })();
+    void runServerInstall(record);
+  })
+);
+
+serversRouter.post(
+  '/:serverId/retry-install',
+  requireServerAccess(),
+  asyncHandler(async (req, res) => {
+    requireWrite(req);
+    const server = getServer(req.params.serverId);
+    if (!server) throw new HttpError(404, 'Server not found');
+    if (server.status !== 'install_failed') {
+      throw new HttpError(409, 'Retry is only available after a failed install');
+    }
+
+    setServerStatus(server.id, 'installing');
+    publish(consoleTopic(server.id), { type: 'status', status: 'installing' });
+    appendLine(server.id, `[MultiCraft] Retrying installation (requested by ${req.auth!.username})`);
+    logAudit(req.auth!.sub, req.auth!.username, 'server.retry_install', server.id);
+    res.status(202).json({ ok: true });
+
+    void runServerInstall(server);
   })
 );
 
