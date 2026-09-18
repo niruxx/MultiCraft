@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { spawn } from 'node:child_process';
 import AdmZip from 'adm-zip';
 import { STEAMCMD_DIR } from '../utils/paths.js';
 import { downloadFile, type LogFn } from '../utils/download.js';
@@ -9,12 +10,53 @@ import { SETTING_STEAMCMD_SOURCE, getSetting } from './systemSettingsService.js'
 const STEAMCMD_WIN_URL = 'https://steamcdn-a.akamaihd.net/client/installer/steamcmd.zip';
 const STEAMCMD_LINUX_URL = 'https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz';
 
+// steamcmd frequently self-updates itself mid-command — on its own schedule, not just on a
+// dedicated bootstrap run — and the process that triggers that exits non-zero (commonly 7) as
+// part of the handoff, *even when the actual command (e.g. an app_update) already completed
+// successfully first*. Trusting the exit code alone produces false failures on real, completed
+// installs. steamcmd does reliably print one of these lines when an app_update genuinely
+// finished, so a non-zero exit is only treated as a real failure if neither appears anywhere in
+// the captured output.
+const STEAMCMD_SUCCESS_MARKER = /Success!\s*App\s*'?\d+'?\s*(fully installed|already up to date)/i;
+
 function steamCmdExecutablePath(): string {
   return path.join(STEAMCMD_DIR, process.platform === 'win32' ? 'steamcmd.exe' : 'steamcmd.sh');
 }
 
 function isUrl(value: string): boolean {
   return /^https?:\/\//i.test(value);
+}
+
+/** Runs a steamcmd command, streaming output like runStreamed(), but tolerant of steamcmd's own
+ *  habit of self-updating mid-command and exiting non-zero afterward even when the actual
+ *  command already succeeded — checked by scanning the captured output for steamcmd's own
+ *  success line rather than trusting the exit code alone. */
+function runSteamCmd(exePath: string, args: string[], cwd: string, onLog?: LogFn): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const child = spawn(exePath, args, { cwd, windowsHide: true });
+    let captured = '';
+    child.stdout.setEncoding('utf8');
+    child.stderr.setEncoding('utf8');
+    child.stdout.on('data', (chunk: string) => {
+      captured += chunk;
+      for (const line of chunk.split(/\r?\n/)) if (line.length) onLog?.(`  ${line}`);
+    });
+    child.stderr.on('data', (chunk: string) => {
+      captured += chunk;
+      for (const line of chunk.split(/\r?\n/)) if (line.length) onLog?.(`  ${line}`);
+    });
+    child.on('error', (err) => reject(err));
+    child.on('exit', (code) => {
+      if (code === 0) return resolve();
+      if (STEAMCMD_SUCCESS_MARKER.test(captured)) {
+        onLog?.(
+          `  (steamcmd exited with code ${code} after reporting success — it likely self-updated itself mid-command; treating this as OK)`
+        );
+        return resolve();
+      }
+      reject(new Error(`steamcmd exited with code ${code}`));
+    });
+  });
 }
 
 async function extractSteamCmdArchive(archivePath: string, onLog?: LogFn): Promise<void> {
@@ -26,10 +68,11 @@ async function extractSteamCmdArchive(archivePath: string, onLog?: LogFn): Promi
   }
 }
 
-/** steamcmd always self-updates on its very first run. On its very first run it also replaces
- *  its own binary as part of that self-update and the original process exits non-zero as part of
- *  the handoff — that's expected, not a failure, so it always gets one retry (a second run
- *  against the now-updated binary) before treating a failure as real. */
+/** steamcmd always self-updates on its very first run, and that self-update can itself be flaky
+ *  (real-world observed behavior: it can restart its own download from 0% several times before
+ *  either succeeding or genuinely failing) — so this retries a few times rather than giving up
+ *  after one non-zero exit, which on a fresh install is expected as part of the normal handoff,
+ *  not a failure. */
 async function selfUpdateSteamCmd(exePath: string, onLog?: LogFn): Promise<void> {
   if (process.platform !== 'win32') {
     try {
@@ -39,20 +82,21 @@ async function selfUpdateSteamCmd(exePath: string, onLog?: LogFn): Promise<void>
     }
   }
   onLog?.('==> Running steamcmd once to let it self-update');
-  for (let attempt = 1; attempt <= 2; attempt++) {
+  const maxAttempts = 3;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
-      await runStreamed(exePath, ['+quit'], STEAMCMD_DIR, onLog);
+      await runSteamCmd(exePath, ['+quit'], STEAMCMD_DIR, onLog);
       return;
     } catch (err) {
-      if (attempt === 2) {
+      if (attempt === maxAttempts) {
         const message = err instanceof Error ? err.message : String(err);
         throw new Error(
           `steamcmd downloaded but failed to run (${message}). On Linux this usually means the 32-bit runtime ` +
             'libraries steamcmd needs are missing — see the README for the packages your distro needs, or re-run ' +
-            'install.sh and accept the steamcmd dependencies prompt.'
+            'install.sh and accept the steamcmd dependencies prompt. If this is a transient network issue, try again.'
         );
       }
-      onLog?.('  (steamcmd exited non-zero after replacing its own binary during self-update — retrying once)');
+      onLog?.(`  (steamcmd self-update did not finish cleanly — retrying, attempt ${attempt + 1}/${maxAttempts})`);
     }
   }
 }
@@ -119,7 +163,13 @@ export async function ensureSteamCmd(onLog?: LogFn): Promise<string> {
  *  only touches files tracked by the app's depot manifest, never save data living outside it.
  *  `login` is the raw value passed after `+login` (default "anonymous"; a real "user pass" is
  *  needed for games that require an owned license). `extraFlags` are additional raw steamcmd
- *  arguments spliced in before `+quit`, for advanced per-server customization. */
+ *  arguments spliced in before `+quit`, for advanced per-server customization.
+ *
+ *  A brand-new app's very first `+app_update` in a given install directory is commonly
+ *  incomplete — steamcmd reports success but hasn't actually finished pulling every depot file,
+ *  a long-documented quirk with no clean single-run fix. So the first time this app is installed
+ *  into this directory (no appmanifest for it yet), the whole command is run twice; once the
+ *  manifest exists, later calls (updates) only need the one, already-reliable pass. */
 export async function steamAppUpdate(
   appId: string,
   instanceDir: string,
@@ -140,9 +190,22 @@ export async function steamAppUpdate(
     '+quit',
   ];
   const loginLog = loginArgs[0] === 'anonymous' ? 'anonymous' : `${loginArgs[0]} ***`;
-  onLog?.(
-    `==> steamcmd +force_install_dir <dir> +login ${loginLog} +app_update ${appId}${validate ? ' validate' : ''}` +
-      `${extraFlags.length ? ' ' + extraFlags.join(' ') : ''} +quit`
-  );
-  await runStreamed(steamCmdPath, args, instanceDir, onLog);
+  const commandLog =
+    `steamcmd +force_install_dir <dir> +login ${loginLog} +app_update ${appId}${validate ? ' validate' : ''}` +
+    `${extraFlags.length ? ' ' + extraFlags.join(' ') : ''} +quit`;
+
+  const manifestPath = path.join(instanceDir, 'steamapps', `appmanifest_${appId}.acf`);
+  const isFirstInstall = !fs.existsSync(manifestPath);
+
+  onLog?.(`==> ${commandLog}`);
+  await runSteamCmd(steamCmdPath, args, instanceDir, onLog);
+
+  if (isFirstInstall) {
+    onLog?.(
+      "==> First-time install for this app — steamcmd's first pass at a new app commonly doesn't fully " +
+        'finish, so running it again to make sure everything actually downloaded'
+    );
+    onLog?.(`==> ${commandLog}`);
+    await runSteamCmd(steamCmdPath, args, instanceDir, onLog);
+  }
 }
