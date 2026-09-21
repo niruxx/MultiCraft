@@ -372,3 +372,8 @@ Set this permanently in your service definition (see the `systemd`/NSSM examples
 - Operator tools and player op/kick/ban are applied via the live console, so the target server must be running. Whitelist/allowlist changes work either way.
 - Resource usage (RAM/CPU) is sampled per-process using platform-native tools (`Get-Process` on Windows, `/proc` on Linux) — no extra agents required.
 - Updating a *Minecraft* server (not the panel) requires it to be stopped first; checking "create a backup first" in its Update tab takes a safety backup before touching any files.
+
+## Left to implement
+Implement a method to install and configure a Spigot/Mohist and SpongeForge server instance for Minecraft.
+Make the webUI more interesting, less boring.
+implement a customize launchable server jar file setting option so users can define what jar in the directory should launch.

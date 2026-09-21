@@ -154,7 +154,8 @@ install_git() {
 install_java() {
   case "$DISTRO_FAMILY" in
     debian)   $SUDO apt-get install -y openjdk-21-jdk ;;
-    arch)     $SUDO pacman -Sy --needed --noconfirm jdk21-openjdk ;;
+    arch)     $SUDO pacman -Sy --needed --noconfirm jre25-openjdk-headless ;;
+              $SUDO archlinux-java set java-25-openjdk
     fedora)   $SUDO dnf install -y java-21-openjdk-devel ;;
     opensuse) $SUDO zypper --non-interactive install java-21-openjdk-devel ;;
     *) die "Don't know how to install Java on this distro. Install a JDK 21+ yourself and re-run." ;;
