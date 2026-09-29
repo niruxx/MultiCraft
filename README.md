@@ -377,3 +377,5 @@ Set this permanently in your service definition (see the `systemd`/NSSM examples
 Implement a method to install and configure a Spigot/Mohist and SpongeForge server instance for Minecraft.
 Make the webUI more interesting, less boring.
 implement a customize launchable server jar file setting option so users can define what jar in the directory should launch.
+
+Restore tab that restores Minecraft auto save states
