@@ -20,7 +20,8 @@ function formatSize(bytes: number): string {
 const EDITABLE_EXT = /\.(txt|properties|json|yml|yaml|conf|cfg|toml|log|md|sh|bat|xml|mcmeta)$/i;
 
 export function FilesTab() {
-  const { serverId, canWrite } = useServerDetail();
+  const { serverId, can } = useServerDetail();
+  const canWrite = can('files.write');
   const confirm = useConfirm();
   const [path, setPath] = useState('');
   const [entries, setEntries] = useState<FileEntry[] | null>(null);

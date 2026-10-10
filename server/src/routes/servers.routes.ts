@@ -2,7 +2,7 @@ import { Router, type Request } from 'express';
 import fs from 'node:fs';
 import os from 'node:os';
 import { asyncHandler, HttpError } from '../utils/asyncHandler.js';
-import { requireAuth, requireRole, requireServerAccess } from '../auth/middleware.js';
+import { requireAuth, requirePermission, requireRole, requireServerAccess } from '../auth/middleware.js';
 import {
   createServerRecord,
   deleteServerRecord,
@@ -10,9 +10,12 @@ import {
   listServers,
   setServerJar,
   setServerStatus,
+  setServerSuspension,
   setServerVersion,
   updateServerRecord,
 } from '../services/serverService.js';
+import { getPrimaryAddress, listHostAddresses } from '../services/networkService.js';
+import { getTransferState, startTransfer } from '../services/nodeService.js';
 import { installServer, listAvailableVersions } from '../services/downloadService.js';
 import { checkForUpdate, performUpdate } from '../services/updateService.js';
 import { writeEula, readServerProperties, writeServerProperties } from '../services/propertiesService.js';
@@ -25,7 +28,7 @@ import {
   stopServer,
 } from '../services/processManager.js';
 import { getPlayerRoster } from '../services/playerService.js';
-import { getUserServerAccess, logAudit } from '../services/userService.js';
+import { getServerPermissions, getUserServerAccess, logAudit } from '../services/userService.js';
 import { publish, consoleTopic } from '../services/wsHub.js';
 import { appendLine } from '../services/consoleLogService.js';
 import { findJava, getJavaVersion } from '../services/javaService.js';
@@ -37,13 +40,6 @@ import { isSteamPlatform, type Loader, type Platform, type Role, type ServerReco
 export const serversRouter = Router();
 serversRouter.use(requireAuth);
 
-function canWrite(role: Role): boolean {
-  return role === 'admin' || role === 'moderator';
-}
-
-function requireWrite(req: Request) {
-  if (!canWrite(req.auth!.role)) throw new HttpError(403, 'Viewers cannot perform this action');
-}
 
 /**
  * Runs (or re-runs) a server's install in the background, streaming verbose progress over the
@@ -238,7 +234,7 @@ serversRouter.post(
   '/:serverId/retry-install',
   requireServerAccess(),
   asyncHandler(async (req, res) => {
-    requireWrite(req);
+    requirePermission(req, 'power');
     const server = getServer(req.params.serverId);
     if (!server) throw new HttpError(404, 'Server not found');
     if (server.status !== 'install_failed') {
@@ -261,7 +257,88 @@ serversRouter.get(
   asyncHandler(async (req, res) => {
     const server = getServer(req.params.serverId);
     if (!server) throw new HttpError(404, 'Server not found');
-    res.json({ server, runtime: getRuntimeInfo(server.id), running: isRunning(server.id) });
+    res.json({
+      server,
+      runtime: getRuntimeInfo(server.id),
+      running: isRunning(server.id),
+      permissions: getServerPermissions(req.auth!.sub, req.auth!.role, server.id) ?? [],
+    });
+  })
+);
+
+/** Where players connect: the bind address from server.properties if one is set, otherwise the
+ *  host's primary LAN address (the server listens on every interface). */
+serversRouter.get(
+  '/:serverId/endpoint',
+  requireServerAccess(),
+  asyncHandler(async (req, res) => {
+    const server = getServer(req.params.serverId);
+    if (!server) throw new HttpError(404, 'Server not found');
+    const props = server.platform === 'steam' ? [] : readServerProperties(server.id, server.platform);
+    const bind = props.find((p) => p.key === 'server-ip')?.value.trim() ?? '';
+    const wildcard = !bind || bind === '0.0.0.0' || bind === '::';
+    const primary = await getPrimaryAddress();
+    const protocol =
+      server.platform === 'java' ? 'tcp' : server.platform === 'bedrock' ? 'udp' : findPreset(server.steam_app_id)?.portProtocol ?? 'udp';
+    res.json({
+      host: wildcard ? primary ?? '127.0.0.1' : bind,
+      bindAddress: wildcard ? '0.0.0.0' : bind,
+      port: server.server_port,
+      protocol,
+      hostname: os.hostname(),
+      addresses: listHostAddresses(),
+    });
+  })
+);
+
+/** Suspension: stops the instance and locks it to admins only (see requireServerAccess). */
+serversRouter.post(
+  '/:serverId/suspend',
+  requireRole('admin'),
+  asyncHandler(async (req, res) => {
+    const server = getServer(req.params.serverId);
+    if (!server) throw new HttpError(404, 'Server not found');
+    const reason = typeof req.body?.reason === 'string' ? req.body.reason.trim().slice(0, 500) : '';
+    setServerSuspension(server.id, true, reason || null, req.auth!.username);
+    if (isRunning(server.id)) {
+      appendLine(server.id, `[MultiCraft] Instance suspended by ${req.auth!.username} — stopping`, 'system');
+      stopServer(server.id, { force: req.body?.force === true });
+    }
+    logAudit(req.auth!.sub, req.auth!.username, 'server.suspend', server.id, reason);
+    res.json({ server: getServer(server.id) });
+  })
+);
+
+serversRouter.post(
+  '/:serverId/unsuspend',
+  requireRole('admin'),
+  asyncHandler(async (req, res) => {
+    const server = getServer(req.params.serverId);
+    if (!server) throw new HttpError(404, 'Server not found');
+    setServerSuspension(server.id, false, null, null);
+    appendLine(server.id, `[MultiCraft] Suspension lifted by ${req.auth!.username}`, 'system');
+    logAudit(req.auth!.sub, req.auth!.username, 'server.unsuspend', server.id);
+    res.json({ server: getServer(server.id) });
+  })
+);
+
+serversRouter.post(
+  '/:serverId/transfer',
+  requireRole('admin'),
+  asyncHandler(async (req, res) => {
+    const { nodeId, deleteSource } = req.body ?? {};
+    if (typeof nodeId !== 'string') throw new HttpError(400, 'nodeId is required');
+    const state = startTransfer(req.params.serverId, nodeId, deleteSource === true);
+    logAudit(req.auth!.sub, req.auth!.username, 'server.transfer', req.params.serverId, `to node ${nodeId}`);
+    res.status(202).json({ transfer: state });
+  })
+);
+
+serversRouter.get(
+  '/:serverId/transfer',
+  requireRole('admin'),
+  asyncHandler(async (req, res) => {
+    res.json({ transfer: getTransferState(req.params.serverId) });
   })
 );
 
@@ -269,7 +346,7 @@ serversRouter.patch(
   '/:serverId',
   requireServerAccess(),
   asyncHandler(async (req, res) => {
-    requireWrite(req);
+    requirePermission(req, 'settings');
     const server = getServer(req.params.serverId);
     if (!server) throw new HttpError(404, 'Server not found');
     const { name, minMemoryMb, maxMemoryMb, serverPort, extraJavaArgs, extraArgs, autoStart, steamLogin, steamExtraFlags } =
@@ -307,7 +384,7 @@ serversRouter.post(
   '/:serverId/start',
   requireServerAccess(),
   asyncHandler(async (req, res) => {
-    requireWrite(req);
+    requirePermission(req, 'power');
     await startServer(req.params.serverId);
     logAudit(req.auth!.sub, req.auth!.username, 'server.start', req.params.serverId);
     res.status(202).json({ ok: true });
@@ -318,7 +395,7 @@ serversRouter.post(
   '/:serverId/stop',
   requireServerAccess(),
   asyncHandler(async (req, res) => {
-    requireWrite(req);
+    requirePermission(req, 'power');
     stopServer(req.params.serverId, { force: req.body?.force === true });
     logAudit(req.auth!.sub, req.auth!.username, 'server.stop', req.params.serverId);
     res.status(202).json({ ok: true });
@@ -329,7 +406,7 @@ serversRouter.post(
   '/:serverId/restart',
   requireServerAccess(),
   asyncHandler(async (req, res) => {
-    requireWrite(req);
+    requirePermission(req, 'power');
     const serverId = req.params.serverId;
     if (isRunning(serverId)) {
       await new Promise<void>((resolve) => {
@@ -352,7 +429,7 @@ serversRouter.post(
   '/:serverId/command',
   requireServerAccess(),
   asyncHandler(async (req, res) => {
-    requireWrite(req);
+    requirePermission(req, 'console');
     const { command } = req.body ?? {};
     if (typeof command !== 'string' || !command.trim()) throw new HttpError(400, 'Command is required');
     sendCommand(req.params.serverId, command);
@@ -393,7 +470,7 @@ serversRouter.post(
   '/:serverId/players/:name/:action',
   requireServerAccess(),
   asyncHandler(async (req, res) => {
-    requireWrite(req);
+    requirePermission(req, 'players');
     const { serverId, name, action } = req.params;
     const server = getServer(serverId);
     if (!server) throw new HttpError(404, 'Server not found');
@@ -423,7 +500,7 @@ serversRouter.put(
   '/:serverId/properties',
   requireServerAccess(),
   asyncHandler(async (req, res) => {
-    requireWrite(req);
+    requirePermission(req, 'settings');
     const server = getServer(req.params.serverId);
     if (!server) throw new HttpError(404, 'Server not found');
     const { updates } = req.body ?? {};
@@ -474,7 +551,7 @@ serversRouter.post(
   '/:serverId/update',
   requireServerAccess(),
   asyncHandler(async (req, res) => {
-    requireWrite(req);
+    requirePermission(req, 'update');
     const server = getServer(req.params.serverId);
     if (!server) throw new HttpError(404, 'Server not found');
     if (isRunning(server.id)) throw new HttpError(409, 'Stop the server before updating it');

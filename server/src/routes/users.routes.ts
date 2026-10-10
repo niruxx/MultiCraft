@@ -6,6 +6,9 @@ import {
   deleteUser,
   getUserById,
   getUserServerAccess,
+  getUserServerAccessDetailed,
+  roleDefaultPermissions,
+  SERVER_PERMISSIONS,
   listUsers,
   logAudit,
   setUserServerAccess,
@@ -20,7 +23,11 @@ usersRouter.use(requireAuth, requireRole('admin'));
 usersRouter.get(
   '/',
   asyncHandler(async (_req, res) => {
-    const users = listUsers().map((u) => ({ ...u, serverAccess: getUserServerAccess(u.id) }));
+    const users = listUsers().map((u) => ({
+      ...u,
+      serverAccess: getUserServerAccess(u.id),
+      serverPermissions: Object.fromEntries(getUserServerAccessDetailed(u.id).map((a) => [a.serverId, a.permissions])),
+    }));
     res.json({ users });
   })
 );
@@ -67,10 +74,28 @@ usersRouter.patch(
       updateUserPassword(target.id, password);
     }
     if (Array.isArray(serverAccess)) {
-      setUserServerAccess(target.id, serverAccess.filter((s) => typeof s === 'string'));
+      // Plain ids get the role's default permissions; objects carry a per-instance permission set.
+      setUserServerAccess(
+        target.id,
+        serverAccess.filter(
+          (s): s is string | { serverId: string; permissions: string[] | null } =>
+            typeof s === 'string' || (typeof s === 'object' && s !== null && typeof s.serverId === 'string')
+        ) as Parameters<typeof setUserServerAccess>[1]
+      );
     }
     logAudit(req.auth!.sub, req.auth!.username, 'user.update', target.id);
     res.json({ user: getUserById(target.id) });
+  })
+);
+
+/** The permission catalog and each role's defaults, for the user editor. */
+usersRouter.get(
+  '/permissions/catalog',
+  asyncHandler(async (_req, res) => {
+    res.json({
+      permissions: SERVER_PERMISSIONS,
+      defaults: { moderator: roleDefaultPermissions('moderator'), viewer: roleDefaultPermissions('viewer') },
+    });
   })
 );
 

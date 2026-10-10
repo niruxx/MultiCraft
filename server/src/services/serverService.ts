@@ -14,7 +14,7 @@ export interface CreateServerInput {
   serverPort: number;
   extraJavaArgs?: string;
   extraArgs?: string;
-  createdBy: string;
+  createdBy: string | null;
   steamAppId?: string | null;
   steamLogin?: string;
   steamExtraFlags?: string;
@@ -111,4 +111,24 @@ export function deleteServerRecord(id: string) {
   prep('DELETE FROM servers WHERE id = ?').run(id);
   fs.rmSync(instanceDir(id), { recursive: true, force: true });
   fs.rmSync(backupDir(id), { recursive: true, force: true });
+}
+
+export function setServerSuspension(id: string, suspended: boolean, reason: string | null, by: string | null) {
+  prep(
+    `UPDATE servers SET suspended = ?, suspended_reason = ?, suspended_at = ?, suspended_by = ? WHERE id = ?`
+  ).run(suspended ? 1 : 0, suspended ? reason : null, suspended ? new Date().toISOString() : null, suspended ? by : null, id);
+}
+
+/** Restores the fields an instance carries between nodes during a transfer. */
+export function applyTransferredFields(
+  id: string,
+  fields: Pick<ServerRecord, 'jar_file' | 'build' | 'extra_java_args' | 'extra_args'>
+) {
+  prep('UPDATE servers SET jar_file = ?, build = ?, extra_java_args = ?, extra_args = ? WHERE id = ?').run(
+    fields.jar_file,
+    fields.build,
+    fields.extra_java_args,
+    fields.extra_args,
+    id
+  );
 }

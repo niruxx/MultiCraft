@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE TABLE IF NOT EXISTS user_server_access (
   user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   server_id TEXT NOT NULL REFERENCES servers(id) ON DELETE CASCADE,
+  permissions TEXT, -- JSON array of ServerPermission; NULL = the role's defaults
   PRIMARY KEY (user_id, server_id)
 );
 
@@ -34,7 +35,21 @@ CREATE TABLE IF NOT EXISTS servers (
   created_by TEXT REFERENCES users(id),
   steam_app_id TEXT, -- Steam App ID actually installed, for platform = 'steam' servers
   steam_login TEXT NOT NULL DEFAULT 'anonymous', -- raw value passed after "+login" (e.g. "anonymous" or "user pass")
-  steam_extra_flags TEXT NOT NULL DEFAULT '' -- extra steamcmd CLI flags spliced into the install/update invocation
+  steam_extra_flags TEXT NOT NULL DEFAULT '', -- extra steamcmd CLI flags spliced into the install/update invocation
+  suspended BOOLEAN NOT NULL DEFAULT 0,
+  suspended_reason TEXT,
+  suspended_at TEXT,
+  suspended_by TEXT
+);
+
+-- Other MultiCraft panels this one can transfer instances to. api_key is the remote panel's
+-- node key (shown on its Configuration page) and has to be stored as-is to call that panel.
+CREATE TABLE IF NOT EXISTS nodes (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  url TEXT NOT NULL,
+  api_key TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
 -- Simple global key/value settings, admin-editable (e.g. where to source the SteamCMD tarball

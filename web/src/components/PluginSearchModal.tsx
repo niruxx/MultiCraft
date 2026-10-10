@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { api, ApiError } from '../api/client.js';
-import type { PluginSearchResult, ResolvedPluginVersion, ServerRecord } from '../api/types.js';
+import type { AddonCatalog, PluginSearchResult, ResolvedPluginVersion, ServerRecord } from '../api/types.js';
 import { PLUGIN_CAPABLE_LOADERS } from '../api/types.js';
 import { useToast } from './Toast.js';
 import { Button, ErrorText, Input, Modal, Spinner } from './ui.js';
@@ -11,13 +11,16 @@ export function PluginSearchModal({
   open,
   onClose,
   defaultServerId,
+  catalog = 'plugin',
   onInstalled,
 }: {
   open: boolean;
   onClose: () => void;
   defaultServerId?: string;
+  catalog?: AddonCatalog;
   onInstalled?: () => void;
 }) {
+  const noun = catalog === 'datapack' ? 'data packs' : 'plugins';
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<PluginSearchResult[] | null>(null);
   const [loading, setLoading] = useState(false);
@@ -41,7 +44,7 @@ export function PluginSearchModal({
     setLoading(true);
     setError('');
     try {
-      const res = await api.get<{ results: PluginSearchResult[] }>(`/plugins/search?query=${encodeURIComponent(q)}&limit=24`);
+      const res = await api.get<{ results: PluginSearchResult[] }>(`/plugins/search?query=${encodeURIComponent(q)}&limit=24&catalog=${catalog}`);
       setResults(res.results);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Search failed');
@@ -52,16 +55,18 @@ export function PluginSearchModal({
 
   return (
     <>
-      <Modal open={open && !picking} onClose={onClose} title="Browse plugins" size="xl">
+      <Modal open={open && !picking} onClose={onClose} title={`Browse ${noun}`} size="xl">
         <div className="mb-4">
           <Input
             value={query}
             onChange={(e) => onQueryChange(e.target.value)}
-            placeholder="Search plugins (EssentialsX, LuckPerms, WorldEdit…)"
+            placeholder={catalog === 'datapack' ? 'Search data packs (Terralith, Vanilla Tweaks…)' : 'Search plugins (EssentialsX, LuckPerms, WorldEdit…)'}
             autoFocus
           />
           <p className="mt-1.5 text-[11px] text-ink-500">
-            Results come from Modrinth's plugin catalog (Bukkit / Spigot / Paper / Purpur).
+            {catalog === 'datapack'
+              ? "Results come from Modrinth's data pack catalog."
+              : "Results come from Modrinth's plugin catalog (Bukkit / Spigot / Paper / Purpur)."}
           </p>
         </div>
 
@@ -72,13 +77,13 @@ export function PluginSearchModal({
             <Spinner /> Searching…
           </div>
         ) : results && results.length === 0 ? (
-          <p className="py-12 text-center text-sm text-ink-500">No plugins found.</p>
+          <p className="py-12 text-center text-sm text-ink-500">No {noun} found.</p>
         ) : (
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             {results?.map((r) => (
               <div
                 key={r.slug}
-                className="flex gap-3 rounded-lg border border-surface-700/80 bg-surface-800/40 p-3 transition-colors hover:border-surface-600"
+                className="flex gap-3 rounded-2xl bg-surface-850 p-3 transition-colors hover:bg-surface-700"
               >
                 {r.iconUrl ? (
                   <img src={r.iconUrl} alt="" className="h-11 w-11 shrink-0 rounded-lg object-cover" />
@@ -108,6 +113,7 @@ export function PluginSearchModal({
       {picking && (
         <InstallTargetModal
           plugin={picking}
+          catalog={catalog}
           defaultServerId={defaultServerId}
           onClose={() => setPicking(null)}
           onInstalled={() => {
@@ -123,11 +129,13 @@ export function PluginSearchModal({
 
 function InstallTargetModal({
   plugin,
+  catalog,
   defaultServerId,
   onClose,
   onInstalled,
 }: {
   plugin: PluginSearchResult;
+  catalog: AddonCatalog;
   defaultServerId?: string;
   onClose: () => void;
   onInstalled: () => void;
@@ -142,7 +150,9 @@ function InstallTargetModal({
     api
       .get<{ servers: ServerRecord[] }>('/servers')
       .then((res) => {
-        const eligible = res.servers.filter((s) => PLUGIN_CAPABLE_LOADERS.includes(s.loader));
+        const eligible = res.servers.filter((s) =>
+          catalog === 'datapack' ? s.loader === 'vanilla' : PLUGIN_CAPABLE_LOADERS.includes(s.loader)
+        );
         setServers(eligible);
         if (!selected) setSelected(eligible[0]?.id);
       })
@@ -174,14 +184,16 @@ function InstallTargetModal({
   return (
     <Modal open onClose={onClose} title={`Install ${plugin.title}`}>
       <div className="space-y-4">
-        <p className="text-sm text-ink-400">Which server should this be installed to?</p>
+        <p className="text-sm text-ink-400">Which instance should this be installed to?</p>
         {servers === null ? (
           <div className="flex items-center gap-2 text-sm text-ink-500">
             <Spinner /> Loading servers…
           </div>
         ) : servers.length === 0 ? (
           <p className="text-sm text-ink-500">
-            No Paper, Purpur, or Spigot servers found. Create one first — Vanilla and Bedrock don't support plugins.
+            {catalog === 'datapack'
+              ? 'No Vanilla Java instances found.'
+              : 'No Paper, Purpur, or Spigot instances found. Create one first.'}
           </p>
         ) : (
           <div className="max-h-56 space-y-1.5 overflow-y-auto">
@@ -189,7 +201,7 @@ function InstallTargetModal({
               <label
                 key={s.id}
                 className={`flex cursor-pointer items-center gap-2.5 rounded-lg border px-3 py-2 text-sm transition-colors ${
-                  selected === s.id ? 'border-accent-500/50 bg-accent-500/10' : 'border-surface-700 hover:border-surface-600'
+                  selected === s.id ? 'border-accent-400 bg-accent-container/40' : 'border-surface-600 hover:border-surface-500'
                 }`}
               >
                 <input type="radio" name="target-server" checked={selected === s.id} onChange={() => setSelected(s.id)} />

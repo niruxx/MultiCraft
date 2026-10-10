@@ -366,6 +366,18 @@ $env:MULTICRAFT_DATA_DIR = "C:\MultiCraftData"
 
 Set this permanently in your service definition (see the `systemd`/NSSM examples above) rather than just in your shell, so it's picked up every time MultiCraft starts.
 
+## Uninstalling (Linux)
+
+```bash
+./uninstall.sh
+```
+
+Walks back everything `install.sh` (and the systemd/pm2 setup above) may have changed, asking before each step: stops the panel and any game servers it launched, stops/disables/removes `multicraft.service` (or the pm2 entry), removes the firewall rule for the panel port, deletes the data directory (it reads `MULTICRAFT_DATA_DIR` from the service file, so a relocated data dir is found too) and `update.sh`'s backups, deletes `node_modules`/build output, offers to remove Node.js (plus the NodeSource repo), Java and steamcmd's 32-bit libraries, removes the dedicated `multicraft` system user if you created one, and finally offers to delete the checkout itself.
+
+Deleting data requires typing `delete`. `install.sh` can't tell which packages were already on the machine before it ran, so package removal is opt-in and your package manager shows exactly what it'll remove before it does; git and curl are only ever removed if you explicitly say so.
+
+Flags: `./uninstall.sh -y` runs non-interactively and keeps your data and packages (removes the service, processes and build output only). `./uninstall.sh -y --purge` removes everything, including data, packages and the checkout. Firewall rules you opened for individual game servers aren't tracked; remove those yourself.
+
 ## Notes
 
 - Creating a Java server requires accepting Mojang's EULA in the creation wizard; MultiCraft writes `eula.txt` accordingly.

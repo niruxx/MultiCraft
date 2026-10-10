@@ -1,6 +1,6 @@
 import { Router, type Request } from 'express';
 import { asyncHandler, HttpError } from '../utils/asyncHandler.js';
-import { requireAuth, requireServerAccess } from '../auth/middleware.js';
+import { requireAuth, requirePermission, requireServerAccess } from '../auth/middleware.js';
 import { getServer } from '../services/serverService.js';
 import { isRunning, sendCommand } from '../services/processManager.js';
 import {
@@ -16,13 +16,6 @@ import { isSteamPlatform, type Role } from '../types/index.js';
 export const whitelistRouter = Router({ mergeParams: true });
 whitelistRouter.use(requireAuth, requireServerAccess());
 
-function canWrite(role: Role): boolean {
-  return role === 'admin' || role === 'moderator';
-}
-
-function requireWrite(req: Request) {
-  if (!canWrite(req.auth!.role)) throw new HttpError(403, 'Viewers cannot manage the allowlist');
-}
 
 function requireServer(serverId: string) {
   const server = getServer(serverId);
@@ -42,7 +35,7 @@ whitelistRouter.get(
 whitelistRouter.put(
   '/enabled',
   asyncHandler(async (req, res) => {
-    requireWrite(req);
+    requirePermission(req, 'players');
     const server = requireServer(req.params.serverId);
     const { enabled } = req.body ?? {};
     if (typeof enabled !== 'boolean') throw new HttpError(400, 'enabled must be a boolean');
@@ -56,7 +49,7 @@ whitelistRouter.put(
 whitelistRouter.post(
   '/players',
   asyncHandler(async (req, res) => {
-    requireWrite(req);
+    requirePermission(req, 'players');
     const server = requireServer(req.params.serverId);
     const { name } = req.body ?? {};
     if (typeof name !== 'string' || !name.trim()) throw new HttpError(400, 'Player name is required');
@@ -75,7 +68,7 @@ whitelistRouter.post(
 whitelistRouter.delete(
   '/players/:name',
   asyncHandler(async (req, res) => {
-    requireWrite(req);
+    requirePermission(req, 'players');
     const server = requireServer(req.params.serverId);
     const name = req.params.name;
 

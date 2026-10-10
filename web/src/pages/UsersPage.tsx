@@ -1,14 +1,11 @@
 import { useEffect, useState } from 'react';
-import { motion } from 'framer-motion';
-import { Layout } from '../components/Layout.js';
+import { Layout, PageHeader } from '../components/Layout.js';
 import { Badge, Button, Card, ErrorText, Field, Input, Modal, Select } from '../components/ui.js';
 import { useToast } from '../components/Toast.js';
 import { useConfirm } from '../components/ConfirmDialog.js';
-import { EnvironmentBackupCard } from '../components/EnvironmentBackupCard.js';
-import { SteamCmdSettingsCard } from '../components/SteamCmdSettingsCard.js';
-import { FactoryResetCard } from '../components/FactoryResetCard.js';
 import { api, ApiError } from '../api/client.js';
-import type { PublicUser, Role, ServerRecord } from '../api/types.js';
+import type { PublicUser, Role, ServerPermission, ServerRecord } from '../api/types.js';
+import { GameTile, gameKindOf } from '../components/GameArt.js';
 import { useAuth } from '../state/AuthContext.js';
 
 export function UsersPage() {
@@ -58,23 +55,16 @@ export function UsersPage() {
 
   return (
     <Layout>
-      <div className="mx-auto max-w-3xl px-6 py-8">
-        <motion.div
-          initial={{ opacity: 0, y: -8 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mb-6 flex items-center justify-between"
-        >
-          <div>
-            <h1 className="text-2xl font-bold text-ink-50">Users</h1>
-            <p className="text-sm text-ink-400">Manage panel accounts and per-server access.</p>
-          </div>
-          <Button variant="primary" onClick={() => setCreateOpen(true)}>
-            + New user
-          </Button>
-        </motion.div>
-
-        <EnvironmentBackupCard />
-        <SteamCmdSettingsCard />
+      <div className="mx-auto max-w-3xl px-4 py-8 sm:px-8">
+        <PageHeader
+          title="Users"
+          subtitle="Manage panel accounts and per-instance access."
+          action={
+            <Button variant="primary" onClick={() => setCreateOpen(true)}>
+              + New user
+            </Button>
+          }
+        />
 
         {users === null ? (
           <p className="text-sm text-ink-500">Loading…</p>
@@ -94,8 +84,8 @@ export function UsersPage() {
                   {u.role !== 'admin' && (
                     <p className="mt-0.5 text-xs text-ink-500">
                       {u.serverAccess && u.serverAccess.length > 0
-                        ? `Access to ${u.serverAccess.length} server(s)`
-                        : 'No server access granted'}
+                        ? `Access to ${u.serverAccess.length} instance(s)`
+                        : 'No instance access granted'}
                     </p>
                   )}
                 </div>
@@ -117,9 +107,6 @@ export function UsersPage() {
           </Card>
         )}
 
-        <div className="mt-8">
-          <FactoryResetCard />
-        </div>
       </div>
 
       <CreateUserModal open={createOpen} onClose={() => setCreateOpen(false)} onSaved={load} />
@@ -172,8 +159,8 @@ function CreateUserModal({ open, onClose, onSaved }: { open: boolean; onClose: (
         <Field label="Role">
           <Select value={role} onChange={(e) => setRole(e.target.value as Role)}>
             <option value="admin">Admin — full access</option>
-            <option value="moderator">Moderator — manage assigned servers</option>
-            <option value="viewer">Viewer — read-only on assigned servers</option>
+            <option value="moderator">Moderator — manage assigned instances</option>
+            <option value="viewer">Viewer — read-only on assigned instances</option>
           </Select>
         </Field>
         <ErrorText>{error}</ErrorText>
@@ -206,7 +193,8 @@ function EditUserModal({
   const toast = useToast();
   const [role, setRole] = useState<Role>('viewer');
   const [password, setPassword] = useState('');
-  const [access, setAccess] = useState<string[]>([]);
+  // Assigned instances → explicit permission set, or null for the role's defaults.
+  const [access, setAccess] = useState<Record<string, ServerPermission[] | null>>({});
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -215,7 +203,7 @@ function EditUserModal({
     if (!user) return;
     setRole(user.role);
     setPassword('');
-    setAccess(user.serverAccess ?? []);
+    setAccess(Object.fromEntries((user.serverAccess ?? []).map((id) => [id, user.serverPermissions?.[id] ?? null])));
     setError('');
   }, [user]);
 
@@ -227,7 +215,7 @@ function EditUserModal({
       await api.patch(`/users/${user.id}`, {
         role,
         password: password || undefined,
-        serverAccess: access,
+        serverAccess: Object.entries(access).map(([serverId, permissions]) => ({ serverId, permissions })),
       });
       toast.success(`Updated "${user.username}"`);
       onSaved();
@@ -240,37 +228,19 @@ function EditUserModal({
   }
 
   return (
-    <Modal open={open} onClose={onClose} title={user ? `Edit ${user.username}` : 'Edit user'}>
+    <Modal open={open} onClose={onClose} title={user ? `Edit ${user.username}` : 'Edit user'} size="lg">
       <div className="space-y-4">
         <Field label="Role">
           <Select value={role} onChange={(e) => setRole(e.target.value as Role)}>
             <option value="admin">Admin — full access</option>
-            <option value="moderator">Moderator — manage assigned servers</option>
-            <option value="viewer">Viewer — read-only on assigned servers</option>
+            <option value="moderator">Moderator — manage assigned instances</option>
+            <option value="viewer">Viewer — read-only on assigned instances</option>
           </Select>
         </Field>
         <Field label="New password (leave blank to keep current)">
           <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} minLength={8} />
         </Field>
-        {role !== 'admin' && (
-          <Field label="Server access">
-            <div className="max-h-40 space-y-1 overflow-y-auto rounded-md border border-surface-700 p-2">
-              {servers.length === 0 && <p className="text-xs text-ink-500">No servers exist yet.</p>}
-              {servers.map((s) => (
-                <label key={s.id} className="flex items-center gap-2 text-sm text-ink-300">
-                  <input
-                    type="checkbox"
-                    checked={access.includes(s.id)}
-                    onChange={(e) =>
-                      setAccess((prev) => (e.target.checked ? [...prev, s.id] : prev.filter((id) => id !== s.id)))
-                    }
-                  />
-                  {s.name}
-                </label>
-              ))}
-            </div>
-          </Field>
-        )}
+        {role !== 'admin' && <AccessEditor role={role} servers={servers} access={access} onChange={setAccess} />}
         <ErrorText>{error}</ErrorText>
         <div className="flex justify-end gap-2">
           <Button variant="ghost" onClick={onClose}>
@@ -282,5 +252,136 @@ function EditUserModal({
         </div>
       </div>
     </Modal>
+  );
+}
+
+const PERMISSION_GROUPS: { label: string; items: { key: ServerPermission; label: string }[] }[] = [
+  {
+    label: 'Control',
+    items: [
+      { key: 'power', label: 'Start / stop' },
+      { key: 'console', label: 'Console commands' },
+      { key: 'players', label: 'Manage players' },
+    ],
+  },
+  {
+    label: 'Files',
+    items: [
+      { key: 'files.read', label: 'View & download' },
+      { key: 'files.write', label: 'Edit & upload' },
+      { key: 'plugins', label: 'Plugins / mods' },
+    ],
+  },
+  {
+    label: 'Snapshots',
+    items: [
+      { key: 'backups.create', label: 'Create & schedule' },
+      { key: 'backups.restore', label: 'Restore' },
+    ],
+  },
+  {
+    label: 'Admin',
+    items: [
+      { key: 'settings', label: 'Edit configuration' },
+      { key: 'update', label: 'Update version' },
+    ],
+  },
+];
+
+const ALL_PERMISSIONS = PERMISSION_GROUPS.flatMap((g) => g.items.map((i) => i.key));
+
+function roleDefaults(role: Role): ServerPermission[] {
+  return role === 'viewer' ? ['files.read'] : ALL_PERMISSIONS;
+}
+
+/** Pick any number of instances; each gets the role's defaults or its own permission set. */
+function AccessEditor({
+  role,
+  servers,
+  access,
+  onChange,
+}: {
+  role: Role;
+  servers: ServerRecord[];
+  access: Record<string, ServerPermission[] | null>;
+  onChange: (next: Record<string, ServerPermission[] | null>) => void;
+}) {
+  const assigned = Object.keys(access).length;
+
+  function toggleAssigned(id: string, on: boolean) {
+    const next = { ...access };
+    if (on) next[id] = null;
+    else delete next[id];
+    onChange(next);
+  }
+
+  function togglePermission(id: string, perm: ServerPermission) {
+    const current = access[id] ?? roleDefaults(role);
+    const nextPerms = current.includes(perm) ? current.filter((p) => p !== perm) : [...current, perm];
+    onChange({ ...access, [id]: nextPerms });
+  }
+
+  return (
+    <div>
+      <div className="mb-2 flex items-center justify-between">
+        <span className="text-xs font-medium text-ink-300">Instance access</span>
+        <span className="text-xs text-ink-500">
+          {assigned} of {servers.length} assigned
+        </span>
+      </div>
+      <div className="max-h-[45vh] space-y-2 overflow-y-auto">
+        {servers.length === 0 && <p className="text-xs text-ink-500">No instances exist yet.</p>}
+        {servers.map((s) => {
+          const isAssigned = s.id in access;
+          const custom = access[s.id];
+          const effective = custom ?? roleDefaults(role);
+          return (
+            <div key={s.id} className={`rounded-2xl p-3 ${isAssigned ? 'bg-surface-700' : 'bg-surface-850'}`}>
+              <label className="flex cursor-pointer items-center gap-3">
+                <input type="checkbox" checked={isAssigned} onChange={(e) => toggleAssigned(s.id, e.target.checked)} />
+                <GameTile kind={gameKindOf(s)} className="h-8 w-8 !rounded-xl" />
+                <span className="min-w-0 flex-1 truncate text-sm text-ink-100">{s.name}</span>
+                {isAssigned && (
+                  <span className="text-xs text-ink-400">{custom ? 'Custom permissions' : `${role === 'viewer' ? 'Viewer' : 'Moderator'} defaults`}</span>
+                )}
+              </label>
+              {isAssigned && (
+                <div className="mt-3 space-y-2 pl-7">
+                  {PERMISSION_GROUPS.map((g) => (
+                    <div key={g.label} className="flex flex-wrap items-center gap-1.5">
+                      <span className="w-20 shrink-0 text-[11px] text-ink-500">{g.label}</span>
+                      {g.items.map((item) => {
+                        const on = effective.includes(item.key);
+                        return (
+                          <button
+                            key={item.key}
+                            type="button"
+                            onClick={() => togglePermission(s.id, item.key)}
+                            className={`state-layer rounded-lg border px-2.5 py-1 text-xs font-medium ${
+                              on ? 'border-transparent bg-secondary-container text-secondary-on-container' : 'border-surface-500 text-ink-400'
+                            }`}
+                          >
+                            {on ? '✓ ' : ''}
+                            {item.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ))}
+                  {custom && (
+                    <button type="button" className="text-xs text-accent-400 hover:underline" onClick={() => onChange({ ...access, [s.id]: null })}>
+                      Reset to role defaults
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+      <p className="mt-2 text-xs text-ink-500">
+        Every assigned user can see the instance's status, console output and player list. Everything else needs the permission.
+      </p>
+    </div>
   );
 }

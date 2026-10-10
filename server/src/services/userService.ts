@@ -57,11 +57,73 @@ export function deleteUser(id: string) {
   prep('DELETE FROM users WHERE id = ?').run(id);
 }
 
-export function setUserServerAccess(userId: string, serverIds: string[]) {
-  const tx = db.prepare('DELETE FROM user_server_access WHERE user_id = ?');
-  tx.run(userId);
-  const insert = prep('INSERT OR IGNORE INTO user_server_access (user_id, server_id) VALUES (?, ?)');
-  for (const serverId of serverIds) insert.run(userId, serverId);
+/**
+ * What a user may do inside an instance they've been assigned. Seeing an assigned instance
+ * (status, console output, player list) needs no permission; everything that changes it does.
+ */
+export const SERVER_PERMISSIONS = [
+  'power', // start / stop / restart / kill / retry install
+  'console', // send console commands
+  'files.read', // browse & download files, browse snapshot contents
+  'files.write', // edit, upload, rename, delete files
+  'backups.create', // create & delete snapshots, edit the snapshot schedule
+  'backups.restore', // restore a whole snapshot or single files from one
+  'plugins', // install, toggle, remove plugins / mods / packs
+  'players', // op, kick, ban, whitelist
+  'settings', // instance configuration & server.properties
+  'update', // change version / update the server software
+] as const;
+
+export type ServerPermission = (typeof SERVER_PERMISSIONS)[number];
+
+export function roleDefaultPermissions(role: Role): ServerPermission[] {
+  if (role === 'viewer') return ['files.read'];
+  return [...SERVER_PERMISSIONS];
+}
+
+function sanitizePermissions(value: unknown): ServerPermission[] | null {
+  if (!Array.isArray(value)) return null;
+  return SERVER_PERMISSIONS.filter((p) => value.includes(p));
+}
+
+export interface ServerAccessEntry {
+  serverId: string;
+  /** null = the role's defaults */
+  permissions: ServerPermission[] | null;
+}
+
+/** Replaces a user's instance assignments. Accepts plain ids (role defaults) or per-instance permission sets. */
+export function setUserServerAccess(userId: string, entries: (string | ServerAccessEntry)[]) {
+  db.prepare('DELETE FROM user_server_access WHERE user_id = ?').run(userId);
+  const insert = prep('INSERT OR IGNORE INTO user_server_access (user_id, server_id, permissions) VALUES (?, ?, ?)');
+  for (const entry of entries) {
+    const serverId = typeof entry === 'string' ? entry : entry.serverId;
+    const perms = typeof entry === 'string' ? null : sanitizePermissions(entry.permissions);
+    insert.run(userId, serverId, perms ? JSON.stringify(perms) : null);
+  }
+}
+
+export function getUserServerAccessDetailed(userId: string): ServerAccessEntry[] {
+  const rows = prep('SELECT server_id, permissions FROM user_server_access WHERE user_id = ?').all(userId) as {
+    server_id: string;
+    permissions: string | null;
+  }[];
+  return rows.map((r) => ({ serverId: r.server_id, permissions: r.permissions ? sanitizePermissions(JSON.parse(r.permissions)) : null }));
+}
+
+/** Effective permissions on one instance, or null when the user isn't assigned to it at all. */
+export function getServerPermissions(userId: string, role: Role, serverId: string): ServerPermission[] | null {
+  if (role === 'admin') return [...SERVER_PERMISSIONS];
+  const row = prep('SELECT permissions FROM user_server_access WHERE user_id = ? AND server_id = ?').get(userId, serverId) as
+    | { permissions: string | null }
+    | undefined;
+  if (!row) return null;
+  if (!row.permissions) return roleDefaultPermissions(role);
+  try {
+    return sanitizePermissions(JSON.parse(row.permissions)) ?? roleDefaultPermissions(role);
+  } catch {
+    return roleDefaultPermissions(role);
+  }
 }
 
 export function getUserServerAccess(userId: string): string[] {

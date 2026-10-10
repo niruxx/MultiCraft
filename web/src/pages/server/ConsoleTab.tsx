@@ -2,11 +2,10 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { motion } from 'framer-motion';
 import { useServerDetail } from './ServerContext.js';
 import { useConsoleSocket } from '../../hooks/useConsoleSocket.js';
-import { api, ApiError } from '../../api/client.js';
-import { Button, Card, ErrorText, Input, Spinner } from '../../components/ui.js';
+import { api } from '../../api/client.js';
+import { Button, Card, Input, Spinner } from '../../components/ui.js';
 
-// The console pane itself is always dark (a terminal, not page chrome), regardless of the
-// site's light/dark theme, so these stay fixed Tailwind colors rather than theme-aware `ink-*`.
+// Terminal palette: status hues follow the MD3 scheme; plain output stays a neutral light gray.
 function lineColor(stream: string, line: string): string {
   if (stream === 'stderr') return 'text-red-400';
   if (stream === 'system') return 'text-sky-400';
@@ -16,7 +15,8 @@ function lineColor(stream: string, line: string): string {
 }
 
 export function ConsoleTab() {
-  const { serverId, canWrite, refresh } = useServerDetail();
+  const { serverId, can } = useServerDetail();
+  const canWrite = can('console');
   const { lines, status, stats, connected, installProgress } = useConsoleSocket(serverId);
   const [command, setCommand] = useState('');
   const [history, setHistory] = useState<string[]>([]);
@@ -65,76 +65,12 @@ export function ConsoleTab() {
     }
   }
 
-  const [actionError, setActionError] = useState('');
-  const [busy, setBusy] = useState(false);
-  async function lifecycleAction(action: 'start' | 'stop' | 'restart') {
-    setBusy(true);
-    setActionError('');
-    try {
-      await api.post(`/servers/${serverId}/${action}`);
-      await refresh();
-    } catch (err) {
-      setActionError(err instanceof ApiError ? err.message : `Failed to ${action}`);
-    } finally {
-      setBusy(false);
-    }
-  }
-  async function retryInstall() {
-    setBusy(true);
-    setActionError('');
-    try {
-      await api.post(`/servers/${serverId}/retry-install`);
-      await refresh();
-    } catch (err) {
-      setActionError(err instanceof ApiError ? err.message : 'Failed to retry install');
-    } finally {
-      setBusy(false);
-    }
-  }
-  async function killServer() {
-    setBusy(true);
-    setActionError('');
-    try {
-      await api.post(`/servers/${serverId}/stop`, { force: true });
-      await refresh();
-    } catch (err) {
-      setActionError(err instanceof ApiError ? err.message : 'Failed to kill server');
-    } finally {
-      setBusy(false);
-    }
-  }
-
   const isRunningLike = status === 'running' || status === 'starting';
 
   return (
-    <div className="flex h-[calc(100vh-8.5rem)] flex-col gap-3">
+    <div className="flex h-full min-h-[420px] flex-col gap-3">
       <div className="flex flex-wrap items-center gap-3">
-        {canWrite && (
-          <>
-            {status === 'install_failed' ? (
-              <Button variant="primary" disabled={busy} onClick={retryInstall}>
-                Retry install
-              </Button>
-            ) : status === 'stopped' || status === 'crashed' ? (
-              <Button variant="primary" disabled={busy} onClick={() => lifecycleAction('start')}>
-                Start
-              </Button>
-            ) : (
-              <>
-                <Button disabled={busy || !isRunningLike} onClick={() => lifecycleAction('restart')}>
-                  Restart
-                </Button>
-                <Button variant="danger" disabled={busy || !isRunningLike} onClick={() => lifecycleAction('stop')}>
-                  Stop
-                </Button>
-                <Button variant="ghost" disabled={busy || !isRunningLike} onClick={killServer}>
-                  Force kill
-                </Button>
-              </>
-            )}
-          </>
-        )}
-        <div className="ml-auto flex items-center gap-4 text-xs text-ink-400">
+        <div className="flex w-full items-center justify-end gap-4 text-xs text-ink-400">
           <span className="inline-flex items-center gap-1.5">
             <span className="relative flex h-2 w-2">
               {connected && (
@@ -148,8 +84,6 @@ export function ConsoleTab() {
           {stats.cpuPercent !== null && <span>CPU {stats.cpuPercent}%</span>}
         </div>
       </div>
-
-      <ErrorText>{actionError}</ErrorText>
 
       {installProgress && (
         <Card className="p-3">
@@ -170,7 +104,7 @@ export function ConsoleTab() {
         </Card>
       )}
 
-      <Card className="flex-1 overflow-hidden !bg-black/40">
+      <Card className="min-h-0 flex-1 overflow-hidden !rounded-2xl !bg-surface-1000">
         <div
           ref={scrollRef}
           onScroll={(e) => {

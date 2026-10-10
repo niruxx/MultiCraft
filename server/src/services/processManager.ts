@@ -4,7 +4,8 @@ import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { getServer, setServerStatus } from './serverService.js';
 import { instanceDir } from '../utils/paths.js';
 import { findJava } from './javaService.js';
-import { readProcessStats, clearStatsSample, type ProcessStats } from './statsService.js';
+import { readProcessStats, clearStatsSample, emptyStats, type ProcessStats } from './statsService.js';
+import { addonLaunchEnv } from './pluginService.js';
 import { handleLogLine, resetOnlinePlayers } from './playerService.js';
 import { publish, consoleTopic } from './wsHub.js';
 import * as consoleLog from './consoleLogService.js';
@@ -129,11 +130,23 @@ function issueStop(instance: RunningInstance) {
   }
 }
 
+/** Bedrock and Linux Steam servers ship their shared libraries next to the binary; mod loaders
+ *  (e.g. BepInEx for Valheim) may add their own preload libraries and variables on top. */
+function buildLaunchEnv(server: ServerRecord, dir: string, base: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  const needsLocalLibs = server.platform === 'bedrock' || (server.platform === 'steam' && process.platform !== 'win32');
+  if (!needsLocalLibs) return base;
+  const addon = addonLaunchEnv(server, dir);
+  const libPath = [...addon.libraryPaths, dir].join(':');
+  return { ...base, ...addon.env, LD_LIBRARY_PATH: libPath };
+}
+
 export async function startServer(serverId: string): Promise<void> {
   if (running.has(serverId)) throw new HttpError(409, 'Server is already running');
   const server = getServer(serverId);
   if (!server) throw new HttpError(404, 'Server not found');
+  if (server.suspended) throw new HttpError(423, 'This instance is suspended — lift the suspension before starting it');
   if (server.status === 'installing') throw new HttpError(409, 'Server is still installing');
+  if (server.status === 'transferring') throw new HttpError(409, 'Server is being transferred to another node');
 
   const dir = instanceDir(serverId);
   let cmd: string;
@@ -178,9 +191,7 @@ export async function startServer(serverId: string): Promise<void> {
     cwd: dir,
     windowsHide: true,
     shell: useShell,
-    env: server.platform === 'bedrock' || (server.platform === 'steam' && process.platform !== 'win32')
-      ? { ...spawnEnv, LD_LIBRARY_PATH: dir }
-      : spawnEnv,
+    env: buildLaunchEnv(server, dir, spawnEnv),
   });
 
   const readyRegex = resolveReadyRegex(server);
@@ -188,7 +199,7 @@ export async function startServer(serverId: string): Promise<void> {
     child,
     startedAt: Date.now(),
     manualStop: false,
-    lastStats: { memoryMb: null, cpuPercent: null },
+    lastStats: emptyStats(),
     readyRegex,
     stopStrategy: resolveStopStrategy(server),
   };

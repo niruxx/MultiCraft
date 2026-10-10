@@ -17,6 +17,9 @@ import { pluginRegistryRouter } from './routes/pluginRegistry.routes.js';
 import { environmentRouter } from './routes/environment.routes.js';
 import { mapRouter } from './routes/map.routes.js';
 import { settingsRouter } from './routes/settings.routes.js';
+import { nodesRouter } from './routes/nodes.routes.js';
+import { nodeLinkRouter } from './routes/nodeLink.routes.js';
+import { recoverInterruptedTransfers } from './services/nodeService.js';
 import { verifyToken } from './auth/tokens.js';
 import { userHasServerAccess } from './services/userService.js';
 import { getServer, listServers } from './services/serverService.js';
@@ -48,6 +51,8 @@ app.use('/api/plugins', pluginRegistryRouter);
 app.use('/api/system', systemRouter);
 app.use('/api/environment', environmentRouter);
 app.use('/api/settings', settingsRouter);
+app.use('/api/nodes', nodesRouter);
+app.use('/api/node-link', nodeLinkRouter);
 
 app.get('/api/health', (_req, res) => res.json({ ok: true }));
 
@@ -91,7 +96,7 @@ httpServer.on('upgrade', (req, socket, head) => {
     socket.destroy();
     return;
   }
-  if (payload.role !== 'admin' && !userHasServerAccess(payload.sub, serverId)) {
+  if (payload.role !== 'admin' && (!userHasServerAccess(payload.sub, serverId) || server.suspended)) {
     socket.write('HTTP/1.1 403 Forbidden\r\n\r\n');
     socket.destroy();
     return;
@@ -113,9 +118,10 @@ httpServer.on('upgrade', (req, socket, head) => {
 
 async function bootstrap() {
   initScheduler();
+  recoverInterruptedTransfers();
 
   for (const server of listServers()) {
-    if (server.auto_start && server.status !== 'installing') {
+    if (server.auto_start && server.status !== 'installing' && !server.suspended) {
       logger.info(`Auto-starting server ${server.name} (${server.id})`);
       startServer(server.id).catch((err) => logger.error(`Auto-start failed for ${server.id}`, err));
     }

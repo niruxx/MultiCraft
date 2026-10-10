@@ -31,7 +31,8 @@ export type ServerStatus =
   | 'running'
   | 'stopping'
   | 'crashed'
-  | 'updating';
+  | 'updating'
+  | 'transferring';
 
 export interface ServerRecord {
   id: string;
@@ -53,6 +54,12 @@ export interface ServerRecord {
   steam_app_id: string | null;
   steam_login: string;
   steam_extra_flags: string;
+  /** Admin-imposed lock (non-payment, TOS violation, …): stopped, can't be started, and only
+   *  admins can see or manage it through the panel/API until it's lifted. */
+  suspended: 0 | 1;
+  suspended_reason: string | null;
+  suspended_at: string | null;
+  suspended_by: string | null;
 }
 
 export interface BackupSchedule {

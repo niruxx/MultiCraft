@@ -9,7 +9,6 @@ function themeScale(prefix, steps) {
 
 export default {
   content: ['./index.html', './src/**/*.{ts,tsx}'],
-  darkMode: ['selector', '[data-theme="dark"]'],
   theme: {
     extend: {
       fontFamily: {
@@ -17,13 +16,35 @@ export default {
         mono: ['"JetBrains Mono"', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
       },
       colors: {
-        // All theme-sensitive colors resolve through CSS variables (defined per [data-theme]
-        // in index.css) so a single class like `bg-surface-900` or `text-ink-200` automatically
-        // repaints when the user switches light/dark — nothing in components needs to change.
-        surface: themeScale('surface', [950, 900, 850, 800, 700, 600, 500]),
+        // All colors resolve through the MD3 tokens defined in index.css.
+        surface: themeScale('surface', [1000, 950, 900, 850, 800, 700, 600, 500]),
         ink: themeScale('ink', [50, 100, 200, 300, 400, 500, 600]),
-        accent: themeScale('accent', [400, 500, 600]),
+        accent: {
+          ...themeScale('accent', [400, 500, 600]),
+          on: themeColor('accent-on'),
+          container: themeColor('accent-container'),
+          'on-container': themeColor('accent-on-container'),
+        },
+        secondary: { container: themeColor('secondary-container'), 'on-container': themeColor('secondary-on-container') },
+        tertiary: {
+          400: themeColor('tertiary-400'),
+          container: themeColor('tertiary-container'),
+          'on-container': themeColor('tertiary-on-container'),
+        },
+        error: {
+          400: themeColor('error-400'),
+          container: themeColor('error-container'),
+          'on-container': themeColor('error-on-container'),
+        },
         success: themeScale('success', [400, 500]),
+        // Status hues retuned to MD3's dark-scheme tones so existing red/yellow/sky classes match.
+        red: { 300: '#ffdad6', 400: '#ffb4ab', 500: '#f2847a' },
+        yellow: { 400: '#ecc65c', 500: '#d6ac3a' },
+        sky: { 400: '#9ecaff', 500: '#6fa8e8' },
+      },
+      borderRadius: {
+        // MD3 shape scale: extra-large containers (dialogs) are 28dp.
+        '4xl': '28px',
       },
       boxShadow: {
         // Flat, neutral elevation — no colored glow. Depth comes from blur + a hairline

@@ -36,7 +36,7 @@ export function SteamCmdSettingsCard() {
 
   return (
     <Card className="mb-6 p-4">
-      <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-400">SteamCMD</h2>
+      <h2 className="text-base font-medium text-ink-100">SteamCMD</h2>
       <p className="mt-1 mb-4 text-xs text-ink-500">
         Controls where MultiCraft gets SteamCMD from when it needs to bootstrap it (the first time a Steam-based
         server is created, or if it's ever removed). Leave this blank to download the official archive from Valve

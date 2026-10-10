@@ -6,7 +6,8 @@ import type { PlayerInfo } from '../../api/types.js';
 import { Badge, Button, Card, ErrorText, Field, Input } from '../../components/ui.js';
 
 export function PlayersTab() {
-  const { serverId, running, canWrite } = useServerDetail();
+  const { serverId, running, can } = useServerDetail();
+  const canWrite = can('players');
   const [players, setPlayers] = useState<PlayerInfo[] | null>(null);
   const [error, setError] = useState('');
   const [busyKey, setBusyKey] = useState<string | null>(null);
@@ -53,7 +54,7 @@ export function PlayersTab() {
       <ErrorText>{error}</ErrorText>
 
       {canWrite && (
-        <Card className="p-4">
+        <Card className="p-5">
           <h3 className="mb-2 text-sm font-semibold text-ink-200">Whitelist a player</h3>
           <div className="flex gap-2">
             <Field label="Player name">
@@ -71,14 +72,14 @@ export function PlayersTab() {
       )}
 
       <section>
-        <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-ink-400">
+        <h2 className="mb-2 text-base font-medium text-ink-100">
           Online ({online.length})
         </h2>
         <PlayerTable players={online} canWrite={canWrite} running={running} busyKey={busyKey} onAction={act} />
       </section>
 
       <section>
-        <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-ink-400">
+        <h2 className="mb-2 text-base font-medium text-ink-100">
           Known players ({offline.length})
         </h2>
         <PlayerTable players={offline} canWrite={canWrite} running={running} busyKey={busyKey} onAction={act} />

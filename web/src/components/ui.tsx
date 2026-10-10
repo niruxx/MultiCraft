@@ -3,53 +3,52 @@ import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, SelectHTMLAt
 
 const springy = { type: 'spring' as const, stiffness: 420, damping: 32 };
 
+/** Inline notice block (MD3 tonal container). */
+export function Notice({ tone = 'info', children }: { tone?: 'info' | 'warning' | 'error'; children: ReactNode }) {
+  const tones = {
+    info: 'bg-tertiary-container text-tertiary-on-container',
+    warning: 'bg-yellow-500/15 text-yellow-400',
+    error: 'bg-error-container text-error-on-container',
+  };
+  return <div className={`rounded-2xl px-4 py-3 text-sm leading-relaxed ${tones[tone]}`}>{children}</div>;
+}
+
+/** MD3 buttons: filled (primary), tonal (default), error-tonal (danger), text (ghost), outlined. */
 export function Button({
   variant = 'default',
   className = '',
   children,
-  disabled,
   ...props
-}: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'default' | 'primary' | 'danger' | 'ghost' }) {
+}: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'default' | 'primary' | 'danger' | 'ghost' | 'outlined' }) {
   const base =
-    'relative inline-flex items-center justify-center gap-1.5 rounded-lg text-sm font-medium px-3.5 py-1.5 border transition-colors duration-150 disabled:opacity-40 disabled:cursor-not-allowed select-none';
+    'state-layer inline-flex items-center justify-center gap-2 rounded-full px-4 py-2 text-sm font-medium tracking-[0.01em] transition-[background-color,box-shadow] duration-150 disabled:cursor-not-allowed disabled:opacity-[0.38] select-none';
   const variants: Record<string, string> = {
-    default: 'bg-surface-800/70 hover:bg-surface-700 border-surface-700 text-ink-100',
-    primary: 'bg-accent-500 hover:bg-accent-400 border-transparent text-ink-50 font-semibold',
-    danger: 'bg-red-500/15 hover:bg-red-500/25 border-red-500/30 text-red-400',
-    ghost: 'bg-transparent hover:bg-surface-800 border-transparent text-ink-300',
+    default: 'bg-secondary-container text-secondary-on-container',
+    primary: 'bg-accent-400 text-accent-on hover:shadow-flat',
+    danger: 'bg-error-container text-error-on-container',
+    ghost: 'bg-transparent text-accent-400',
+    outlined: 'border border-surface-500 bg-transparent text-accent-400',
   };
   return (
-    <motion.button
-      whileHover={disabled ? undefined : { y: -1 }}
-      whileTap={disabled ? undefined : { scale: 0.97 }}
-      transition={springy}
-      className={`${base} ${variants[variant]} ${className}`}
-      disabled={disabled}
-      {...(props as any)}
-    >
+    <button className={`${base} ${variants[variant]} ${className}`} {...props}>
       {children}
-    </motion.button>
+    </button>
   );
 }
 
+const FIELD_BASE =
+  'w-full rounded-lg border border-surface-500 bg-transparent px-3 py-2 text-sm text-ink-100 outline-none transition-colors duration-150 hover:border-ink-300 focus:border-accent-400 focus:ring-1 focus:ring-accent-400 disabled:opacity-[0.38]';
+
+/** MD3 outlined text field. */
 export function Input(props: InputHTMLAttributes<HTMLInputElement>) {
-  return (
-    <input
-      {...props}
-      className={`w-full rounded-lg bg-surface-800/80 border border-surface-600 px-3 py-1.5 text-sm text-ink-100 placeholder-ink-500 outline-none transition-all duration-150 focus:border-accent-500/60 focus:ring-2 focus:ring-accent-500/25 hover:border-surface-500 ${props.className ?? ''}`}
-    />
-  );
+  return <input {...props} className={`${FIELD_BASE} placeholder-ink-500 ${props.className ?? ''}`} />;
 }
 
 export function Select(props: SelectHTMLAttributes<HTMLSelectElement>) {
-  return (
-    <select
-      {...props}
-      className={`w-full rounded-lg bg-surface-800/80 border border-surface-600 px-3 py-1.5 text-sm text-ink-100 outline-none transition-all duration-150 focus:border-accent-500/60 focus:ring-2 focus:ring-accent-500/25 hover:border-surface-500 ${props.className ?? ''}`}
-    />
-  );
+  return <select {...props} className={`${FIELD_BASE} bg-surface-900 ${props.className ?? ''}`} />;
 }
 
+/** MD3 filled card (surface-container); `glass={false}` gives the lower container tone. */
 export function Card({
   children,
   className = '',
@@ -62,19 +61,30 @@ export function Card({
   glass?: boolean;
 }) {
   return (
-    <motion.div
-      whileHover={hover ? { y: -2, transition: springy } : undefined}
-      className={`rounded-xl border border-surface-700/70 shadow-flat ${glass ? 'glass' : 'bg-surface-900'} ${className}`}
+    <div
+      className={`rounded-3xl ${glass ? 'bg-surface-850' : 'bg-surface-900'} ${
+        hover ? 'transition-colors duration-150 hover:bg-surface-800' : ''
+      } ${className}`}
     >
       {children}
-    </motion.div>
+    </div>
+  );
+}
+
+/** Section heading used at the top of cards. */
+export function CardTitle({ children, action }: { children: ReactNode; action?: ReactNode }) {
+  return (
+    <div className="mb-4 flex items-center justify-between gap-3">
+      <h2 className="text-base font-medium text-ink-100">{children}</h2>
+      {action}
+    </div>
   );
 }
 
 // `green` deliberately uses the `success` palette, not `accent` — status color (good/running)
 // and brand/interactive color are different concepts and must stay visually distinct.
 const BADGE_TONES: Record<string, string> = {
-  neutral: 'bg-surface-700/70 text-ink-300',
+  neutral: 'bg-surface-700 text-ink-300',
   green: 'bg-success-500/15 text-success-400',
   red: 'bg-red-500/15 text-red-400',
   yellow: 'bg-yellow-500/15 text-yellow-400',
@@ -98,7 +108,7 @@ export function Badge({
     blue: 'bg-sky-400',
   };
   return (
-    <span className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium ${BADGE_TONES[tone]}`}>
+    <span className={`inline-flex items-center gap-1.5 rounded-lg px-2 py-0.5 text-xs font-medium ${BADGE_TONES[tone]}`}>
       {pulse && (
         <span className="relative flex h-1.5 w-1.5">
           <span className={`absolute inline-flex h-full w-full animate-ping-slow rounded-full ${dotColor[tone]}`} />
@@ -146,7 +156,7 @@ export function Modal({
     <AnimatePresence>
       {open && (
         <motion.div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -154,20 +164,22 @@ export function Modal({
           onClick={onClose}
         >
           <motion.div
-            className={`flex max-h-[85vh] w-full ${MODAL_SIZE[size]} flex-col rounded-xl border border-surface-700/70 bg-surface-900 shadow-card`}
+            className={`flex max-h-[85vh] w-full ${MODAL_SIZE[size]} flex-col rounded-4xl bg-surface-800 shadow-card`}
             initial={{ opacity: 0, scale: 0.95, y: 12 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.96, y: 8 }}
             transition={springy}
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex shrink-0 items-center justify-between border-b border-surface-700/80 px-4 py-3">
-              <h3 className="text-sm font-semibold text-ink-100">{title}</h3>
-              <button onClick={onClose} className="rounded-md p-1 text-ink-400 transition-colors hover:bg-surface-800 hover:text-ink-200">
-                ✕
+            <div className="flex shrink-0 items-center justify-between px-6 pb-2 pt-6">
+              <h3 className="text-xl font-normal text-ink-50">{title}</h3>
+              <button onClick={onClose} aria-label="Close" className="state-layer rounded-full p-2 text-ink-300">
+                <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                  <path d="M18 6L6 18M6 6l12 12" />
+                </svg>
               </button>
             </div>
-            <div className="overflow-y-auto p-4">{children}</div>
+            <div className="overflow-y-auto px-6 pb-6 pt-2">{children}</div>
           </motion.div>
         </motion.div>
       )}
@@ -178,7 +190,7 @@ export function Modal({
 export function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <label className="block space-y-1">
-      <span className="text-xs font-medium uppercase tracking-wide text-ink-400">{label}</span>
+      <span className="text-xs font-medium text-ink-300">{label}</span>
       {children}
     </label>
   );
@@ -192,7 +204,7 @@ export function ErrorText({ children }: { children: ReactNode }) {
           initial={{ opacity: 0, height: 0 }}
           animate={{ opacity: 1, height: 'auto' }}
           exit={{ opacity: 0, height: 0 }}
-          className="overflow-hidden rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-400"
+          className="overflow-hidden rounded-xl bg-error-container px-3 py-2 text-sm text-error-on-container"
         >
           {children}
         </motion.p>

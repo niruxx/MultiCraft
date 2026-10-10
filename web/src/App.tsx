@@ -1,14 +1,15 @@
-import { Navigate, Route, BrowserRouter, Routes } from 'react-router-dom';
+import { Navigate, Route, BrowserRouter, Routes, useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { AuthProvider, useAuth } from './state/AuthContext.js';
-import { ThemeProvider } from './state/ThemeContext.js';
 import { ToastProvider } from './components/Toast.js';
 import { ConfirmProvider } from './components/ConfirmDialog.js';
 import { Logo } from './components/Logo.js';
 import { LoginPage } from './pages/LoginPage.js';
 import { SetupPage } from './pages/SetupPage.js';
-import { DashboardPage } from './pages/DashboardPage.js';
-import { ServerPage } from './pages/ServerPage.js';
+import { InstancesPage } from './pages/InstancesPage.js';
+import { InstancePage } from './pages/InstancePage.js';
+import { ConfigurationPage } from './pages/ConfigurationPage.js';
+import { FileManagerPage } from './pages/FileManagerPage.js';
 import { UsersPage } from './pages/UsersPage.js';
 import type { ReactNode } from 'react';
 
@@ -19,7 +20,7 @@ function FullScreenLoader() {
         animate={{ opacity: [1, 0.5, 1] }}
         transition={{ duration: 1.3, repeat: Infinity, ease: 'easeInOut' }}
       >
-        <Logo className="h-9 w-9 rounded-lg shadow-glow" />
+        <Logo className="h-9 w-9 rounded-lg" />
       </motion.div>
     </div>
   );
@@ -39,6 +40,12 @@ function RequireAdmin({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
 
+/** Old /servers/:id/... links (bookmarks, notifications) now live under /instances. */
+function LegacyServerRedirect() {
+  const { serverId, '*': rest } = useParams();
+  return <Navigate to={`/instances/${serverId}/${rest ?? ''}`} replace />;
+}
+
 function AppRoutes() {
   const { setupRequired, loading } = useAuth();
   if (loading) return <FullScreenLoader />;
@@ -51,15 +58,32 @@ function AppRoutes() {
         path="/"
         element={
           <RequireAuth>
-            <DashboardPage />
+            <InstancesPage />
           </RequireAuth>
         }
       />
       <Route
-        path="/servers/:serverId/*"
+        path="/instances/:serverId/*"
         element={
           <RequireAuth>
-            <ServerPage />
+            <InstancePage />
+          </RequireAuth>
+        }
+      />
+      <Route path="/servers/:serverId/*" element={<LegacyServerRedirect />} />
+      <Route
+        path="/configuration"
+        element={
+          <RequireAuth>
+            <ConfigurationPage />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/files/:serverId?"
+        element={
+          <RequireAuth>
+            <FileManagerPage />
           </RequireAuth>
         }
       />
@@ -81,15 +105,13 @@ function AppRoutes() {
 export default function App() {
   return (
     <BrowserRouter>
-      <ThemeProvider>
-        <AuthProvider>
-          <ToastProvider>
-            <ConfirmProvider>
-              <AppRoutes />
-            </ConfirmProvider>
-          </ToastProvider>
-        </AuthProvider>
-      </ThemeProvider>
+      <AuthProvider>
+        <ToastProvider>
+          <ConfirmProvider>
+            <AppRoutes />
+          </ConfirmProvider>
+        </ToastProvider>
+      </AuthProvider>
     </BrowserRouter>
   );
 }

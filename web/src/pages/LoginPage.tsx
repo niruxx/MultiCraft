@@ -5,7 +5,6 @@ import { useAuth } from '../state/AuthContext.js';
 import { ApiError } from '../api/client.js';
 import { Badge, Button, ErrorText, Field, Input } from '../components/ui.js';
 import { Logo } from '../components/Logo.js';
-import { ThemeToggle } from '../components/ThemeToggle.js';
 
 const APP_VERSION = '1.0.0';
 
@@ -45,22 +44,19 @@ export function LoginPage() {
           transition={{ duration: 7, repeat: Infinity, ease: 'easeInOut' }}
         />
       </div>
-      <div className="fixed right-4 top-4 z-20">
-        <ThemeToggle />
-      </div>
       <motion.div
         initial={{ opacity: 0, y: 16, scale: 0.98 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ type: 'spring', stiffness: 280, damping: 26 }}
-        className="glass relative z-10 w-full max-w-sm rounded-2xl border border-surface-700/80 p-7 shadow-card"
+        className="relative z-10 w-full max-w-sm rounded-4xl bg-surface-850 p-8"
       >
         <div className="mb-6 text-center">
-          <Logo className="mx-auto mb-3.5 h-11 w-11 rounded-xl shadow-glow" />
+          <Logo className="mx-auto mb-3.5 h-11 w-11 rounded-xl" />
           <div className="flex items-center justify-center gap-2">
             <h1 className="text-xl font-bold text-ink-50">Sign in to MultiCraft</h1>
             <Badge tone="neutral">v{APP_VERSION}</Badge>
           </div>
-          <p className="mt-1 text-sm text-ink-400">Manage your Minecraft servers.</p>
+          <p className="mt-1 text-sm text-ink-400">Manage your game server instances.</p>
         </div>
         <form onSubmit={onSubmit} className="space-y-4">
           <Field label="Username">

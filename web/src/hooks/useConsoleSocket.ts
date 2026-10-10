@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { wsUrl } from '../api/client.js';
-import type { ServerStatus } from '../api/types.js';
+import type { ProcessStats, ServerStatus } from '../api/types.js';
 
 export interface LogLine {
   id: number;
@@ -9,10 +9,20 @@ export interface LogLine {
   at: number;
 }
 
-export interface Stats {
-  memoryMb: number | null;
-  cpuPercent: number | null;
-}
+export type Stats = ProcessStats;
+
+export const EMPTY_STATS: Stats = {
+  memoryMb: null,
+  cpuPercent: null,
+  diskReadBytes: null,
+  diskWriteBytes: null,
+  diskReadRate: null,
+  diskWriteRate: null,
+  netRxBytes: null,
+  netTxBytes: null,
+  netRxRate: null,
+  netTxRate: null,
+};
 
 export interface StatsSample extends Stats {
   t: number;
@@ -34,7 +44,7 @@ let counter = 0;
 export function useConsoleSocket(serverId: string | undefined): ConsoleState {
   const [lines, setLines] = useState<LogLine[]>([]);
   const [status, setStatus] = useState<ServerStatus | null>(null);
-  const [stats, setStats] = useState<Stats>({ memoryMb: null, cpuPercent: null });
+  const [stats, setStats] = useState<Stats>(EMPTY_STATS);
   const [statsHistory, setStatsHistory] = useState<StatsSample[]>([]);
   const [connected, setConnected] = useState(false);
   const [installProgress, setInstallProgress] = useState<{ pct: number; message: string } | null>(null);
@@ -59,7 +69,7 @@ export function useConsoleSocket(serverId: string | undefined): ConsoleState {
         const msg = JSON.parse(event.data);
         if (msg.type === 'hello') {
           setStatus(msg.status);
-          if (msg.runtime?.stats) setStats(msg.runtime.stats);
+          if (msg.runtime?.stats) setStats({ ...EMPTY_STATS, ...msg.runtime.stats });
           setLines(
             (msg.history as string[]).map((line) => ({ id: counter++, stream: 'stdout' as const, line, at: Date.now() }))
           );
@@ -72,7 +82,8 @@ export function useConsoleSocket(serverId: string | undefined): ConsoleState {
           setStatus(msg.status);
           if (msg.status !== 'installing') setInstallProgress(null);
         } else if (msg.type === 'stats') {
-          const sample: Stats = { memoryMb: msg.memoryMb, cpuPercent: msg.cpuPercent };
+          const { type: _type, ...rest } = msg;
+          const sample: Stats = { ...EMPTY_STATS, ...rest };
           setStats(sample);
           setStatsHistory((prev) => {
             const next = [...prev, { ...sample, t: Date.now() }];

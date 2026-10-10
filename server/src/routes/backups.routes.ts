@@ -1,27 +1,54 @@
-import { Router, type Request } from 'express';
+import { Router } from 'express';
 import { asyncHandler, HttpError } from '../utils/asyncHandler.js';
-import { requireAuth, requireServerAccess } from '../auth/middleware.js';
+import { requireAuth, requirePermission, requireServerAccess } from '../auth/middleware.js';
 import {
+  compareSnapshotFile,
   createBackup,
   deleteBackup,
   listBackups,
+  listSnapshotEntries,
   resolveBackupPath,
   restoreBackup,
+  restoreSnapshotFile,
 } from '../services/backupService.js';
 import { getSchedule, removeSchedule, setSchedule } from '../services/schedulerService.js';
 import { logAudit } from '../services/userService.js';
-import type { Role } from '../types/index.js';
 
+/** Snapshots (zip backups of the instance folder), their schedule, and restore — whole or per file. */
 export const backupsRouter = Router({ mergeParams: true });
 backupsRouter.use(requireAuth, requireServerAccess());
 
-function canWrite(role: Role): boolean {
-  return role === 'admin' || role === 'moderator';
-}
+// Schedule routes come first: otherwise DELETE /schedule would be captured by DELETE /:fileName.
+backupsRouter.get(
+  '/schedule',
+  asyncHandler(async (req, res) => {
+    res.json({ schedule: getSchedule(req.params.serverId) ?? null });
+  })
+);
 
-function requireWrite(req: Request) {
-  if (!canWrite(req.auth!.role)) throw new HttpError(403, 'Viewers cannot manage backups');
-}
+backupsRouter.put(
+  '/schedule',
+  asyncHandler(async (req, res) => {
+    requirePermission(req, 'backups.create');
+    const { cronExpression, retentionCount, enabled } = req.body ?? {};
+    if (typeof cronExpression !== 'string' || !cronExpression) {
+      throw new HttpError(400, 'cronExpression is required');
+    }
+    const schedule = setSchedule(req.params.serverId, cronExpression, Number(retentionCount) || 5, enabled !== false);
+    logAudit(req.auth!.sub, req.auth!.username, 'backup.schedule.set', req.params.serverId, cronExpression);
+    res.json({ schedule });
+  })
+);
+
+backupsRouter.delete(
+  '/schedule',
+  asyncHandler(async (req, res) => {
+    requirePermission(req, 'backups.create');
+    removeSchedule(req.params.serverId);
+    logAudit(req.auth!.sub, req.auth!.username, 'backup.schedule.remove', req.params.serverId);
+    res.status(204).end();
+  })
+);
 
 backupsRouter.get(
   '/',
@@ -33,8 +60,9 @@ backupsRouter.get(
 backupsRouter.post(
   '/',
   asyncHandler(async (req, res) => {
-    requireWrite(req);
-    const backup = await createBackup(req.params.serverId, req.body?.label);
+    requirePermission(req, 'backups.create');
+    const label = typeof req.body?.label === 'string' ? req.body.label : undefined;
+    const backup = await createBackup(req.params.serverId, label);
     logAudit(req.auth!.sub, req.auth!.username, 'backup.create', req.params.serverId, backup.fileName);
     res.status(201).json({ backup });
   })
@@ -43,15 +71,44 @@ backupsRouter.post(
 backupsRouter.get(
   '/:fileName/download',
   asyncHandler(async (req, res) => {
+    requirePermission(req, 'files.read');
     const filePath = resolveBackupPath(req.params.serverId, req.params.fileName);
     res.download(filePath, req.params.fileName);
+  })
+);
+
+backupsRouter.get(
+  '/:fileName/entries',
+  asyncHandler(async (req, res) => {
+    requirePermission(req, 'files.read');
+    res.json({ entries: listSnapshotEntries(req.params.serverId, req.params.fileName) });
+  })
+);
+
+backupsRouter.get(
+  '/:fileName/compare',
+  asyncHandler(async (req, res) => {
+    requirePermission(req, 'files.read');
+    const filePath = typeof req.query.path === 'string' ? req.query.path : '';
+    res.json(compareSnapshotFile(req.params.serverId, req.params.fileName, filePath));
+  })
+);
+
+backupsRouter.post(
+  '/:fileName/restore-file',
+  asyncHandler(async (req, res) => {
+    requirePermission(req, 'backups.restore');
+    const filePath = typeof req.body?.path === 'string' ? req.body.path : '';
+    restoreSnapshotFile(req.params.serverId, req.params.fileName, filePath);
+    logAudit(req.auth!.sub, req.auth!.username, 'backup.restore_file', req.params.serverId, `${req.params.fileName}: ${filePath}`);
+    res.json({ ok: true });
   })
 );
 
 backupsRouter.post(
   '/:fileName/restore',
   asyncHandler(async (req, res) => {
-    requireWrite(req);
+    requirePermission(req, 'backups.restore');
     await restoreBackup(req.params.serverId, req.params.fileName);
     logAudit(req.auth!.sub, req.auth!.username, 'backup.restore', req.params.serverId, req.params.fileName);
     res.json({ ok: true });
@@ -61,44 +118,9 @@ backupsRouter.post(
 backupsRouter.delete(
   '/:fileName',
   asyncHandler(async (req, res) => {
-    requireWrite(req);
+    requirePermission(req, 'backups.create');
     deleteBackup(req.params.serverId, req.params.fileName);
     logAudit(req.auth!.sub, req.auth!.username, 'backup.delete', req.params.serverId, req.params.fileName);
-    res.status(204).end();
-  })
-);
-
-backupsRouter.get(
-  '/schedule',
-  asyncHandler(async (req, res) => {
-    res.json({ schedule: getSchedule(req.params.serverId) ?? null });
-  })
-);
-
-backupsRouter.put(
-  '/schedule',
-  asyncHandler(async (req, res) => {
-    requireWrite(req);
-    const { cronExpression, retentionCount, enabled } = req.body ?? {};
-    if (typeof cronExpression !== 'string' || !cronExpression) {
-      throw new HttpError(400, 'cronExpression is required');
-    }
-    const schedule = setSchedule(
-      req.params.serverId,
-      cronExpression,
-      Number(retentionCount) || 5,
-      enabled !== false
-    );
-    logAudit(req.auth!.sub, req.auth!.username, 'backup.schedule.set', req.params.serverId, cronExpression);
-    res.json({ schedule });
-  })
-);
-
-backupsRouter.delete(
-  '/schedule',
-  asyncHandler(async (req, res) => {
-    requireWrite(req);
-    removeSchedule(req.params.serverId);
     res.status(204).end();
   })
 );

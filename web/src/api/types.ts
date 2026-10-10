@@ -1,11 +1,25 @@
 export type Role = 'admin' | 'moderator' | 'viewer';
 
+export type ServerPermission =
+  | 'power'
+  | 'console'
+  | 'files.read'
+  | 'files.write'
+  | 'backups.create'
+  | 'backups.restore'
+  | 'plugins'
+  | 'players'
+  | 'settings'
+  | 'update';
+
 export interface PublicUser {
   id: string;
   username: string;
   role: Role;
   created_at: string;
   serverAccess?: string[];
+  /** serverId → explicit permission set, or null for the role's defaults */
+  serverPermissions?: Record<string, ServerPermission[] | null>;
 }
 
 export type Platform = 'java' | 'bedrock' | 'steam';
@@ -35,7 +49,8 @@ export type ServerStatus =
   | 'running'
   | 'stopping'
   | 'crashed'
-  | 'updating';
+  | 'updating'
+  | 'transferring';
 
 export interface ServerRecord {
   id: string;
@@ -57,16 +72,49 @@ export interface ServerRecord {
   steam_app_id: string | null;
   steam_login: string;
   steam_extra_flags: string;
+  suspended: 0 | 1;
+  suspended_reason: string | null;
+  suspended_at: string | null;
+  suspended_by: string | null;
 }
 
 export interface SystemSettings {
   steamcmdSource: string | null;
 }
 
+export interface ProcessStats {
+  memoryMb: number | null;
+  cpuPercent: number | null;
+  diskReadBytes: number | null;
+  diskWriteBytes: number | null;
+  diskReadRate: number | null;
+  diskWriteRate: number | null;
+  /** Host-wide (all interfaces) — the kernel doesn't track network bytes per process. */
+  netRxBytes: number | null;
+  netTxBytes: number | null;
+  netRxRate: number | null;
+  netTxRate: number | null;
+}
+
 export interface RuntimeInfo {
   pid: number | null;
   uptimeMs: number;
-  stats: { memoryMb: number | null; cpuPercent: number | null };
+  stats: ProcessStats;
+}
+
+export interface HostAddress {
+  address: string;
+  interface: string;
+  family: 'IPv4' | 'IPv6';
+}
+
+export interface EndpointInfo {
+  host: string;
+  bindAddress: string;
+  port: number;
+  protocol: 'tcp' | 'udp';
+  hostname: string;
+  addresses: HostAddress[];
 }
 
 export interface PlayerInfo {
@@ -89,6 +137,18 @@ export interface BackupInfo {
   fileName: string;
   sizeBytes: number;
   createdAt: string;
+}
+
+export interface SnapshotEntry {
+  path: string;
+  size: number;
+}
+
+export interface SnapshotFileSide {
+  exists: boolean;
+  size: number;
+  binary: boolean;
+  text: string | null;
 }
 
 export interface BackupSchedule {
@@ -116,6 +176,39 @@ export interface SystemInfo {
   hostname: string;
   nodeVersion: string;
   java: { available: boolean; version: string | null };
+  primaryAddress: string | null;
+  addresses: HostAddress[];
+  cpuCores: number;
+  totalMemMb: number;
+  uptimeSec: number;
+}
+
+export interface NodeInfo {
+  hostname: string;
+  platform: string;
+  arch: string;
+  instances: number;
+  running: number;
+}
+
+export interface PanelNode {
+  id: string;
+  name: string;
+  url: string;
+  created_at: string;
+  keyHint: string;
+}
+
+export interface TransferState {
+  state: 'running' | 'done' | 'failed';
+  nodeId: string;
+  nodeName: string;
+  bytesSent: number;
+  startedAt: string;
+  finishedAt: string | null;
+  remoteServerId: string | null;
+  sourceDeleted: boolean;
+  error: string | null;
 }
 
 export interface WhitelistState {
@@ -128,9 +221,26 @@ export interface InstalledPlugin {
   fileName: string;
   displayName: string;
   enabled: boolean;
+  canToggle: boolean;
   sizeBytes: number;
   modifiedAt: string;
+  detail: string | null;
 }
+
+export type AddonCatalog = 'plugin' | 'datapack';
+
+export interface AddonProfile {
+  kind: 'bukkit' | 'datapack' | 'bedrock' | 'bepinex' | 'pak';
+  label: string;
+  singular: string;
+  folder: string;
+  extensions: string[];
+  catalog: AddonCatalog | null;
+  notes: string[];
+  warning: string | null;
+}
+
+export type AddonSupport = { supported: true; profile: AddonProfile } | { supported: false; reason: string };
 
 export interface PluginSearchResult {
   slug: string;

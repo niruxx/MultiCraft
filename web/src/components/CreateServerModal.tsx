@@ -81,7 +81,7 @@ export function CreateServerModal({ open, onClose, onCreated }: { open: boolean;
 
   async function submit() {
     setError('');
-    if (!name.trim()) return setError('Server name is required');
+    if (!name.trim()) return setError('Instance name is required');
     if (!version) return setError('Choose a version');
     if (platform === 'java' && !acceptEula) return setError("You must accept Mojang's EULA");
     if (platform === 'steam' && steamGameChoice === CUSTOM_STEAM_GAME) {
@@ -109,14 +109,14 @@ export function CreateServerModal({ open, onClose, onCreated }: { open: boolean;
       setName('');
       setAcceptEula(false);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Failed to create server');
+      setError(err instanceof ApiError ? err.message : 'Failed to create instance');
     } finally {
       setSubmitting(false);
     }
   }
 
   return (
-    <Modal open={open} onClose={onClose} title="Create a new server">
+    <Modal open={open} onClose={onClose} title="Create a new instance">
       <div className="space-y-4">
         <Field label="Server name">
           <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="My Survival Server" autoFocus />
@@ -289,7 +289,7 @@ export function CreateServerModal({ open, onClose, onCreated }: { open: boolean;
             Cancel
           </Button>
           <Button variant="primary" onClick={submit} disabled={submitting}>
-            {submitting ? 'Creating…' : 'Create server'}
+            {submitting ? 'Creating…' : 'Create instance'}
           </Button>
         </div>
       </div>

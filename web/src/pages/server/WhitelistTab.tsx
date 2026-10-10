@@ -7,7 +7,8 @@ import { useToast } from '../../components/Toast.js';
 import { Badge, Button, Card, Field, Input } from '../../components/ui.js';
 
 export function WhitelistTab() {
-  const { serverId, canWrite, server } = useServerDetail();
+  const { serverId, can, server } = useServerDetail();
+  const canWrite = can('players');
   const toast = useToast();
   const [state, setState] = useState<WhitelistState | null>(null);
   const [newName, setNewName] = useState('');
@@ -73,10 +74,10 @@ export function WhitelistTab() {
 
   return (
     <div className="space-y-6">
-      <Card className="p-4">
+      <Card className="p-5">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-400">
+            <h2 className="text-base font-medium text-ink-100">
               {label === 'allowlist' ? 'Allowlist' : 'Whitelist'} enforcement
             </h2>
             <p className="mt-1 text-xs text-ink-500">
@@ -102,8 +103,8 @@ export function WhitelistTab() {
         )}
       </Card>
 
-      <Card className="p-4">
-        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-ink-400">Players</h2>
+      <Card className="p-5">
+        <h2 className="mb-3 text-base font-medium text-ink-100">Players</h2>
         {canWrite && (
           <div className="mb-4 flex gap-2">
             <Field label="Player name">

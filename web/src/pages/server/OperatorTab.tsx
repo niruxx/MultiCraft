@@ -40,7 +40,8 @@ function QuickCommandRow({
 }
 
 export function OperatorTab() {
-  const { serverId, running, canWrite, server } = useServerDetail();
+  const { serverId, running, can, server } = useServerDetail();
+  const canWrite = can('players');
   const toast = useToast();
   const [broadcast, setBroadcast] = useState('');
   const [busy, setBusy] = useState(false);
@@ -86,8 +87,8 @@ export function OperatorTab() {
         </p>
       )}
 
-      <Card className="p-4">
-        <h2 className="mb-1 text-sm font-semibold uppercase tracking-wide text-ink-400">Broadcast</h2>
+      <Card className="p-5">
+        <h2 className="mb-1 text-base font-medium text-ink-100">Broadcast</h2>
         <p className="mb-3 text-xs text-ink-500">Send a message to everyone currently online.</p>
         <div className="flex gap-2">
           <Input
@@ -105,8 +106,8 @@ export function OperatorTab() {
         </div>
       </Card>
 
-      <Card className="p-4">
-        <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-ink-400">World controls</h2>
+      <Card className="p-5">
+        <h2 className="mb-2 text-base font-medium text-ink-100">World controls</h2>
         <QuickCommandRow
           label="Save the world now"
           hint="Flushes all loaded chunks to disk"
@@ -164,9 +165,9 @@ export function OperatorTab() {
         )}
       </Card>
 
-      <Card className="p-4">
+      <Card className="p-5">
         <div className="mb-2 flex items-center justify-between">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-400">Moderate a player</h2>
+          <h2 className="text-base font-medium text-ink-100">Moderate a player</h2>
           <Link to="../whitelist" className="text-xs text-accent-500 hover:underline">
             Manage the allowlist →
           </Link>

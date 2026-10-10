@@ -1,18 +1,115 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { AnimatePresence, motion } from 'framer-motion';
 import { useAuth } from '../state/AuthContext.js';
 import { Badge } from './ui.js';
 import { Logo } from './Logo.js';
-import { ThemeToggle } from './ThemeToggle.js';
+import { Icon, type IconName } from './icons.js';
 import { api } from '../api/client.js';
 import type { SystemInfo } from '../api/types.js';
 
-export function Layout({ children }: { children: ReactNode }) {
+/** One MD3 navigation-drawer item: full-width pill, secondary-container indicator when active. */
+export function NavItem({
+  to,
+  icon,
+  label,
+  end = false,
+  onClick,
+}: {
+  to: string;
+  icon: IconName;
+  label: string;
+  end?: boolean;
+  onClick?: () => void;
+}) {
+  return (
+    <NavLink to={to} end={end} onClick={onClick} className="block">
+      {({ isActive }) => (
+        <span
+          className={`state-layer flex h-12 items-center gap-3 rounded-full px-4 text-sm font-medium transition-colors ${
+            isActive ? 'bg-secondary-container text-secondary-on-container' : 'text-ink-300'
+          }`}
+        >
+          <Icon name={icon} className="h-5 w-5" />
+          <span className="truncate">{label}</span>
+        </span>
+      )}
+    </NavLink>
+  );
+}
+
+export function NavSectionLabel({ children }: { children: ReactNode }) {
+  return <p className="px-4 pb-1 pt-4 text-xs font-medium text-ink-400">{children}</p>;
+}
+
+function MainNav({ onNavigate }: { onNavigate?: () => void }) {
+  const { user } = useAuth();
+  const location = useLocation();
+  // The instance list is "/", but it should also read as active nowhere else.
+  const onInstances = location.pathname === '/';
+  return (
+    <nav className="space-y-1">
+      <NavLink to="/" end onClick={onNavigate} className="block">
+        <span
+          className={`state-layer flex h-12 items-center gap-3 rounded-full px-4 text-sm font-medium ${
+            onInstances ? 'bg-secondary-container text-secondary-on-container' : 'text-ink-300'
+          }`}
+        >
+          <Icon name="instances" />
+          Instances
+        </span>
+      </NavLink>
+      <NavItem to="/configuration" icon="configuration" label="Configuration" onClick={onNavigate} />
+      <NavItem to="/files" icon="folder" label="File Management" onClick={onNavigate} />
+      {user?.role === 'admin' && <NavItem to="/users" icon="users" label="Users" onClick={onNavigate} />}
+    </nav>
+  );
+}
+
+function DrawerFooter({ system }: { system: SystemInfo | null }) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const location = useLocation();
+  return (
+    <div className="mt-auto space-y-3 px-1 pt-4">
+      <div className="flex items-center gap-3 rounded-2xl bg-surface-850 p-3">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent-container text-sm font-medium text-accent-on-container">
+          {user?.username?.slice(0, 1).toUpperCase()}
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-medium text-ink-100">{user?.username}</p>
+          <Badge tone="neutral">{user?.role}</Badge>
+        </div>
+        <button
+          onClick={() => {
+            logout();
+            navigate('/login');
+          }}
+          title="Sign out"
+          aria-label="Sign out"
+          className="state-layer rounded-full p-2 text-ink-300"
+        >
+          <Icon name="logout" />
+        </button>
+      </div>
+      {system && (
+        <p className="truncate px-3 text-[11px] text-ink-500" title={`Node ${system.nodeVersion} on ${system.hostname}`}>
+          <span className="mr-1.5 inline-block h-1.5 w-1.5 rounded-full bg-accent-400 align-middle" />
+          {system.hostname} · {system.platformLabel} {system.arch}
+          {system.java.available ? ' · Java' : ''}
+        </p>
+      )}
+    </div>
+  );
+}
+
+/**
+ * App shell: MD3 navigation drawer + content. Pages can replace the drawer's navigation with
+ * their own (`sidebar`) — the instance view does, swapping in Status/Console/Backups/….
+ */
+export function Layout({ children, sidebar }: { children: ReactNode; sidebar?: (close: () => void) => ReactNode }) {
   const [system, setSystem] = useState<SystemInfo | null>(null);
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const location = useLocation();
 
   useEffect(() => {
     api
@@ -21,75 +118,66 @@ export function Layout({ children }: { children: ReactNode }) {
       .catch(() => setSystem(null));
   }, []);
 
+  useEffect(() => setMobileOpen(false), [location.pathname]);
+
+  const close = () => setMobileOpen(false);
+  const drawer = (
+    <div className="flex h-full flex-col px-3 py-4">
+      <div className="mb-4 flex items-center gap-3 px-4 py-2">
+        <Logo className="h-8 w-8 shrink-0 rounded-lg" />
+        <span className="text-lg font-medium tracking-tight text-ink-50">MultiCraft</span>
+      </div>
+      <div className="min-h-0 flex-1 overflow-y-auto">{sidebar ? sidebar(close) : <MainNav onNavigate={close} />}</div>
+      <DrawerFooter system={system} />
+    </div>
+  );
+
   return (
-    <div className="flex min-h-screen bg-surface-950">
-      <aside className="glass relative flex w-56 shrink-0 flex-col border-r border-surface-700/80">
-        <div className="flex items-center gap-2.5 px-4 py-5">
-          <Logo className="h-8 w-8 shrink-0 rounded-lg shadow-glow" />
-          <span className="text-[15px] font-bold tracking-tight text-ink-50">MultiCraft</span>
-        </div>
-        <nav className="flex-1 space-y-0.5 px-2.5">
-          <SidebarLink to="/" active={location.pathname === '/'}>
-            <span>Servers</span>
-          </SidebarLink>
-          {user?.role === 'admin' && (
-            <SidebarLink to="/users" active={location.pathname.startsWith('/users')}>
-              <span>Users</span>
-            </SidebarLink>
-          )}
-        </nav>
-        <div className="border-t border-surface-700/80 px-3 py-3">
-          <div className="mb-2.5 flex items-center gap-2.5">
-            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-accent-500/15 text-xs font-semibold text-accent-400 border border-accent-500/25">
-              {user?.username?.slice(0, 1).toUpperCase()}
-            </div>
-            <span className="min-w-0 flex-1 truncate text-sm font-medium text-ink-200">{user?.username}</span>
-            <Badge tone="neutral">{user?.role}</Badge>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <motion.button
-              whileHover={{ x: 2 }}
-              whileTap={{ scale: 0.97 }}
-              onClick={() => {
-                logout();
-                navigate('/login');
-              }}
-              className="flex-1 rounded-lg bg-surface-800/80 px-3 py-1.5 text-left text-sm text-ink-400 transition-colors hover:bg-surface-700 hover:text-ink-200"
+    <div className="flex h-screen bg-surface-950">
+      <aside className="hidden w-72 shrink-0 bg-surface-900 md:block">{drawer}</aside>
+
+      <AnimatePresence>
+        {mobileOpen && (
+          <motion.div className="fixed inset-0 z-40 md:hidden" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+            <div className="absolute inset-0 bg-black/60" onClick={close} />
+            <motion.aside
+              className="absolute inset-y-0 left-0 w-72 rounded-r-3xl bg-surface-900"
+              initial={{ x: -300 }}
+              animate={{ x: 0 }}
+              exit={{ x: -300 }}
+              transition={{ type: 'spring', stiffness: 400, damping: 40 }}
             >
-              Sign out
-            </motion.button>
-            <ThemeToggle />
-          </div>
-          {system && (
-            <p
-              className="mt-2.5 truncate text-[11px] text-ink-500"
-              title={`Node ${system.nodeVersion} on ${system.hostname}`}
-            >
-              <span className="inline-block h-1.5 w-1.5 rounded-full bg-accent-500/70 align-middle mr-1.5" />
-              {system.platformLabel} · {system.arch}
-              {system.java.available ? ' · Java detected' : ' · Java not found'}
-            </p>
-          )}
+              {drawer}
+            </motion.aside>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <div className="flex min-w-0 flex-1 flex-col">
+        <div className="flex items-center gap-3 bg-surface-900 px-4 py-3 md:hidden">
+          <button onClick={() => setMobileOpen(true)} aria-label="Open navigation" className="state-layer rounded-full p-2 text-ink-200">
+            <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+              <path d="M3 6h18M3 12h18M3 18h18" />
+            </svg>
+          </button>
+          <Logo className="h-6 w-6 rounded-md" />
+          <span className="font-medium text-ink-50">MultiCraft</span>
         </div>
-      </aside>
-      <main className="min-w-0 flex-1 overflow-y-auto">{children}</main>
+        <main className="min-h-0 flex-1 overflow-y-auto">{children}</main>
+      </div>
     </div>
   );
 }
 
-function SidebarLink({ to, active, children }: { to: string; active: boolean; children: ReactNode }) {
+/** Standard page header for top-level pages. */
+export function PageHeader({ title, subtitle, action }: { title: string; subtitle?: string; action?: ReactNode }) {
   return (
-    <Link to={to} className="relative block rounded-lg px-3 py-2 text-sm font-medium">
-      {active && (
-        <motion.span
-          layoutId="sidebar-active-pill"
-          className="absolute inset-0 rounded-lg bg-accent-500/12 border border-accent-500/25"
-          transition={{ type: 'spring', stiffness: 500, damping: 38 }}
-        />
-      )}
-      <span className={`relative z-10 transition-colors ${active ? 'text-accent-400' : 'text-ink-400 hover:text-ink-200'}`}>
-        {children}
-      </span>
-    </Link>
+    <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} className="mb-6 flex flex-wrap items-end justify-between gap-4">
+      <div>
+        <h1 className="text-[28px] font-normal leading-9 text-ink-50">{title}</h1>
+        {subtitle && <p className="mt-1 text-sm text-ink-400">{subtitle}</p>}
+      </div>
+      {action}
+    </motion.div>
   );
 }

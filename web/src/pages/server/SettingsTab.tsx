@@ -3,9 +3,11 @@ import { useServerDetail } from './ServerContext.js';
 import { api, ApiError } from '../../api/client.js';
 import type { PropertyEntry } from '../../api/types.js';
 import { Button, Card, ErrorText, Field, Input } from '../../components/ui.js';
+import { InstanceAdminCards } from './AdminCards.js';
 
 export function SettingsTab() {
-  const { server, canWrite, refresh } = useServerDetail();
+  const { server, can, refresh } = useServerDetail();
+  const canWrite = can('settings');
   const [name, setName] = useState('');
   const [minMemoryMb, setMinMemoryMb] = useState(1024);
   const [maxMemoryMb, setMaxMemoryMb] = useState(2048);
@@ -71,10 +73,10 @@ export function SettingsTab() {
 
   return (
     <div className="space-y-6">
-      <Card className="p-4">
-        <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-ink-400">General</h2>
-        <div className="grid grid-cols-2 gap-4">
-          <Field label="Server name">
+      <Card className="p-5">
+        <h2 className="mb-4 text-base font-medium text-ink-100">General</h2>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <Field label="Instance name">
             <Input value={name} onChange={(e) => setName(e.target.value)} disabled={!canWrite} />
           </Field>
           <Field label="Port">
@@ -134,7 +136,7 @@ export function SettingsTab() {
         )}
         <label className="mt-4 flex items-center gap-2 text-sm text-ink-300">
           <input type="checkbox" checked={autoStart} onChange={(e) => setAutoStart(e.target.checked)} disabled={!canWrite} />
-          Automatically start this server when the panel boots
+          Automatically start this instance when the panel boots
         </label>
         <p className="mt-2 text-xs text-ink-500">
           Memory and argument changes take effect the next time the server starts.
@@ -151,16 +153,18 @@ export function SettingsTab() {
       </Card>
 
       {server.platform === 'steam' ? (
-        <Card className="p-4">
-          <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-ink-400">Config files</h2>
+        <Card className="p-5">
+          <h2 className="mb-2 text-base font-medium text-ink-100">Config files</h2>
           <p className="text-sm text-ink-400">
-            This game's config files aren't edited here — open the Files tab to view or edit whatever config file
+            This game's config files aren't edited here — open File Management to view or edit whatever config file
             it writes (INI, JSON, or otherwise).
           </p>
         </Card>
       ) : (
         <PropertiesEditor serverId={server.id} canWrite={canWrite} />
       )}
+
+      <InstanceAdminCards />
     </div>
   );
 }
@@ -210,9 +214,9 @@ function PropertiesEditor({ serverId, canWrite }: { serverId: string; canWrite: 
   if (!properties) return <p className="text-sm text-ink-500">Loading properties…</p>;
 
   return (
-    <Card className="p-4">
+    <Card className="p-5">
       <div className="mb-3 flex items-center justify-between">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-400">server.properties</h2>
+        <h2 className="text-base font-medium text-ink-100">server.properties</h2>
         <p className="text-xs text-ink-500">Restart the server for changes to take effect.</p>
       </div>
 

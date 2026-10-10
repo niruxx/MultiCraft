@@ -3,73 +3,59 @@
 @tailwind utilities;
 
 /*
- * Theme tokens — dark is the default and also the fallback (no data-theme attribute yet,
- * e.g. first paint before React mounts). Every color Tailwind class in the app (surface-*,
- * ink-*, accent-*, success-*) resolves through these CSS variables, so toggling the
- * `data-theme` attribute on <html> repaints the whole app without touching component code.
- * Values are "R G B" triplets (no commas) so Tailwind's rgb(var(--x) / alpha) trick works.
+ * Theme tokens — a dark-only Material Design 3 scheme generated from MultiCraft's green seed.
+ * Every color Tailwind class in the app (surface-*, ink-*, accent-*, …) resolves through these
+ * CSS variables. Values are "R G B" triplets (no commas) so Tailwind's rgb(var(--x) / alpha)
+ * trick works.
+ *
+ * MD3 role mapping:
+ *   surface-950 surface · 900 container-low · 850 container · 800 container-high
+ *   700 container-highest · 600 outline-variant · 500 outline
+ *   ink-100 on-surface · ink-300 on-surface-variant
+ *   accent-400 primary · accent-on on-primary · accent-container / accent-on-container
  */
-:root,
-[data-theme='dark'] {
+:root {
   color-scheme: dark;
 
-  --surface-950: 9 9 15;
-  --surface-900: 16 16 24;
-  --surface-850: 21 21 31;
-  --surface-800: 26 26 38;
-  --surface-700: 37 37 51;
-  --surface-600: 56 56 74;
-  --surface-500: 84 84 107;
+  --surface-1000: 12 15 10;
+  --surface-950: 17 20 15;
+  --surface-900: 25 29 23;
+  --surface-850: 29 33 27;
+  --surface-800: 39 43 37;
+  --surface-700: 50 54 47;
+  --surface-600: 66 73 63;
+  --surface-500: 108 116 104;
 
-  --ink-50: 255 255 255;
-  --ink-100: 241 245 249;
-  --ink-200: 226 232 240;
-  --ink-300: 203 213 225;
-  --ink-400: 148 163 184;
-  --ink-500: 100 116 139;
-  --ink-600: 71 85 105;
+  --ink-50: 241 244 234;
+  --ink-100: 225 228 218;
+  --ink-200: 211 216 204;
+  --ink-300: 194 201 187;
+  --ink-400: 163 170 157;
+  --ink-500: 140 147 135;
+  --ink-600: 107 114 104;
 
-  --accent-400: 74 222 128;
-  --accent-500: 34 197 94;
-  --accent-600: 22 163 74;
+  --accent-400: 120 220 119;
+  --accent-500: 94 196 96;
+  --accent-600: 61 165 68;
+  --accent-on: 0 57 10;
+  --accent-container: 0 83 19;
+  --accent-on-container: 148 249 144;
 
-  --success-400: 52 211 153;
-  --success-500: 16 185 129;
+  --secondary-container: 58 75 55;
+  --secondary-on-container: 213 232 206;
 
-  --glass-bg: rgba(255, 255, 255, 0.045);
+  --tertiary-400: 161 206 215;
+  --tertiary-container: 31 77 85;
+  --tertiary-on-container: 188 235 244;
+
+  --error-400: 255 180 171;
+  --error-container: 147 0 10;
+  --error-on-container: 255 218 214;
+
+  --success-400: 108 222 176;
+  --success-500: 76 196 150;
+
   --grid-line: rgba(255, 255, 255, 0.03);
-  --radial-glow: rgba(34, 197, 94, 0.14);
-}
-
-[data-theme='light'] {
-  color-scheme: light;
-
-  --surface-950: 242 243 245;
-  --surface-900: 255 255 255;
-  --surface-850: 248 249 251;
-  --surface-800: 238 240 243;
-  --surface-700: 219 223 229;
-  --surface-600: 195 200 209;
-  --surface-500: 154 161 173;
-
-  --ink-50: 10 12 15;
-  --ink-100: 18 21 26;
-  --ink-200: 38 43 50;
-  --ink-300: 61 67 76;
-  --ink-400: 88 97 110;
-  --ink-500: 107 116 128;
-  --ink-600: 148 157 168;
-
-  --accent-400: 22 163 74;
-  --accent-500: 21 128 61;
-  --accent-600: 22 101 52;
-
-  --success-400: 5 150 105;
-  --success-500: 4 120 87;
-
-  --glass-bg: rgba(15, 23, 20, 0.045);
-  --grid-line: rgba(15, 23, 20, 0.05);
-  --radial-glow: rgba(21, 128, 61, 0.09);
 }
 
 html, body, #root {
@@ -78,10 +64,6 @@ html, body, #root {
 
 body {
   @apply bg-surface-950 text-ink-200 antialiased font-sans;
-  background-image: radial-gradient(60% 60% at 50% 0%, var(--radial-glow) 0%, transparent 70%);
-  background-repeat: no-repeat;
-  background-attachment: fixed;
-  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 * {
@@ -111,14 +93,32 @@ body {
   font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
-/* Frosted glass surface used for cards, modals, nav — one flat translucent fill (no inner
-   gradient sheen) plus a hairline border for edge definition; the blur is what does the work.
-   The tint itself flips sign between themes (lightening on dark, darkening on light) via
-   --glass-bg so the "frosted" effect reads correctly against either page background. */
+/* Legacy "glass" surfaces are now flat MD3 tonal containers — elevation comes from tone,
+   not blur or shadow. */
 .glass {
-  background: var(--glass-bg);
-  backdrop-filter: blur(20px) saturate(140%);
-  -webkit-backdrop-filter: blur(20px) saturate(140%);
+  background: rgb(var(--surface-900));
+}
+
+/* MD3 state layer: an overlay in the content color at 8% on hover, 12% on press. */
+.state-layer {
+  position: relative;
+  isolation: isolate;
+}
+.state-layer::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: currentColor;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+}
+.state-layer:not(:disabled):hover::after {
+  opacity: 0.08;
+}
+.state-layer:not(:disabled):active::after {
+  opacity: 0.12;
 }
 
 /* Faint grid backdrop for auth screens */

@@ -48,7 +48,7 @@ export function FactoryResetCard() {
 
   if (restarting) {
     return (
-      <Card className="p-4">
+      <Card className="p-5">
         <div className="flex items-center gap-3">
           <Spinner className="h-5 w-5 text-accent-400" />
           <div>

@@ -17,16 +17,11 @@ interface ToastState {
 
 const ToastContext = createContext<ToastState | null>(null);
 
+// MD3 snackbar: inverse-surface container, a status-tinted icon, inverse-on-surface text.
 const ICONS: Record<ToastKind, ReactNode> = {
-  success: <span className="text-success-400">✓</span>,
-  error: <span className="text-red-400">✕</span>,
-  info: <span className="text-sky-400">ℹ</span>,
-};
-
-const RING: Record<ToastKind, string> = {
-  success: 'ring-success-500/25',
-  error: 'ring-red-500/25',
-  info: 'ring-sky-500/25',
+  success: <span className="text-[#2e7d32]">✓</span>,
+  error: <span className="text-[#ba1a1a]">✕</span>,
+  info: <span className="text-[#00639b]">ℹ</span>,
 };
 
 export function ToastProvider({ children }: { children: ReactNode }) {
@@ -60,13 +55,13 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, x: 40, scale: 0.94 }}
               transition={{ type: 'spring', stiffness: 420, damping: 32 }}
-              className={`glass pointer-events-auto flex items-start gap-2.5 rounded-lg border border-surface-700/80 px-3.5 py-3 text-sm text-ink-200 shadow-card ring-1 ${RING[t.kind]}`}
+              className="pointer-events-auto flex items-start gap-3 rounded-xl bg-ink-100 px-4 py-3 text-sm text-[#2e312b] shadow-card"
             >
               <span className="mt-0.5">{ICONS[t.kind]}</span>
               <span className="flex-1 leading-snug">{t.message}</span>
               <button
                 onClick={() => setToasts((prev) => prev.filter((x) => x.id !== t.id))}
-                className="text-ink-500 hover:text-ink-300"
+                className="text-[#5a6155] hover:text-[#2e312b]"
               >
                 ✕
               </button>

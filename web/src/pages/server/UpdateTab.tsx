@@ -14,7 +14,8 @@ const PRESERVED_BY_PLATFORM: Record<string, string[]> = {
 };
 
 export function UpdateTab() {
-  const { serverId, server, running, canWrite, refresh } = useServerDetail();
+  const { serverId, server, running, can, refresh } = useServerDetail();
+  const canWrite = can('update');
   const { status: liveStatus, installProgress } = useConsoleSocket(serverId);
   const toast = useToast();
   const [check, setCheck] = useState<UpdateCheckResult | null>(null);
@@ -67,9 +68,9 @@ export function UpdateTab() {
 
   return (
     <div className="space-y-6">
-      <Card className="p-4">
+      <Card className="p-5">
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-400">Version status</h2>
+          <h2 className="text-base font-medium text-ink-100">Version status</h2>
           <Button className="!px-2.5 !py-1 text-xs" onClick={runCheck} disabled={checking}>
             {checking ? 'Checking…' : 'Check again'}
           </Button>
@@ -106,8 +107,8 @@ export function UpdateTab() {
         <ErrorText>{error}</ErrorText>
       </Card>
 
-      <Card className="p-4">
-        <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-ink-400">What's preserved</h2>
+      <Card className="p-5">
+        <h2 className="mb-2 text-base font-medium text-ink-100">What's preserved</h2>
         <p className="mb-2 text-sm text-ink-400">
           Updating replaces the server software in place. These are never touched:
         </p>
@@ -139,7 +140,7 @@ export function UpdateTab() {
       </Card>
 
       {isUpdating && (
-        <Card className="p-4">
+        <Card className="p-5">
           <div className="mb-1 flex items-center justify-between text-xs text-ink-400">
             <span className="inline-flex items-center gap-1.5">
               <Spinner className="h-3 w-3 text-accent-400" />

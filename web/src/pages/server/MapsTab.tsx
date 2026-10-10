@@ -16,7 +16,8 @@ function timeAgo(iso: string): string {
 }
 
 export function MapsTab() {
-  const { serverId, canWrite } = useServerDetail();
+  const { serverId, can } = useServerDetail();
+  const canWrite = can('files.read');
   const toast = useToast();
   const [state, setState] = useState<MapState | null>(null);
   const [rendering, setRendering] = useState(false);

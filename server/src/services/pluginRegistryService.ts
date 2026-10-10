@@ -1,4 +1,4 @@
-import type { Loader } from '../types/index.js';
+import type { AddonCatalog } from './pluginService.js';
 
 const MODRINTH_API = 'https://api.modrinth.com/v2';
 // Modrinth tags Bukkit-ecosystem plugins with these loader/category values.
@@ -30,9 +30,15 @@ interface ModrinthSearchHit {
   categories: string[];
 }
 
-/** Searches Modrinth for Bukkit/Spigot/Paper/Purpur-compatible plugins. */
-export async function searchPlugins(query: string, limit = 24): Promise<PluginSearchResult[]> {
-  const facets = JSON.stringify([BUKKIT_LOADERS.map((l) => `categories:${l}`)]);
+function loadersFor(catalog: AddonCatalog): string[] {
+  return catalog === 'datapack' ? ['datapack'] : BUKKIT_LOADERS;
+}
+
+/** Searches Modrinth for Bukkit-family plugins, or vanilla data packs. */
+export async function searchPlugins(query: string, limit = 24, catalog: AddonCatalog = 'plugin'): Promise<PluginSearchResult[]> {
+  const facets = JSON.stringify(
+    catalog === 'datapack' ? [['project_type:datapack']] : [BUKKIT_LOADERS.map((l) => `categories:${l}`)]
+  );
   const params = new URLSearchParams({
     query,
     facets,
@@ -74,10 +80,10 @@ function pickFile(version: ModrinthVersion) {
 /** Resolves the best download for a plugin against a specific server's loader + Minecraft version. */
 export async function resolvePluginVersion(
   slug: string,
-  _loader: Loader,
+  catalog: AddonCatalog,
   gameVersion: string
 ): Promise<ResolvedPluginVersion> {
-  const loadersParam = JSON.stringify(BUKKIT_LOADERS);
+  const loadersParam = JSON.stringify(loadersFor(catalog));
 
   const exact = await modrinthFetch<ModrinthVersion[]>(
     `/project/${encodeURIComponent(slug)}/version?loaders=${encodeURIComponent(loadersParam)}&game_versions=${encodeURIComponent(
@@ -108,5 +114,5 @@ export async function resolvePluginVersion(
   const fallbackMatch = fromList(fallback, true);
   if (fallbackMatch) return fallbackMatch;
 
-  throw new Error(`No downloadable version of "${slug}" was found for this server's loader.`);
+  throw new Error(`No downloadable version of "${slug}" was found for this instance type.`);
 }

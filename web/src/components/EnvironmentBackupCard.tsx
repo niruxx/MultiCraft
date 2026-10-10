@@ -88,7 +88,7 @@ export function EnvironmentBackupCard() {
 
   return (
     <Card className="mb-6 p-4">
-      <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-400">Environment backup &amp; restore</h2>
+      <h2 className="text-base font-medium text-ink-100">Environment backup &amp; restore</h2>
       <p className="mt-1 mb-4 text-xs text-ink-500">
         Exports everything MultiCraft manages — the database, every server's files and worlds, and all backups — as
         one compressed archive. Import it into a fresh install to move or restore your whole setup.

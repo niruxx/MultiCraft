@@ -11,6 +11,25 @@ export function runMigrations(db: DatabaseSync): void {
   addSteamAppIdColumn(db);
   dropPlatformCheckConstraint(db);
   addSteamCmdColumns(db);
+  addSuspensionColumns(db);
+  addAccessPermissionsColumn(db);
+}
+
+function addAccessPermissionsColumn(db: DatabaseSync): void {
+  const hasColumn = db.prepare("SELECT 1 FROM pragma_table_info('user_server_access') WHERE name = 'permissions'").get();
+  if (hasColumn) return;
+  logger.info('Migrating database: adding user_server_access.permissions column');
+  db.exec('ALTER TABLE user_server_access ADD COLUMN permissions TEXT');
+}
+
+function addSuspensionColumns(db: DatabaseSync): void {
+  const hasColumn = db.prepare("SELECT 1 FROM pragma_table_info('servers') WHERE name = 'suspended'").get();
+  if (hasColumn) return;
+  logger.info('Migrating database: adding servers suspension columns');
+  db.exec('ALTER TABLE servers ADD COLUMN suspended BOOLEAN NOT NULL DEFAULT 0');
+  db.exec('ALTER TABLE servers ADD COLUMN suspended_reason TEXT');
+  db.exec('ALTER TABLE servers ADD COLUMN suspended_at TEXT');
+  db.exec('ALTER TABLE servers ADD COLUMN suspended_by TEXT');
 }
 
 function addSteamAppIdColumn(db: DatabaseSync): void {
