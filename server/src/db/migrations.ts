@@ -14,6 +14,34 @@ export function runMigrations(db: DatabaseSync): void {
   addSuspensionColumns(db);
   addAccessPermissionsColumn(db);
   addLaunchConfigColumn(db);
+  addRestartAndUpnpColumns(db);
+  addIsolationColumn(db);
+}
+
+function addIsolationColumn(db: DatabaseSync): void {
+  const has = db.prepare("SELECT 1 FROM pragma_table_info('servers') WHERE name = 'isolation'").get();
+  if (!has) {
+    logger.info('Migrating database: adding servers.isolation column');
+    db.exec("ALTER TABLE servers ADD COLUMN isolation TEXT NOT NULL DEFAULT 'inherit'");
+  }
+  if (!db.prepare("SELECT 1 FROM pragma_table_info('servers') WHERE name = 'docker_config'").get()) {
+    logger.info('Migrating database: adding servers.docker_config column');
+    db.exec('ALTER TABLE servers ADD COLUMN docker_config TEXT');
+  }
+}
+
+function addRestartAndUpnpColumns(db: DatabaseSync): void {
+  const has = (col: string) => db.prepare("SELECT 1 FROM pragma_table_info('servers') WHERE name = ?").get(col);
+  if (!has('restart_policy')) {
+    logger.info('Migrating database: adding auto-restart columns');
+    db.exec("ALTER TABLE servers ADD COLUMN restart_policy TEXT NOT NULL DEFAULT 'never'");
+    db.exec('ALTER TABLE servers ADD COLUMN restart_delay_sec INTEGER NOT NULL DEFAULT 10');
+    db.exec('ALTER TABLE servers ADD COLUMN restart_max_attempts INTEGER NOT NULL DEFAULT 0');
+  }
+  if (!has('upnp_config')) {
+    logger.info('Migrating database: adding servers.upnp_config column');
+    db.exec('ALTER TABLE servers ADD COLUMN upnp_config TEXT');
+  }
 }
 
 function addLaunchConfigColumn(db: DatabaseSync): void {

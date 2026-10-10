@@ -11,8 +11,8 @@ export interface User {
 
 export type PublicUser = Omit<User, 'password_hash' | 'password_salt'>;
 
-export type Platform = 'java' | 'bedrock' | 'steam' | 'custom';
-export type Loader = 'vanilla' | 'paper' | 'purpur' | 'spigot' | 'bedrock' | 'steam' | 'custom';
+export type Platform = 'java' | 'bedrock' | 'steam' | 'custom' | 'docker';
+export type Loader = 'vanilla' | 'paper' | 'purpur' | 'spigot' | 'bedrock' | 'steam' | 'custom' | 'docker';
 
 /** Loaders that support the Bukkit plugin API (a /plugins directory of jars). */
 export const PLUGIN_CAPABLE_LOADERS: Loader[] = ['paper', 'purpur', 'spigot'];
@@ -39,6 +39,8 @@ export type ServerStatus =
   | 'updating'
   | 'transferring';
 
+export type RestartPolicy = 'never' | 'on-crash' | 'always';
+
 export interface ServerRecord {
   id: string;
   name: string;
@@ -63,6 +65,17 @@ export interface ServerRecord {
    *  admins can see or manage it through the panel/API until it's lifted. */
   /** JSON-encoded LaunchConfig (see services/launchConfig.ts); null = platform defaults. */
   launch_config: string | null;
+  /** Restart automatically when the process exits on its own: never, only after a crash, or always. */
+  restart_policy: RestartPolicy;
+  restart_delay_sec: number;
+  /** 0 = keep trying forever. */
+  restart_max_attempts: number;
+  /** JSON-encoded UpnpConfig (see services/upnpService.ts); null = not configured. */
+  upnp_config: string | null;
+  /** 'inherit' = sandboxed when the panel's sandbox is on; 'off' = admin opt-out for this instance. */
+  isolation: 'inherit' | 'off';
+  /** JSON-encoded DockerConfig (services/containerService.ts) for platform = 'docker'. */
+  docker_config: string | null;
   suspended: 0 | 1;
   suspended_reason: string | null;
   suspended_at: string | null;

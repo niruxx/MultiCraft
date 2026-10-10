@@ -252,8 +252,9 @@ export function StatusTab() {
       </div>
 
       <p className="text-xs text-ink-500">
-        Network figures are the whole machine's traffic — the OS doesn't count network bytes per process. Disk figures
-        are this instance's processes only. {connected ? 'Live.' : 'Reconnecting…'}
+        {server?.platform === 'docker'
+          ? 'Network and disk figures are this container’s own.'
+          : "Network figures are the whole machine's traffic — the OS doesn't count network bytes per process. Disk figures are this instance's processes only."} {connected ? 'Live.' : 'Reconnecting…'}
       </p>
     </div>
   );

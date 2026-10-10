@@ -75,6 +75,7 @@ const PERMISSION_LABEL: Record<ServerPermission, string> = {
   settings: 'Edit configuration',
   update: 'Update server',
   launch: 'Edit launch command',
+  network: 'Manage UPnP port forwarding',
 };
 
 /** Throws 403 unless the signed-in user holds `permission` on the instance in the route. */

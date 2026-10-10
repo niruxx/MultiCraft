@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Layout, PageHeader } from '../components/Layout.js';
-import { Badge, Button, Card, CardTitle, ErrorText, Field, Input, Modal, Spinner } from '../components/ui.js';
+import { Badge, Button, Card, CardTitle, ErrorText, Field, Input, Modal, Notice, Spinner } from '../components/ui.js';
 import { Icon } from '../components/icons.js';
 import { useToast } from '../components/Toast.js';
 import { useConfirm } from '../components/ConfirmDialog.js';
@@ -8,7 +8,7 @@ import { EnvironmentBackupCard } from '../components/EnvironmentBackupCard.js';
 import { SteamCmdSettingsCard } from '../components/SteamCmdSettingsCard.js';
 import { FactoryResetCard } from '../components/FactoryResetCard.js';
 import { api, ApiError } from '../api/client.js';
-import type { NodeInfo, PanelNode, SystemInfo } from '../api/types.js';
+import type { NodeInfo, PanelNode, SandboxStatus, SystemInfo } from '../api/types.js';
 import { useAuth } from '../state/AuthContext.js';
 
 function formatUptime(sec: number): string {
@@ -67,6 +67,47 @@ function HostCard() {
           )}
         </>
       )}
+    </Card>
+  );
+}
+
+function SecurityCard() {
+  const toast = useToast();
+  const [sandbox, setSandbox] = useState<SandboxStatus | null>(null);
+  useEffect(() => {
+    api.get<{ sandbox: SandboxStatus }>('/settings/security').then((r) => setSandbox(r.sandbox)).catch(() => {});
+  }, []);
+
+  async function toggle(enabled: boolean) {
+    try {
+      const r = await api.put<{ sandbox: SandboxStatus }>('/settings/security', { sandboxEnabled: enabled });
+      setSandbox(r.sandbox);
+      toast.success(enabled ? 'Sandbox on — applies from each instance’s next start' : 'Sandbox off — applies from each instance’s next start');
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : 'Failed to change the sandbox setting');
+    }
+  }
+
+  const active = sandbox?.available && sandbox.enabled;
+  return (
+    <Card className="p-5">
+      <CardTitle action={sandbox && <Badge tone={active ? 'green' : 'yellow'}>{active ? 'Protected' : sandbox.available ? 'Off' : 'Unavailable'}</Badge>}>Security</CardTitle>
+      <div className="space-y-3 text-sm text-ink-300">
+        <p>Every instance is kept to its own folder:</p>
+        <ul className="space-y-1.5">
+          <li>🛡️ <b className="text-ink-100">Process sandbox</b> — game servers run under bubblewrap: their folder is the only writable place, system folders are read-only, and home folders, other instances and the panel’s data are hidden.</li>
+          <li>🔗 <b className="text-ink-100">Symlink-proof file access</b> — the panel never follows a link out of an instance folder (files, uploads, plugins, snapshots).</li>
+          <li>🧹 <b className="text-ink-100">Clean environment</b> — instances never inherit the panel’s environment variables or secrets.</li>
+          <li>🐳 <b className="text-ink-100">Docker instances</b> — containers only see their mounted folder, with memory/process limits and no-new-privileges.</li>
+        </ul>
+        {sandbox && !sandbox.available && <Notice tone="warning">{sandbox.reason}</Notice>}
+        {sandbox?.available && (
+          <label className="flex items-center gap-2">
+            <input type="checkbox" checked={sandbox.enabled} onChange={(e) => toggle(e.target.checked)} />
+            Sandbox game server processes ({sandbox.version})
+          </label>
+        )}
+      </div>
     </Card>
   );
 }
@@ -306,6 +347,7 @@ export function ConfigurationPage() {
         <HostCard />
         {isAdmin ? (
           <>
+            <SecurityCard />
             <NodesCard />
             <EnvironmentBackupCard />
             <SteamCmdSettingsCard />

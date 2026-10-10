@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Navigate, NavLink, Route, Routes, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Layout, NavItem, NavSectionLabel } from '../components/Layout.js';
@@ -20,6 +20,7 @@ import { SettingsTab } from './server/SettingsTab.js';
 import { FilesTab } from './server/FilesTab.js';
 import { BackupsTab } from './server/BackupsTab.js';
 import { UpdateTab } from './server/UpdateTab.js';
+import { UpnpTab } from './server/UpnpTab.js';
 import { useEndpoint } from '../hooks/useEndpoint.js';
 import { api, ApiError } from '../api/client.js';
 import { isMinecraftPlatform, type ServerRecord } from '../api/types.js';
@@ -47,6 +48,7 @@ function InstanceNav({ server, onNavigate }: { server: ServerRecord; onNavigate:
       <NavItem to="backups" icon="backup" label="Backup Schedule" onClick={onNavigate} />
       <NavItem to="configuration" icon="configuration" label="Configuration" onClick={onNavigate} />
       <NavItem to="files" icon="folder" label="File Management" onClick={onNavigate} />
+      <NavItem to="upnp" icon="router" label="UPnP" onClick={onNavigate} />
 
       <NavSectionLabel>Manage</NavSectionLabel>
       <NavItem to="plugins" icon="plugin" label={addonNavLabel(server)} onClick={onNavigate} />
@@ -80,8 +82,36 @@ function CopyChip({ icon, label, value, copyValue }: { icon: 'globe' | 'port'; l
   );
 }
 
+/** "Restarting in 7s" with a cancel button while an auto-restart is scheduled. */
+function AutoRestartCountdown({ onCancel, canCancel }: { onCancel: () => void; canCancel: boolean }) {
+  const { autoRestart } = useServerDetail();
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 500);
+    return () => clearInterval(t);
+  }, []);
+  if (!autoRestart?.pendingAt) return null;
+  const secs = Math.max(0, Math.ceil((Date.parse(autoRestart.pendingAt) - now) / 1000));
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.95 }}
+      animate={{ opacity: 1, scale: 1 }}
+      className="flex items-center gap-2 rounded-full bg-tertiary-container py-1 pl-3 pr-1 text-sm text-tertiary-on-container"
+    >
+      <Icon name="restart" className="h-4 w-4 animate-spin [animation-duration:2.5s]" />
+      Auto-restart {secs > 0 ? `in ${secs}s` : 'now'}
+      {autoRestart.attempts > 1 && <span className="text-xs opacity-80">· attempt {autoRestart.attempts}</span>}
+      {canCancel && (
+        <button onClick={onCancel} className="state-layer rounded-full px-2.5 py-1 text-xs font-medium">
+          Cancel
+        </button>
+      )}
+    </motion.div>
+  );
+}
+
 function LifecycleActions() {
-  const { server, serverId, can, refresh } = useServerDetail();
+  const { server, serverId, can, refresh, autoRestart } = useServerDetail();
   const canWrite = can('power');
   const toast = useToast();
   const [busy, setBusy] = useState(false);
@@ -102,6 +132,18 @@ function LifecycleActions() {
 
   const s = server.status;
   const runningLike = s === 'running' || s === 'starting';
+  if (autoRestart?.pendingAt && !runningLike) {
+    return (
+      <div className="flex flex-wrap items-center gap-2">
+        <AutoRestartCountdown canCancel={canWrite} onCancel={() => act('stop')} />
+        {canWrite && (
+          <Button variant="primary" disabled={busy} onClick={() => act('start')}>
+            <Icon name="play" className="h-4 w-4" /> Start now
+          </Button>
+        )}
+      </div>
+    );
+  }
   if (s === 'install_failed') {
     return (
       <Button variant="primary" disabled={busy} onClick={() => act('retry-install')}>
@@ -161,6 +203,7 @@ function InstanceTopBar({ server }: { server: ServerRecord }) {
           <p className="mt-0.5 text-sm text-ink-400">
             {gameLabel(kind)}
             {isMinecraftPlatform(server.platform) && ` · ${server.loader} ${server.version}`}
+            {server.platform === 'docker' && <span className="font-mono"> · 🐳 {server.version}</span>}
           </p>
         </div>
         <LifecycleActions />
@@ -267,6 +310,7 @@ function InstancePageInner() {
             {!steam && <Route path="whitelist" element={<WhitelistTab />} />}
             {!steam && <Route path="maps" element={<MapsTab />} />}
             <Route path="update" element={<UpdateTab />} />
+            <Route path="upnp" element={<UpnpTab />} />
             {/* Old tab names, so existing bookmarks keep working. */}
             <Route path="settings" element={<Navigate to="../configuration" replace />} />
             <Route path="resources" element={<Navigate to="../status" replace />} />

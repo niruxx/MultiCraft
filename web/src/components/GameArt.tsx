@@ -4,7 +4,7 @@ import type { ServerRecord } from '../api/types.js';
  * Small emblems that identify which game an instance runs. These are original, simplified
  * illustrations (a grass block, a horned helmet, …) — not the games' trademarked logos.
  */
-type DrawnKind = 'minecraft-java' | 'minecraft-bedrock' | 'palworld' | 'valheim' | 'zomboid' | 'terraria' | 'quake' | 'custom' | 'steam';
+type DrawnKind = 'minecraft-java' | 'minecraft-bedrock' | 'palworld' | 'valheim' | 'zomboid' | 'terraria' | 'quake' | 'custom' | 'docker' | 'steam';
 
 /** Games identified by a generic emblem: a crosshair for shooters, otherwise a short monogram. */
 interface MarkedGame {
@@ -62,10 +62,23 @@ const DRAWN_LABEL: Record<DrawnKind, string> = {
   terraria: 'Terraria',
   quake: 'Quake Live',
   custom: 'Custom server',
+  docker: 'Docker container',
   steam: 'Steam dedicated server',
 };
 
-export function gameKindOf(server: Pick<ServerRecord, 'platform' | 'steam_app_id'>): GameKind {
+/** Well-known community images → the game they run. */
+const IMAGE_GAME: [RegExp, GameKind][] = [
+  [/minecraft-bedrock/i, 'minecraft-bedrock'],
+  [/minecraft/i, 'minecraft-java'],
+  [/valheim/i, 'valheim'],
+  [/palworld/i, 'palworld'],
+  [/zomboid/i, 'zomboid'],
+  [/terraria/i, 'terraria'],
+  [/(^|\/)cs2|counter-?strike/i, 'steam:730'],
+];
+
+export function gameKindOf(server: Pick<ServerRecord, 'platform' | 'steam_app_id'> & { version?: string }): GameKind {
+  if (server.platform === 'docker') return IMAGE_GAME.find(([re]) => re.test(server.version ?? ''))?.[1] ?? 'docker';
   if (server.platform === 'java') return 'minecraft-java';
   if (server.platform === 'bedrock') return 'minecraft-bedrock';
   if (server.platform === 'custom') return 'custom';
@@ -95,6 +108,7 @@ const TILE: Record<DrawnKind, string> = {
   terraria: 'from-[#1d3557] to-[#122036]',
   quake: 'from-[#3a1d12] to-[#1c0d08]',
   custom: 'from-[#20262b] to-[#0f1316]',
+  docker: 'from-[#173450] to-[#0d1d2e]',
   steam: 'from-[#22303f] to-[#141c26]',
 };
 
@@ -203,6 +217,15 @@ function Emblem({ kind }: { kind: GameKind }) {
         <g>
           <circle cx="16" cy="16" r="10" fill="none" stroke="#c46a2c" strokeWidth="2.2" />
           <path d="M17.5 7l-6 10h4.5l-1.5 8 6.5-11h-4.6z" fill="#e8893a" />
+        </g>
+      );
+    case 'docker':
+      // Stacked shipping containers (generic — not the Docker logo)
+      return (
+        <g>
+          <rect x="6" y="16" width="20" height="9" rx="1.5" fill="#4f9ee8" />
+          <rect x="9" y="8" width="14" height="8" rx="1.5" fill="#7cc0ff" />
+          <path d="M10 18v5M14 18v5M18 18v5M22 18v5M12.5 10v4M16 10v4M19.5 10v4" stroke="#0d1d2e" strokeWidth="1.3" strokeLinecap="round" />
         </g>
       );
     case 'custom':

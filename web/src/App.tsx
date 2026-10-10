@@ -10,6 +10,7 @@ import { InstancesPage } from './pages/InstancesPage.js';
 import { InstancePage } from './pages/InstancePage.js';
 import { ConfigurationPage } from './pages/ConfigurationPage.js';
 import { FileManagerPage } from './pages/FileManagerPage.js';
+import { DockerPage } from './pages/DockerPage.js';
 import { UsersPage } from './pages/UsersPage.js';
 import type { ReactNode } from 'react';
 
@@ -76,6 +77,14 @@ function AppRoutes() {
         element={
           <RequireAuth>
             <ConfigurationPage />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/docker"
+        element={
+          <RequireAuth>
+            <DockerPage />
           </RequireAuth>
         }
       />

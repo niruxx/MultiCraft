@@ -73,13 +73,14 @@ export const SERVER_PERMISSIONS = [
   'settings', // instance configuration & server.properties
   'update', // change version / update the server software
   'launch', // change the launch command/executable — effectively running arbitrary code, so opt-in
+  'network', // UPnP: open ports on the router to this host — opt-in for the same reason
 ] as const;
 
 export type ServerPermission = (typeof SERVER_PERMISSIONS)[number];
 
 export function roleDefaultPermissions(role: Role): ServerPermission[] {
   if (role === 'viewer') return ['files.read'];
-  return SERVER_PERMISSIONS.filter((p) => p !== 'launch');
+  return SERVER_PERMISSIONS.filter((p) => p !== 'launch' && p !== 'network');
 }
 
 function sanitizePermissions(value: unknown): ServerPermission[] | null {

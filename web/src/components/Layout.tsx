@@ -59,6 +59,7 @@ function MainNav({ onNavigate }: { onNavigate?: () => void }) {
       <NavItem to="/" end icon="instances" label="Instances" onClick={onNavigate} />
       <NavItem to="/configuration" icon="configuration" label="Configuration" onClick={onNavigate} />
       <NavItem to="/files" icon="folder" label="File Management" onClick={onNavigate} />
+      <NavItem to="/docker" icon="container" label="Docker" onClick={onNavigate} />
       {user?.role === 'admin' && <NavItem to="/users" icon="users" label="Users" onClick={onNavigate} />}
     </nav>
   );

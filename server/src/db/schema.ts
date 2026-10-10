@@ -36,7 +36,13 @@ CREATE TABLE IF NOT EXISTS servers (
   steam_app_id TEXT, -- Steam App ID actually installed, for platform = 'steam' servers
   steam_login TEXT NOT NULL DEFAULT 'anonymous', -- raw value passed after "+login" (e.g. "anonymous" or "user pass")
   steam_extra_flags TEXT NOT NULL DEFAULT '', -- extra steamcmd CLI flags spliced into the install/update invocation
-  launch_config TEXT, -- JSON LaunchConfig: executable/args/env/stop/restart overrides (required for platform = 'custom')
+  launch_config TEXT,
+  restart_policy TEXT NOT NULL DEFAULT 'never', -- never | on-crash | always
+  restart_delay_sec INTEGER NOT NULL DEFAULT 10,
+  restart_max_attempts INTEGER NOT NULL DEFAULT 0, -- 0 = unlimited
+  upnp_config TEXT, -- JSON UpnpConfig: router port-mapping rules
+  isolation TEXT NOT NULL DEFAULT 'inherit', -- inherit | off (admin opt-out of the process sandbox)
+  docker_config TEXT, -- JSON DockerConfig for platform = 'docker' -- JSON LaunchConfig: executable/args/env/stop/restart overrides (required for platform = 'custom')
   suspended BOOLEAN NOT NULL DEFAULT 0,
   suspended_reason TEXT,
   suspended_at TEXT,

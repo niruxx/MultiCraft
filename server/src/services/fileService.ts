@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import fsp from 'node:fs/promises';
 import path from 'node:path';
-import { instanceDir, safeJoin } from '../utils/paths.js';
+import { instanceDir, isSymlinkAt, safeJoin, safeJoinReal } from '../utils/paths.js';
 import { HttpError } from '../utils/asyncHandler.js';
 
 const MAX_TEXT_EDIT_BYTES = 5 * 1024 * 1024; // 5 MB safety cap for the in-browser text editor
@@ -16,9 +16,9 @@ export interface FileEntry {
 
 function resolvePath(serverId: string, relativePath: string): string {
   try {
-    return safeJoin(instanceDir(serverId), relativePath);
-  } catch {
-    throw new HttpError(400, 'Invalid path');
+    return safeJoinReal(instanceDir(serverId), relativePath);
+  } catch (err) {
+    throw new HttpError(400, err instanceof Error && /symlink/.test(err.message) ? err.message : 'Invalid path');
   }
 }
 
@@ -75,6 +75,11 @@ export async function createDirectory(serverId: string, relativePath: string): P
 export async function deleteEntry(serverId: string, relativePath: string): Promise<void> {
   if (relativePath === '' || relativePath === '.' || relativePath === '/') {
     throw new HttpError(400, 'Refusing to delete the server root directory');
+  }
+  // A symlink (even one pointing outside) can always be removed — unlink it, never follow it.
+  if (isSymlinkAt(instanceDir(serverId), relativePath)) {
+    await fsp.unlink(safeJoin(instanceDir(serverId), relativePath));
+    return;
   }
   const target = resolvePath(serverId, relativePath);
   await fsp.rm(target, { recursive: true, force: true });

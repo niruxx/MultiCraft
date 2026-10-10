@@ -10,6 +10,8 @@ import {
   listServers,
   setServerJar,
   setServerStatus,
+  setDockerConfig,
+  setIsolation,
   setLaunchConfig,
   setServerSuspension,
   setServerVersion,
@@ -29,6 +31,9 @@ import {
   stopServer,
   restartServer,
   buildLaunch,
+  cancelAutoRestart,
+  getAutoRestartState,
+  launchSandboxed,
 } from '../services/processManager.js';
 import { getPlayerRoster } from '../services/playerService.js';
 import { getServerPermissions, getUserServerAccess, logAudit } from '../services/userService.js';
@@ -41,6 +46,7 @@ import { STEAM_GAME_PRESETS, findPreset } from '../services/steamGames.js';
 import { isMinecraftPlatform, type Loader, type Platform, type ServerRecord } from '../types/index.js';
 import { sanitizeLaunchConfig, launchConfigOf, launchVariables, resolveExecutable, ensureExecutable } from '../services/launchConfig.js';
 import { getOnlinePlayers } from '../services/playerService.js';
+import { dockerConfigOf, getEngineStatus, pullImage, sanitizeDockerConfig } from '../services/containerService.js';
 
 export const serversRouter = Router();
 serversRouter.use(requireAuth);
@@ -56,6 +62,22 @@ serversRouter.use(requireAuth);
  * no way to know it, so this only verifies the file actually exists afterward.
  */
 async function runServerInstall(server: ServerRecord): Promise<void> {
+  if (server.platform === 'docker') {
+    // "Installing" a Docker instance = pulling its image.
+    try {
+      publish(consoleTopic(server.id), { type: 'install_progress', pct: 5, message: `Pulling ${server.version}` });
+      await pullImage(server.version, (line) => appendLine(server.id, line));
+      appendLine(server.id, '[MultiCraft] Image ready — the instance can start');
+      setServerStatus(server.id, 'stopped');
+      publish(consoleTopic(server.id), { type: 'status', status: 'stopped' });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      appendLine(server.id, `[MultiCraft] Image pull failed: ${message}`, 'stderr');
+      setServerStatus(server.id, 'install_failed');
+      publish(consoleTopic(server.id), { type: 'status', status: 'install_failed', error: message });
+    }
+    return;
+  }
   try {
     const result = await installServer(
       server.platform,
@@ -177,11 +199,11 @@ serversRouter.post(
     } = req.body ?? {};
 
     if (typeof name !== 'string' || !name.trim()) throw new HttpError(400, 'Server name is required');
-    if (!['java', 'bedrock', 'steam', 'custom'].includes(platform)) throw new HttpError(400, 'Invalid platform');
-    if (!['vanilla', 'paper', 'purpur', 'spigot', 'bedrock', 'steam', 'custom'].includes(loader)) {
+    if (!['java', 'bedrock', 'steam', 'custom', 'docker'].includes(platform)) throw new HttpError(400, 'Invalid platform');
+    if (!['vanilla', 'paper', 'purpur', 'spigot', 'bedrock', 'steam', 'custom', 'docker'].includes(loader)) {
       throw new HttpError(400, 'Invalid loader');
     }
-    if (typeof version !== 'string' || !version) throw new HttpError(400, 'Version is required');
+    if (platform !== 'docker' && (typeof version !== 'string' || !version)) throw new HttpError(400, 'Version is required');
     if (platform === 'java' && acceptEula !== true) {
       throw new HttpError(400, "You must accept Mojang's EULA to create a Java server");
     }
@@ -191,6 +213,18 @@ serversRouter.post(
     if (platform === 'custom') {
       if (req.auth!.role !== 'admin') throw new HttpError(403, 'Only admins can create custom instances');
       launchConfig = JSON.stringify(sanitizeLaunchConfig(req.body?.launch ?? {}, { isAdmin: true, platform: 'custom' }));
+    }
+
+    // Docker access is root-equivalent on most hosts, so only admins create container instances.
+    let dockerConfig: string | null = null;
+    let dockerImage: string | null = null;
+    if (platform === 'docker') {
+      if (req.auth!.role !== 'admin') throw new HttpError(403, 'Only admins can create Docker instances');
+      const engine = getEngineStatus(true);
+      if (!engine.available) throw new HttpError(400, `${engine.error}${engine.hint ? ` — ${engine.hint}` : ''}`);
+      const cfg = sanitizeDockerConfig(req.body?.docker);
+      dockerConfig = JSON.stringify(cfg);
+      dockerImage = cfg.image;
     }
 
     let preset: ReturnType<typeof findPreset> | undefined;
@@ -217,10 +251,11 @@ serversRouter.post(
       name: name.trim(),
       platform: platform as Platform,
       loader: loader as Loader,
-      version,
+      version: dockerImage ?? version,
       minMemoryMb: Number(minMemoryMb) || 1024,
       maxMemoryMb: Number(maxMemoryMb) || 2048,
-      serverPort: Number(serverPort) || preset?.defaultPort || (platform === 'bedrock' ? 19132 : 25565),
+      serverPort:
+        (dockerConfig ? JSON.parse(dockerConfig).ports[0].host : 0) || Number(serverPort) || preset?.defaultPort || (platform === 'bedrock' ? 19132 : 25565),
       extraJavaArgs: typeof extraJavaArgs === 'string' ? extraJavaArgs : '',
       extraArgs: typeof extraArgs === 'string' ? extraArgs : '',
       createdBy: req.auth!.sub,
@@ -228,6 +263,7 @@ serversRouter.post(
       steamLogin: platform === 'steam' && typeof steamLogin === 'string' && steamLogin.trim() ? steamLogin.trim() : 'anonymous',
       steamExtraFlags: platform === 'steam' && typeof steamExtraFlags === 'string' ? steamExtraFlags.trim() : '',
       launchConfig,
+      dockerConfig,
     });
 
     if (platform === 'steam' && !preset && typeof customExecutable === 'string') {
@@ -291,6 +327,7 @@ serversRouter.get(
       runtime: getRuntimeInfo(server.id),
       running: isRunning(server.id),
       permissions: getServerPermissions(req.auth!.sub, req.auth!.role, server.id) ?? [],
+      autoRestart: getAutoRestartState(server.id),
     });
   })
 );
@@ -314,7 +351,9 @@ serversRouter.get(
           ? 'udp'
           : server.platform === 'custom'
             ? launchConfigOf(server).protocol ?? 'tcp'
-            : findPreset(server.steam_app_id)?.portProtocol ?? 'udp';
+            : server.platform === 'docker'
+              ? dockerConfigOf(server)?.ports[0]?.protocol ?? 'tcp'
+              : findPreset(server.steam_app_id)?.portProtocol ?? 'udp';
     res.json({
       host: wildcard ? primary ?? '127.0.0.1' : bind,
       bindAddress: wildcard ? '0.0.0.0' : bind,
@@ -340,7 +379,7 @@ serversRouter.get(
     } catch (err) {
       previewError = err instanceof Error ? err.message : String(err);
     }
-    res.json({ config: launchConfigOf(server), preview, previewError, variables: launchVariables(server) });
+    res.json({ config: launchConfigOf(server), preview, previewError, variables: launchVariables(server), sandboxed: launchSandboxed(server) });
   })
 );
 
@@ -368,6 +407,34 @@ serversRouter.put(
   })
 );
 
+/** Container settings for a Docker instance (admin-only to change: they decide what runs on the host). */
+serversRouter.get(
+  '/:serverId/docker',
+  requireServerAccess(),
+  asyncHandler(async (req, res) => {
+    const server = getServer(req.params.serverId);
+    if (!server) throw new HttpError(404, 'Server not found');
+    if (server.platform !== 'docker') throw new HttpError(400, 'Not a Docker instance');
+    res.json({ config: dockerConfigOf(server), engine: getEngineStatus() });
+  })
+);
+
+serversRouter.put(
+  '/:serverId/docker',
+  requireRole('admin'),
+  asyncHandler(async (req, res) => {
+    const server = getServer(req.params.serverId);
+    if (!server) throw new HttpError(404, 'Server not found');
+    if (server.platform !== 'docker') throw new HttpError(400, 'Not a Docker instance');
+    const config = sanitizeDockerConfig(req.body?.config);
+    setDockerConfig(server.id, JSON.stringify(config), config.image);
+    updateServerRecord(server.id, { serverPort: config.ports[0].host });
+    appendLine(server.id, `[MultiCraft] Container settings changed by ${req.auth!.username} — they apply on the next start`, 'system');
+    logAudit(req.auth!.sub, req.auth!.username, 'server.docker.update', server.id, config.image);
+    res.json({ config, server: getServer(server.id) });
+  })
+);
+
 /** Suspension: stops the instance and locks it to admins only (see requireServerAccess). */
 serversRouter.post(
   '/:serverId/suspend',
@@ -377,6 +444,7 @@ serversRouter.post(
     if (!server) throw new HttpError(404, 'Server not found');
     const reason = typeof req.body?.reason === 'string' ? req.body.reason.trim().slice(0, 500) : '';
     setServerSuspension(server.id, true, reason || null, req.auth!.username);
+    cancelAutoRestart(server.id, 'instance suspended');
     if (isRunning(server.id)) {
       appendLine(server.id, `[MultiCraft] Instance suspended by ${req.auth!.username} — stopping`, 'system');
       stopServer(server.id, { force: req.body?.force === true });
@@ -426,8 +494,31 @@ serversRouter.patch(
     requirePermission(req, 'settings');
     const server = getServer(req.params.serverId);
     if (!server) throw new HttpError(404, 'Server not found');
-    const { name, minMemoryMb, maxMemoryMb, serverPort, extraJavaArgs, extraArgs, autoStart, steamLogin, steamExtraFlags } =
-      req.body ?? {};
+    const {
+      name,
+      minMemoryMb,
+      maxMemoryMb,
+      serverPort,
+      extraJavaArgs,
+      extraArgs,
+      autoStart,
+      steamLogin,
+      steamExtraFlags,
+      restartPolicy,
+      restartDelaySec,
+      restartMaxAttempts,
+      isolation,
+    } = req.body ?? {};
+    if (isolation !== undefined) {
+      if (isolation !== 'inherit' && isolation !== 'off') throw new HttpError(400, 'isolation must be inherit or off');
+      if (isolation === 'off' && req.auth!.role !== 'admin') throw new HttpError(403, 'Only admins can turn off sandboxing for an instance');
+      setIsolation(server.id, isolation);
+    }
+    if (restartPolicy !== undefined && !['never', 'on-crash', 'always'].includes(restartPolicy)) {
+      throw new HttpError(400, 'restartPolicy must be never, on-crash or always');
+    }
+    const clampInt = (v: unknown, min: number, max: number) =>
+      v === undefined || v === null || v === '' ? undefined : Math.min(Math.max(Math.round(Number(v)) || 0, min), max);
     updateServerRecord(server.id, {
       name,
       minMemoryMb: minMemoryMb !== undefined ? Number(minMemoryMb) : undefined,
@@ -438,7 +529,11 @@ serversRouter.patch(
       autoStart,
       steamLogin: typeof steamLogin === 'string' ? steamLogin : undefined,
       steamExtraFlags: typeof steamExtraFlags === 'string' ? steamExtraFlags : undefined,
+      restartPolicy,
+      restartDelaySec: clampInt(restartDelaySec, 1, 3600),
+      restartMaxAttempts: clampInt(restartMaxAttempts, 0, 10_000),
     });
+    if (restartPolicy === 'never') cancelAutoRestart(server.id);
     logAudit(req.auth!.sub, req.auth!.username, 'server.update', server.id);
     res.json({ server: getServer(server.id) });
   })
@@ -451,6 +546,7 @@ serversRouter.delete(
     const server = getServer(req.params.serverId);
     if (!server) throw new HttpError(404, 'Server not found');
     if (isRunning(server.id)) throw new HttpError(409, 'Stop the server before deleting it');
+    cancelAutoRestart(server.id);
     deleteServerRecord(server.id);
     logAudit(req.auth!.sub, req.auth!.username, 'server.delete', server.id);
     res.status(204).end();

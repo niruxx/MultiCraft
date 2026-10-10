@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { HttpError } from '../utils/asyncHandler.js';
-import { instanceDir, safeJoin } from '../utils/paths.js';
+import { instanceDir, safeJoinReal } from '../utils/paths.js';
 import type { ServerRecord } from '../types/index.js';
 
 /**
@@ -220,9 +220,9 @@ export function splitArgs(input: string): string[] {
 export function resolveExecutable(server: ServerRecord, executable: string): string {
   if (path.isAbsolute(executable)) return executable;
   try {
-    return safeJoin(instanceDir(server.id), executable);
+    return safeJoinReal(instanceDir(server.id), executable);
   } catch {
-    throw new HttpError(400, 'executable must stay inside the instance folder');
+    throw new HttpError(400, 'executable must stay inside the instance folder (symlinks pointing outside it are refused)');
   }
 }
 

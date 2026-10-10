@@ -11,7 +11,8 @@ export type ServerPermission =
   | 'players'
   | 'settings'
   | 'update'
-  | 'launch';
+  | 'launch'
+  | 'network';
 
 export interface PublicUser {
   id: string;
@@ -23,8 +24,8 @@ export interface PublicUser {
   serverPermissions?: Record<string, ServerPermission[] | null>;
 }
 
-export type Platform = 'java' | 'bedrock' | 'steam' | 'custom';
-export type Loader = 'vanilla' | 'paper' | 'purpur' | 'spigot' | 'bedrock' | 'steam' | 'custom';
+export type Platform = 'java' | 'bedrock' | 'steam' | 'custom' | 'docker';
+export type Loader = 'vanilla' | 'paper' | 'purpur' | 'spigot' | 'bedrock' | 'steam' | 'custom' | 'docker';
 
 export const PLUGIN_CAPABLE_LOADERS: Loader[] = ['paper', 'purpur', 'spigot'];
 
@@ -58,6 +59,13 @@ export type ServerStatus =
   | 'updating'
   | 'transferring';
 
+export type RestartPolicy = 'never' | 'on-crash' | 'always';
+
+export interface AutoRestartState {
+  pendingAt: string | null;
+  attempts: number;
+}
+
 export interface ServerRecord {
   id: string;
   name: string;
@@ -80,6 +88,12 @@ export interface ServerRecord {
   steam_extra_flags: string;
   /** JSON-encoded LaunchConfig; null = platform defaults. */
   launch_config: string | null;
+  restart_policy: RestartPolicy;
+  restart_delay_sec: number;
+  restart_max_attempts: number;
+  upnp_config: string | null;
+  isolation: 'inherit' | 'off';
+  docker_config: string | null;
   suspended: 0 | 1;
   suspended_reason: string | null;
   suspended_at: string | null;
@@ -327,6 +341,7 @@ export interface LaunchConfig {
 
 export interface LaunchInfo {
   config: LaunchConfig;
+  sandboxed?: boolean;
   preview: string | null;
   previewError: string | null;
   variables: Record<string, string>;
@@ -361,4 +376,83 @@ export interface SystemMetrics {
     memoryMb: number;
     cpuPercent: number;
   };
+}
+
+export type UpnpProtocol = 'TCP' | 'UDP' | 'BOTH';
+
+export interface UpnpRule {
+  id: string;
+  label: string;
+  protocol: UpnpProtocol;
+  externalStart: number;
+  externalEnd: number;
+  internalStart: number;
+  enabled: boolean;
+}
+
+export interface UpnpConfig {
+  autoMap: boolean;
+  leaseSeconds: number;
+  rules: UpnpRule[];
+}
+
+export interface UpnpMappingState {
+  externalPort: number;
+  internalPort: number;
+  protocol: 'TCP' | 'UDP';
+  ok: boolean;
+  error: string | null;
+  at: string;
+}
+
+export interface UpnpGatewayInfo {
+  gateway: {
+    friendlyName: string;
+    manufacturer: string | null;
+    modelName: string | null;
+    localAddress: string;
+    controlUrl: string;
+    discoveredAt: string;
+  } | null;
+  externalIp: string | null;
+  routerMappings: { externalPort: number; internalPort: number; internalClient: string; protocol: string; description: string; enabled: boolean; leaseSeconds: number }[];
+  error: string | null;
+}
+
+export interface PortMapping {
+  host: number;
+  container: number;
+  protocol: 'tcp' | 'udp';
+}
+
+export interface DockerConfig {
+  image: string;
+  ports: PortMapping[];
+  env: { key: string; value: string }[];
+  dataPath: string;
+  cpus: number | null;
+  command: string;
+  runAsPanelUser: boolean;
+}
+
+export interface EngineStatus {
+  available: boolean;
+  engine: 'docker' | 'podman' | null;
+  version: string | null;
+  rootless: boolean;
+  error: string | null;
+  hint: string | null;
+}
+
+export interface DockerOverview {
+  engine: EngineStatus;
+  counts: { containers: number; running: number; images: number } | null;
+  containers: { name: string; status: string; image: string; instanceId: string }[];
+}
+
+export interface SandboxStatus {
+  available: boolean;
+  version: string | null;
+  reason: string | null;
+  enabled: boolean;
 }

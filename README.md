@@ -110,6 +110,26 @@ Open **http://localhost:8642** — the first visit walks you through creating th
       Link other MultiCraft hosts and transfer an instance's files and settings between them.
     </td>
     <td valign="top">
+      <h4>🔌 UPnP port forwarding</h4>
+      Forward ports and ranges on your router straight from the panel — automatically while an instance runs.
+    </td>
+  </tr>
+  <tr>
+    <td valign="top">
+      <h4>♻️ Auto-restart</h4>
+      Bring an instance back when it crashes — or whenever it stops — with a delay and an optional attempt limit.
+    </td>
+    <td valign="top">
+      <h4>🐳 Docker &amp; Podman</h4>
+      Run any game image in a container that only sees its own folder — with presets for popular game images.
+    </td>
+  </tr>
+  <tr>
+    <td valign="top">
+      <h4>🛡️ Sandboxed by default</h4>
+      Game processes are confined to their own folder with bubblewrap; the panel never follows a symlink out of one.
+    </td>
+    <td valign="top">
       <h4>👤 Players &amp; operators</h4>
       Op, kick, ban, whitelist/allowlist, broadcasts, time, weather and difficulty — from one page.
     </td>
@@ -145,6 +165,7 @@ Open **http://localhost:8642** — the first visit walks you through creating th
 | 🌳 | **Terraria** | — *(the vanilla server has no mod loader)* | `7777/tcp` |
 | 🎯 | **Any Steam App ID** — CS2, TF2, Rust, ARK, Quake Live… | — | your choice |
 | ⌨️ | **Custom** — any binary or shell script | — | your choice |
+| 🐳 | **Docker / Podman** — any container image (Minecraft, Valheim, Palworld, CS2 presets) | via the image | your choice |
 
 Known titles get their own emblem in the UI, and running instances wear a live 🟢 dot.
 
@@ -230,8 +251,86 @@ Roles set the defaults; each user can be assigned **any number of instances**, e
 | ⚙️ Configuration | instance settings and `server.properties` | ✅ | — |
 | ⬆️ Update | update the server software | ✅ | — |
 | 🚀 Edit launch command | change what runs | — | — |
+| 🔌 UPnP port forwarding | open router ports to this host | — | — |
 
 Admins can do everything. Every assigned user can see status, console output and the player list.
+
+</details>
+
+<details>
+<summary><h3>🛡️ Security &amp; isolation</h3></summary>
+
+Every instance is kept to its own folder — on by default, managed under **Configuration → Security**:
+
+| Layer | What it stops |
+|---|---|
+| 🛡️ **Process sandbox** (bubblewrap, Linux) | The game can only write inside its instance folder (plus a private `/tmp`). System folders are read-only; your home folder, other instances and the panel's database/session secret don't exist inside the sandbox. `HOME` points at `<instance>/.home`. |
+| 🔗 **Symlink-proof file access** | A server, plugin or script can create `ln -s / escape` in its folder — the panel refuses to follow links out of the instance for browsing, editing, uploads, plugins and snapshot restores (an escaping link can still be deleted). |
+| 📤 **Safe uploads** | Uploaded file names are reduced to a plain name, so `../../file` can't land outside the folder. |
+| 🧹 **Clean environment** | Instances never inherit the panel's environment variables — no `MULTICRAFT_*` secrets or credentials that happened to be exported. |
+| 🐳 **Containers** | Docker instances only see their mounted folder, with memory, CPU and process limits and `no-new-privileges`. |
+
+Graceful stops still work in the sandbox — signals go straight to the game (e.g. Valheim's SIGINT save). Steam games get `~/.steam/sdk64/steamclient.so` linked from their own folder. Each instance shows its status under **Configuration → Isolation**; an admin can opt a single instance out if it truly needs files elsewhere.
+
+> [!NOTE]
+> The sandbox needs **bubblewrap** (`bwrap`) — already present wherever Flatpak is installed; otherwise `sudo apt install bubblewrap` / `dnf install bubblewrap` / `pacman -S bubblewrap`. Without it (or on Windows/macOS) the other layers still apply, and the Security card says why the sandbox is unavailable.
+
+</details>
+
+<details>
+<summary><h3>🐳 Docker instances</h3></summary>
+
+The **Docker** page shows your container engine and only your container-backed instances. It works with **Docker** or **Podman** — Podman runs rootless with no daemon, which is the safest option.
+
+- ➕ **New Docker instance** *(admin)* — pick a preset (⛏️ Minecraft Java · 🪨 Bedrock · 🪖 Valheim · 🐾 Palworld · 🎯 CS2) or any image, then set ports, environment variables, the mount path, a CPU limit and an optional command. The image is pulled immediately.
+- 📦 **Only its own folder** — the instance folder is the single host folder mounted into the container (at `/data` by default). Memory limit = the instance's *Max memory*; plus a process limit and `no-new-privileges`.
+- 🖥️ **Everything else works as usual** — live console with input, start/stop/restart (signals are passed into the container), auto-restart, snapshots, File Management, UPnP and **per-container CPU, memory, network and disk metrics**.
+- ✏️ **Change settings later** under the instance's **Configuration → Container**; **Update** pulls the image tag again.
+- 👤 **Run as the panel's user** keeps files the container writes editable from File Management (turn it off for images that must start as root).
+
+> [!WARNING]
+> Access to the Docker daemon is root-equivalent on most hosts, so only admins can create or reconfigure Docker instances. Prefer rootless Podman or rootless Docker.
+
+Pin an engine with `MULTICRAFT_CONTAINER_ENGINE=docker` or `podman`.
+
+</details>
+
+<details>
+<summary><h3>🔌 UPnP port forwarding</h3></summary>
+
+Each instance has a **UPnP** tab that asks your router (via UPnP IGD) to forward ports to this machine — no router admin page needed.
+
+- 📡 **Router card** — the router MultiCraft found, this host's LAN address and your public IP.
+- 🔢 **Rules** — single ports or ranges (up to 256 per rule), TCP, UDP or both, mapped one-to-one (`27015–27020` → `27015–27020`, or shifted to another local range).
+- ⚡ **Forward now / Remove forwarding** — apply or clear on demand, with a per-port result (✅ / ❌ and the router's reason).
+- 🔁 **Forward automatically while running** — opens the ports when the instance starts and closes them when it stops.
+- ⏳ **Leases** — 30 min to 24 h (renewed automatically), or permanent. A timed lease lets the router drop the forwarding on its own if the panel goes away.
+- 🗒️ **Forwarded right now** — every UPnP mapping the router currently points at this machine.
+
+> [!IMPORTANT]
+> Forwarding exposes this machine to the internet, so it needs the **UPnP port forwarding** permission (never on by default). Non-admins can't forward ports below 1024 or the panel's own port.
+
+> [!TIP]
+> **Router not found?** Turn on UPnP in the router and keep the host on the same network (discovery doesn't cross VPNs or Docker bridge networks). Host firewalls often drop the router's replies — with firewalld:
+> `sudo firewall-cmd --permanent --add-service=upnp-client && sudo firewall-cmd --reload`.
+> You can also skip discovery by pointing `MULTICRAFT_UPNP_GATEWAY` at the router's description URL (e.g. `http://192.168.0.1:5000/rootDesc.xml`).
+
+</details>
+
+<details>
+<summary><h3>♻️ Auto-restart</h3></summary>
+
+In an instance's **Configuration → General → Automatic restart**:
+
+| Policy | Restarts when the process… |
+|---|---|
+| ⛔ **Never** | — (default) |
+| 💥 **Crashes or fails** | exits with an error code or is killed by a signal |
+| 🔁 **Stops for any reason** | exits in any way the panel didn't ask for — including an in-game `stop` |
+
+- ⏱️ **Wait before restarting** — seconds between the exit and the restart.
+- 🔢 **Give up after** — consecutive attempts before stopping (`0` = keep going forever). A run of 10 minutes or more counts as healthy and resets the count.
+- 🛑 Stopping from the panel never triggers a restart, and pressing **Stop** during the countdown cancels it. Suspending an instance cancels it too.
 
 </details>
 
@@ -422,10 +521,12 @@ flowchart LR
   P --> S2["🪨 bedrock_server"]
   P --> S3["🎮 Steam game binary"]
   P --> S4["⌨️ your script"]
+  P --> S5["🐳 docker / podman run"]
   P <-->|node key| N["🌐 Other MultiCraft nodes"]
   P -.-> X["⬇️ Mojang · PaperMC · Purpur<br/>SteamCMD · Modrinth"]
 ```
 
+- 🛡️ **Isolation** — bubblewrap sandbox per game process, symlink-aware path checks, scrubbed environments, and containers for Docker instances.
 - 🗄️ **Zero native dependencies** — SQLite via `node:sqlite`; HMAC session tokens and `scrypt` hashing via `node:crypto`.
 - ⚙️ **Plain child processes** — console output and player events stream to the browser over WebSocket; custom instances run in their own process group so scripts' children stop too.
 - 📊 **Metrics from `/proc`** on Linux (`Get-Process` on Windows). Network figures are host-wide — the OS doesn't count network bytes per process.
@@ -451,6 +552,8 @@ MultiCraft/
 - [x] 🎨 Material 3 redesign with list / grid / box views
 - [x] 🚀 Custom launch executables, jars and custom script servers
 - [x] 📸 Snapshots with per-file diff &amp; restore
+- [x] 🔌 UPnP port forwarding and ♻️ auto-restart
+- [x] 🛡️ Process sandbox and 🐳 Docker/Podman instances
 - [ ] 🧱 Mohist and SpongeForge instances
 - [ ] ⏪ Restore view for Minecraft's own auto-save states
 

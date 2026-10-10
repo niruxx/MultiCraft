@@ -132,6 +132,24 @@ const PATHS: Record<string, ReactNode> = {
   close: <path d="M18 6L6 18M6 6l12 12" />,
   more: <path d="M12 5h.01M12 12h.01M12 19h.01" />,
   list: <path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" />,
+  container: (
+    <>
+      <path d="M21 8l-9-5-9 5v8l9 5 9-5V8z" />
+      <path d="M3 8l9 5 9-5M12 13v8" />
+    </>
+  ),
+  shieldCheck: (
+    <>
+      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+      <path d="M9 12l2 2 4-4" />
+    </>
+  ),
+  router: (
+    <>
+      <rect x="2" y="13" width="20" height="8" rx="2" />
+      <path d="M6 17h.01M10 17h.01M15 13l3-8M9 13 6 5" />
+    </>
+  ),
   grid: (
     <>
       <rect x="3" y="3" width="7" height="7" rx="1.5" />

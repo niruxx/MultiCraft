@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { useParams } from 'react-router-dom';
 import { api, ApiError } from '../../api/client.js';
-import type { RuntimeInfo, ServerPermission, ServerRecord } from '../../api/types.js';
+import type { AutoRestartState, RuntimeInfo, ServerPermission, ServerRecord } from '../../api/types.js';
 import { useAuth } from '../../state/AuthContext.js';
 
 interface ServerDetailState {
@@ -14,6 +14,8 @@ interface ServerDetailState {
   /** Whether the signed-in user holds a specific permission on this instance. */
   can: (permission: ServerPermission) => boolean;
   permissions: ServerPermission[];
+  /** A scheduled automatic restart after the process exited on its own. */
+  autoRestart: AutoRestartState | null;
   isAdmin: boolean;
   /** Set when the API refuses access because the instance is suspended (non-admins only). */
   suspendedMessage: string | null;
@@ -32,17 +34,25 @@ export function ServerDetailProvider({ children, serverId: explicitId }: { child
   const [runtime, setRuntime] = useState<RuntimeInfo | null>(null);
   const [running, setRunning] = useState(false);
   const [permissions, setPermissions] = useState<ServerPermission[]>([]);
+  const [autoRestart, setAutoRestart] = useState<AutoRestartState | null>(null);
   const [suspendedMessage, setSuspendedMessage] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   async function refresh() {
     if (!serverId) return;
     try {
-      const res = await api.get<{ server: ServerRecord; runtime: RuntimeInfo | null; running: boolean; permissions: ServerPermission[] }>(
+      const res = await api.get<{
+        server: ServerRecord;
+        runtime: RuntimeInfo | null;
+        running: boolean;
+        permissions: ServerPermission[];
+        autoRestart?: AutoRestartState;
+      }>(
         `/servers/${serverId}`
       );
       setServer(res.server);
       setPermissions(res.permissions ?? []);
+      setAutoRestart(res.autoRestart ?? null);
       setRuntime(res.runtime);
       setRunning(res.running);
       setSuspendedMessage(null);
@@ -75,7 +85,7 @@ export function ServerDetailProvider({ children, serverId: explicitId }: { child
 
   return (
     <ServerDetailContext.Provider
-      value={{ serverId: serverId!, server, runtime, running, canWrite, can, permissions, isAdmin, suspendedMessage, loadError, refresh }}
+      value={{ serverId: serverId!, server, runtime, running, canWrite, can, permissions, autoRestart, isAdmin, suspendedMessage, loadError, refresh }}
     >
       {children}
     </ServerDetailContext.Provider>

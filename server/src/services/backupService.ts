@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import AdmZip from 'adm-zip';
-import { backupDir, instanceDir, safeJoin } from '../utils/paths.js';
+import { backupDir, instanceDir, safeJoinReal } from '../utils/paths.js';
 import { isRunning } from './processManager.js';
 import { HttpError } from '../utils/asyncHandler.js';
 import { logger } from '../utils/logger.js';
@@ -143,7 +143,7 @@ export function compareSnapshotFile(serverId: string, fileName: string, rawPath:
   if (!entry || entry.isDirectory) throw new HttpError(404, 'That file is not in this snapshot');
   let livePath: string;
   try {
-    livePath = safeJoin(instanceDir(serverId), entryPath);
+    livePath = safeJoinReal(instanceDir(serverId), entryPath);
   } catch {
     throw new HttpError(400, 'Invalid file path');
   }
@@ -158,7 +158,7 @@ export function restoreSnapshotFile(serverId: string, fileName: string, rawPath:
   if (!entry || entry.isDirectory) throw new HttpError(404, 'That file is not in this snapshot');
   let livePath: string;
   try {
-    livePath = safeJoin(instanceDir(serverId), entryPath);
+    livePath = safeJoinReal(instanceDir(serverId), entryPath);
   } catch {
     throw new HttpError(400, 'Invalid file path');
   }

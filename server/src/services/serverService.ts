@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import crypto from 'node:crypto';
 import { prep } from '../db/db.js';
 import { instanceDir, backupDir } from '../utils/paths.js';
-import type { Loader, Platform, ServerRecord, ServerStatus } from '../types/index.js';
+import type { Loader, Platform, RestartPolicy, ServerRecord, ServerStatus } from '../types/index.js';
 
 export interface CreateServerInput {
   name: string;
@@ -19,6 +19,7 @@ export interface CreateServerInput {
   steamLogin?: string;
   steamExtraFlags?: string;
   launchConfig?: string | null;
+  dockerConfig?: string | null;
 }
 
 export function createServerRecord(input: CreateServerInput): ServerRecord {
@@ -27,8 +28,8 @@ export function createServerRecord(input: CreateServerInput): ServerRecord {
   fs.mkdirSync(backupDir(id), { recursive: true });
   prep(
     `INSERT INTO servers
-      (id, name, platform, loader, version, min_memory_mb, max_memory_mb, server_port, extra_java_args, extra_args, status, created_by, steam_app_id, steam_login, steam_extra_flags, launch_config)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'installing', ?, ?, ?, ?, ?)`
+      (id, name, platform, loader, version, min_memory_mb, max_memory_mb, server_port, extra_java_args, extra_args, status, created_by, steam_app_id, steam_login, steam_extra_flags, launch_config, docker_config)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'installing', ?, ?, ?, ?, ?, ?)`
   ).run(
     id,
     input.name,
@@ -44,7 +45,8 @@ export function createServerRecord(input: CreateServerInput): ServerRecord {
     input.steamAppId ?? null,
     input.steamLogin ?? 'anonymous',
     input.steamExtraFlags ?? '',
-    input.launchConfig ?? null
+    input.launchConfig ?? null,
+    input.dockerConfig ?? null
   );
   return getServer(id)!;
 }
@@ -85,6 +87,9 @@ export interface UpdateServerInput {
   autoStart?: boolean;
   steamLogin?: string;
   steamExtraFlags?: string;
+  restartPolicy?: RestartPolicy;
+  restartDelaySec?: number;
+  restartMaxAttempts?: number;
 }
 
 export function updateServerRecord(id: string, input: UpdateServerInput) {
@@ -93,7 +98,8 @@ export function updateServerRecord(id: string, input: UpdateServerInput) {
   prep(
     `UPDATE servers SET
       name = ?, min_memory_mb = ?, max_memory_mb = ?, server_port = ?,
-      extra_java_args = ?, extra_args = ?, auto_start = ?, steam_login = ?, steam_extra_flags = ?
+      extra_java_args = ?, extra_args = ?, auto_start = ?, steam_login = ?, steam_extra_flags = ?,
+      restart_policy = ?, restart_delay_sec = ?, restart_max_attempts = ?
      WHERE id = ?`
   ).run(
     input.name ?? current.name,
@@ -105,6 +111,9 @@ export function updateServerRecord(id: string, input: UpdateServerInput) {
     input.autoStart === undefined ? current.auto_start : input.autoStart ? 1 : 0,
     input.steamLogin ?? current.steam_login,
     input.steamExtraFlags ?? current.steam_extra_flags,
+    input.restartPolicy ?? current.restart_policy,
+    input.restartDelaySec ?? current.restart_delay_sec,
+    input.restartMaxAttempts ?? current.restart_max_attempts,
     id
   );
 }
@@ -137,4 +146,16 @@ export function applyTransferredFields(
 
 export function setLaunchConfig(id: string, launchConfig: string | null) {
   prep('UPDATE servers SET launch_config = ? WHERE id = ?').run(launchConfig, id);
+}
+
+export function setUpnpConfig(id: string, config: string | null) {
+  prep('UPDATE servers SET upnp_config = ? WHERE id = ?').run(config, id);
+}
+
+export function setIsolation(id: string, isolation: 'inherit' | 'off') {
+  prep('UPDATE servers SET isolation = ? WHERE id = ?').run(isolation, id);
+}
+
+export function setDockerConfig(id: string, config: string, image: string) {
+  prep('UPDATE servers SET docker_config = ?, version = ? WHERE id = ?').run(config, image, id);
 }

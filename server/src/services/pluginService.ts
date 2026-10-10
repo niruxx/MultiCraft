@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import AdmZip from 'adm-zip';
-import { instanceDir, safeJoin } from '../utils/paths.js';
+import { instanceDir, safeJoin, safeJoinReal } from '../utils/paths.js';
 import { downloadFile, type LogFn } from '../utils/download.js';
 import { HttpError } from '../utils/asyncHandler.js';
 import { readServerProperties } from './propertiesService.js';
@@ -57,7 +57,7 @@ function levelName(server: ServerRecord): string {
 /** Joins a path under the instance directory, rejecting anything that escapes it. */
 function inInstance(server: ServerRecord, relative: string): string {
   try {
-    return safeJoin(instanceDir(server.id), relative);
+    return safeJoinReal(instanceDir(server.id), relative);
   } catch {
     throw new HttpError(400, 'Invalid path');
   }
@@ -183,6 +183,9 @@ export function getAddonSupport(server: ServerRecord): AddonSupport {
     return { supported: false, reason: 'MultiCraft doesn’t know this game’s mod format. Manage its files directly from File Management.' };
   }
 
+  if (server.platform === 'docker') {
+    return { supported: false, reason: 'Docker instances manage their own software — add plugins or mods through the image’s own options (often environment variables) or by placing files in File Management.' };
+  }
   return { supported: false, reason: 'This instance type doesn’t support plugins.' };
 }
 
@@ -266,7 +269,7 @@ function listFileAddons(server: ServerRecord, profile: AddonProfile): InstalledP
 function resolveAddonPath(server: ServerRecord, profile: AddonProfile, fileName: string): string {
   if (!fileName || fileName.includes('/') || fileName.includes('\\')) throw new HttpError(400, 'Invalid file name');
   try {
-    return safeJoin(addonDir(server, profile), fileName);
+    return safeJoinReal(addonDir(server, profile), fileName);
   } catch {
     throw new HttpError(400, 'Invalid file name');
   }
@@ -404,7 +407,7 @@ function resolveBedrockPack(server: ServerRecord, id: string): { type: PackType;
   }
   let folder: string;
   try {
-    folder = safeJoin(packsDir(server, type), name);
+    folder = safeJoinReal(packsDir(server, type), name);
   } catch {
     throw new HttpError(400, 'Invalid pack id');
   }
@@ -517,7 +520,7 @@ export function installUploadedAddon(server: ServerRecord, originalName: string,
     return [path.basename(dest)];
   }
 
-  fs.writeFileSync(path.join(dir, name), buffer);
+  fs.writeFileSync(safeJoinReal(dir, name), buffer);
   return [name];
 }
 
@@ -531,7 +534,7 @@ export async function installPluginFile(
   const profile = requireAddonProfile(server);
   const dir = addonDir(server, profile);
   fs.mkdirSync(dir, { recursive: true });
-  const destination = safeJoin(dir, safeFileName(fileName));
+  const destination = safeJoinReal(dir, safeFileName(fileName));
   await downloadFile(downloadUrl, destination, undefined, onLog);
 }
 

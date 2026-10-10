@@ -15,6 +15,7 @@ import {
   writeTextFile,
 } from '../services/fileService.js';
 import { logAudit } from '../services/userService.js';
+import { safeJoinReal } from '../utils/paths.js';
 import type { Role } from '../types/index.js';
 
 export const filesRouter = Router({ mergeParams: true });
@@ -108,7 +109,16 @@ filesRouter.post(
     const targetDir = resolveForUpload(req.params.serverId, dirPath);
     const files = (req.files as Express.Multer.File[] | undefined) ?? [];
     for (const file of files) {
-      fs.writeFileSync(path.join(targetDir, file.originalname), file.buffer);
+      // The browser supplies originalname — never trust it as a path ("../../x", "/etc/x").
+      const name = path.basename(file.originalname.replace(/\\/g, '/'));
+      if (!name || name === '.' || name === '..') throw new HttpError(400, `Invalid file name: ${file.originalname}`);
+      let target: string;
+      try {
+        target = safeJoinReal(targetDir, name);
+      } catch {
+        throw new HttpError(400, `Refusing to write ${name}: it would land outside the instance folder`);
+      }
+      fs.writeFileSync(target, file.buffer);
     }
     logAudit(req.auth!.sub, req.auth!.username, 'file.upload', req.params.serverId, `${files.length} file(s) -> ${dirPath}`);
     res.status(201).json({ uploaded: files.map((f) => f.originalname) });

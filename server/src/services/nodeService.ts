@@ -206,6 +206,7 @@ type TransferMeta = Pick<
   | 'steam_login'
   | 'steam_extra_flags'
   | 'launch_config'
+  | 'docker_config'
 >;
 
 function setStatus(serverId: string, status: ServerStatus) {
@@ -257,6 +258,7 @@ export function startTransfer(serverId: string, nodeId: string, deleteSource: bo
     steam_login: server.steam_login,
     steam_extra_flags: server.steam_extra_flags,
     launch_config: server.launch_config,
+    docker_config: server.docker_config,
   };
 
   void (async () => {
@@ -325,7 +327,7 @@ export async function receiveTransfer(req: Request): Promise<ServerRecord> {
   } catch {
     throw new HttpError(400, 'Invalid instance metadata');
   }
-  if (!meta?.name || !['java', 'bedrock', 'steam', 'custom'].includes(meta.platform)) throw new HttpError(400, 'Invalid instance metadata');
+  if (!meta?.name || !['java', 'bedrock', 'steam', 'custom', 'docker'].includes(meta.platform)) throw new HttpError(400, 'Invalid instance metadata');
 
   const record = createServerRecord({
     name: meta.name,
@@ -342,13 +344,14 @@ export async function receiveTransfer(req: Request): Promise<ServerRecord> {
     steamLogin: meta.steam_login,
     steamExtraFlags: meta.steam_extra_flags,
     launchConfig: meta.launch_config ?? null,
+    dockerConfig: meta.docker_config ?? null,
   });
   setServerStatus(record.id, 'transferring');
 
   try {
     const dir = instanceDir(record.id);
     // tar refuses absolute paths and ".." members by default (GNU tar and bsdtar alike).
-    const tar = spawn('tar', ['-xzf', '-', '-C', dir], { windowsHide: true });
+    const tar = spawn('tar', ['-xzf', '-', '--no-same-owner', '-C', dir], { windowsHide: true });
     let tarError = '';
     tar.stderr.on('data', (chunk) => (tarError += chunk.toString()));
     req.pipe(tar.stdin);

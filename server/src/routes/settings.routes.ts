@@ -8,6 +8,7 @@ import {
   setSetting,
 } from '../services/systemSettingsService.js';
 import { logAudit } from '../services/userService.js';
+import { getSandboxStatus, setSandboxEnabled } from '../services/sandboxService.js';
 
 export const settingsRouter = Router();
 settingsRouter.use(requireAuth, requireRole('admin'));
@@ -33,5 +34,24 @@ settingsRouter.put(
     }
     logAudit(req.auth!.sub, req.auth!.username, 'settings.update');
     res.json(getSystemSettings());
+  })
+);
+
+/** Process sandbox (bubblewrap) status and the global switch. */
+settingsRouter.get(
+  '/security',
+  asyncHandler(async (_req, res) => {
+    res.json({ sandbox: getSandboxStatus() });
+  })
+);
+
+settingsRouter.put(
+  '/security',
+  asyncHandler(async (req, res) => {
+    const { sandboxEnabled } = req.body ?? {};
+    if (typeof sandboxEnabled !== 'boolean') throw new HttpError(400, 'sandboxEnabled must be a boolean');
+    setSandboxEnabled(sandboxEnabled);
+    logAudit(req.auth!.sub, req.auth!.username, 'settings.sandbox', undefined, String(sandboxEnabled));
+    res.json({ sandbox: getSandboxStatus() });
   })
 );

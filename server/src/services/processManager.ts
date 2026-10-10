@@ -6,6 +6,9 @@ import { instanceDir } from '../utils/paths.js';
 import { findJava } from './javaService.js';
 import { readProcessStats, clearStatsSample, emptyStats, type ProcessStats } from './statsService.js';
 import { addonLaunchEnv } from './pluginService.js';
+import { upnpOnStart, upnpOnStop } from './upnpService.js';
+import { minimalEnv, sandboxApplies, wrapInSandbox } from './sandboxService.js';
+import { buildContainerLaunch, killContainer, sampleContainer } from './containerService.js';
 import { handleLogLine, resetOnlinePlayers } from './playerService.js';
 import { publish, consoleTopic } from './wsHub.js';
 import * as consoleLog from './consoleLogService.js';
@@ -49,12 +52,83 @@ interface RunningInstance {
   stopTimeoutMs: number;
   /** Signals go to the whole process group (custom instances run detached so scripts' children stop too). */
   groupKill: boolean;
+  /** The real game process inside a bubblewrap sandbox (signals must go to it, not to bwrap). */
+  innerPid: number | null;
+  sandboxed: boolean;
   server: ServerRecord;
   config: LaunchConfig;
   cwd: string;
 }
 
 const running = new Map<string, RunningInstance>();
+
+// ---------------------------------------------------------------------------
+// Auto-restart (per-instance restart_policy)
+// ---------------------------------------------------------------------------
+
+/** A run at least this long counts as healthy and resets the consecutive-restart counter. */
+const STABLE_RUN_MS = 10 * 60_000;
+const pendingRestarts = new Map<string, { timer: NodeJS.Timeout; at: number; attempt: number }>();
+const restartAttempts = new Map<string, number>();
+let shuttingDown = false;
+
+export function getAutoRestartState(serverId: string): { pendingAt: string | null; attempts: number } {
+  const pending = pendingRestarts.get(serverId);
+  return { pendingAt: pending ? new Date(pending.at).toISOString() : null, attempts: restartAttempts.get(serverId) ?? 0 };
+}
+
+/** Cancels a scheduled auto-restart and resets the attempt counter. Returns whether one was pending. */
+export function cancelAutoRestart(serverId: string, reason?: string): boolean {
+  const pending = pendingRestarts.get(serverId);
+  restartAttempts.delete(serverId);
+  if (!pending) return false;
+  clearTimeout(pending.timer);
+  pendingRestarts.delete(serverId);
+  if (reason) appendLog(serverId, `[MultiCraft] Auto-restart cancelled (${reason})`, 'system');
+  publish(consoleTopic(serverId), { type: 'auto_restart', pendingAt: null });
+  return true;
+}
+
+function maybeScheduleAutoRestart(serverId: string, crashed: boolean, ranForMs: number) {
+  if (shuttingDown) return;
+  const server = getServer(serverId);
+  if (!server || server.suspended) return;
+  const policy = server.restart_policy ?? 'never';
+  if (policy === 'never' || (policy === 'on-crash' && !crashed)) {
+    restartAttempts.delete(serverId);
+    return;
+  }
+  if (ranForMs >= STABLE_RUN_MS) restartAttempts.set(serverId, 0);
+  const attempt = (restartAttempts.get(serverId) ?? 0) + 1;
+  const max = server.restart_max_attempts;
+  if (max > 0 && attempt > max) {
+    appendLog(serverId, `[MultiCraft] Auto-restart gave up after ${max} attempt${max === 1 ? '' : 's'} — start it manually once the problem is fixed`, 'system');
+    restartAttempts.delete(serverId);
+    return;
+  }
+  restartAttempts.set(serverId, attempt);
+  const delayMs = Math.max(1, server.restart_delay_sec || 10) * 1000;
+  const at = Date.now() + delayMs;
+  appendLog(
+    serverId,
+    `[MultiCraft] ${crashed ? 'Crash detected' : 'Process exited'} — auto-restarting in ${delayMs / 1000}s (attempt ${attempt}${max ? ` of ${max}` : ''})`,
+    'system'
+  );
+  const timer = setTimeout(async () => {
+    pendingRestarts.delete(serverId);
+    publish(consoleTopic(serverId), { type: 'auto_restart', pendingAt: null });
+    const current = getServer(serverId);
+    if (!current || current.suspended || running.has(serverId) || !['crashed', 'stopped'].includes(current.status)) return;
+    try {
+      await startServer(serverId, { auto: true });
+    } catch (err) {
+      appendLog(serverId, `[MultiCraft] Auto-restart failed to start: ${err instanceof Error ? err.message : String(err)}`, 'system');
+      maybeScheduleAutoRestart(serverId, true, 0);
+    }
+  }, delayMs);
+  pendingRestarts.set(serverId, { timer, at, attempt });
+  publish(consoleTopic(serverId), { type: 'auto_restart', pendingAt: new Date(at).toISOString(), attempt });
+}
 
 function appendLog(serverId: string, line: string, stream: 'stdout' | 'stderr' | 'system') {
   consoleLog.appendLine(serverId, line, stream);
@@ -85,6 +159,11 @@ export interface LaunchPlan {
   env: Record<string, string>;
   /** Human-readable command line (env values omitted). */
   display: string;
+}
+
+/** Whether a launch would be sandboxed — for the UI preview. */
+export function launchSandboxed(server: ServerRecord): boolean {
+  return sandboxApplies(server);
 }
 
 const splitPlain = (value: string) => (value ? value.split(' ').filter(Boolean) : []);
@@ -120,6 +199,11 @@ export async function buildLaunch(server: ServerRecord): Promise<LaunchPlan> {
   let cmd: string;
   let args: string[];
   let useShell = false;
+
+  if (server.platform === 'docker') {
+    ({ cmd, args } = buildContainerLaunch(server));
+    return { cmd, args, useShell: false, detached: false, cwd: instanceDir(server.id), env, display: [cmd, ...args].join(' ') };
+  }
 
   if (server.platform === 'java') {
     const javaPath = config.javaPath ? expand(config.javaPath) : await findJava();
@@ -196,7 +280,7 @@ function resolveReadyRegex(server: ServerRecord, config: LaunchConfig): RegExp |
   }
   if (server.platform === 'java') return JAVA_READY_RE;
   if (server.platform === 'bedrock') return BEDROCK_READY_RE;
-  if (server.platform === 'custom') return null;
+  if (server.platform === 'custom' || server.platform === 'docker') return null;
   return findPreset(server.steam_app_id)?.readyRegex ?? null;
 }
 
@@ -208,13 +292,24 @@ function resolveStopStrategy(server: ServerRecord, config: LaunchConfig): StopPl
   if (stop?.kind === 'script') return { kind: 'script', command: stop.command };
   if (server.platform === 'java') return JAVA_STOP;
   if (server.platform === 'bedrock') return BEDROCK_STOP;
-  if (server.platform === 'custom') return CUSTOM_STEAM_STOP;
+  if (server.platform === 'custom' || server.platform === 'docker') return CUSTOM_STEAM_STOP; // docker: proxied to the container
   return findPreset(server.steam_app_id)?.stopStrategy ?? CUSTOM_STEAM_STOP;
 }
 
 /** Sends a signal to the instance — to its whole process group when it was spawned detached. */
 function signalInstance(instance: RunningInstance, signal: NodeJS.Signals) {
   const pid = instance.child.pid;
+  // The attached CLI proxies catchable signals into the container, but SIGKILL can't be proxied.
+  if (instance.server.platform === 'docker' && signal === 'SIGKILL') killContainer(instance.server);
+  // Signalling bwrap itself would kill the sandbox and orphan the game — target the game.
+  if (instance.sandboxed && instance.innerPid && !instance.groupKill) {
+    try {
+      process.kill(instance.innerPid, signal);
+      return;
+    } catch {
+      // already gone; fall through
+    }
+  }
   if (instance.groupKill && pid) {
     try {
       process.kill(-pid, signal);
@@ -233,7 +328,7 @@ function runScript(serverId: string, instance: Pick<RunningInstance, 'server' | 
   return new Promise((resolve) => {
     const proc = spawn(process.platform === 'win32' ? line : '/bin/sh', process.platform === 'win32' ? [] : ['-c', line], {
       cwd: instance.cwd,
-      env: { ...process.env, ...launchEnv(instance.server, instance.config) },
+      env: { ...minimalEnv(), ...launchEnv(instance.server, instance.config) },
       shell: process.platform === 'win32',
       windowsHide: true,
     });
@@ -287,8 +382,10 @@ function buildLaunchEnv(server: ServerRecord, dir: string, base: NodeJS.ProcessE
   return { ...base, ...addon.env, LD_LIBRARY_PATH: libPath };
 }
 
-export async function startServer(serverId: string): Promise<void> {
+export async function startServer(serverId: string, options: { auto?: boolean } = {}): Promise<void> {
   if (running.has(serverId)) throw new HttpError(409, 'Server is already running');
+  // A manual start supersedes any scheduled auto-restart and resets its attempt counter.
+  if (!options.auto) cancelAutoRestart(serverId);
   const server = getServer(serverId);
   if (!server) throw new HttpError(404, 'Server not found');
   if (server.suspended) throw new HttpError(423, 'This instance is suspended — lift the suspension before starting it');
@@ -307,13 +404,25 @@ export async function startServer(serverId: string): Promise<void> {
   setServerStatus(serverId, 'starting');
   publish(consoleTopic(serverId), { type: 'status', status: 'starting' });
 
-  const child = spawn(plan.cmd, plan.args, {
+  // The docker/podman *client* needs the panel's full environment (XDG_RUNTIME_DIR, DOCKER_HOST…);
+  // the container itself only receives the variables in its config.
+  const baseEnv = server.platform === 'docker' ? ({ ...process.env } as Record<string, string>) : minimalEnv();
+  const env = { ...buildLaunchEnv(server, dir, baseEnv), ...plan.env } as Record<string, string>;
+  const sandboxed = sandboxApplies(server);
+  const target = sandboxed ? wrapInSandbox(server, { cmd: plan.cmd, args: plan.args, cwd: plan.cwd, env }) : { cmd: plan.cmd, args: plan.args };
+  if (sandboxed) {
+    appendLog(serverId, `[MultiCraft] Sandboxed (bubblewrap): only ${dir} is writable; the rest of the host's files are read-only system folders or hidden`, 'system');
+  }
+
+  const child = spawn(target.cmd, target.args, {
     cwd: plan.cwd,
     windowsHide: true,
-    shell: plan.useShell,
+    shell: plan.useShell && !sandboxed,
     detached: plan.detached,
-    env: { ...buildLaunchEnv(server, dir, { ...process.env }), ...plan.env },
-  });
+    env,
+    // fd 3 carries bwrap's {"child-pid": …} report
+    stdio: sandboxed ? ['pipe', 'pipe', 'pipe', 'pipe'] : ['pipe', 'pipe', 'pipe'],
+  }) as unknown as ChildProcessWithoutNullStreams;
 
   const readyRegex = resolveReadyRegex(server, config);
   const instance: RunningInstance = {
@@ -325,11 +434,23 @@ export async function startServer(serverId: string): Promise<void> {
     stopStrategy: resolveStopStrategy(server, config),
     stopTimeoutMs: (config.stopTimeoutSec ?? DEFAULT_STOP_TIMEOUT_MS / 1000) * 1000,
     groupKill: plan.detached,
+    innerPid: null,
+    sandboxed,
     server,
     config,
     cwd: plan.cwd,
   };
   running.set(serverId, instance);
+  if (sandboxed) {
+    let info = '';
+    const fd3 = (child as unknown as { stdio: (NodeJS.ReadableStream | null)[] }).stdio[3];
+    fd3?.on('data', (chunk: Buffer) => {
+      info += chunk.toString();
+      const m = info.match(/"child-pid":\s*(\d+)/);
+      if (m) instance.innerPid = Number(m[1]);
+    });
+  }
+  void upnpOnStart(server);
 
   if (readyRegex === null) {
     // No known "ready" log line for this game — mark it running as soon as we know the process
@@ -370,11 +491,39 @@ export async function startServer(serverId: string): Promise<void> {
     setServerStatus(serverId, finalStatus);
     appendLog(serverId, `[MultiCraft] Process exited (code ${code ?? 'null'}, signal ${signal ?? 'none'})`, 'system');
     publish(consoleTopic(serverId), { type: 'status', status: finalStatus });
+    void upnpOnStop(serverId);
+    if (!wasManual) maybeScheduleAutoRestart(serverId, code !== 0, Date.now() - instance.startedAt);
   });
 
+  let prevContainer: { at: number; netRx: number | null; netTx: number | null; read: number | null; write: number | null; baseRx: number | null; baseTx: number | null } | null = null;
   instance.statsTimer = setInterval(async () => {
     if (!child.pid) return;
-    const stats = await readProcessStats(child.pid);
+    let stats: ProcessStats;
+    if (server.platform === 'docker') {
+      // Container processes aren't children of the CLI — ask the engine (per-container network included).
+      const s = await sampleContainer(server);
+      if (!s) return;
+      const now = Date.now();
+      const secs = prevContainer ? (now - prevContainer.at) / 1000 : 0;
+      const rate = (cur: number | null, prev: number | null | undefined) => (cur === null || prev == null || secs <= 0 ? null : Math.max(0, Math.round((cur - prev) / secs)));
+      const baseRx = prevContainer?.baseRx ?? s.netRx;
+      const baseTx = prevContainer?.baseTx ?? s.netTx;
+      stats = {
+        memoryMb: s.memoryMb,
+        cpuPercent: s.cpuPercent,
+        diskReadBytes: s.blockRead,
+        diskWriteBytes: s.blockWrite,
+        diskReadRate: rate(s.blockRead, prevContainer?.read),
+        diskWriteRate: rate(s.blockWrite, prevContainer?.write),
+        netRxBytes: s.netRx,
+        netTxBytes: s.netTx,
+        netRxRate: rate(s.netRx, prevContainer?.netRx),
+        netTxRate: rate(s.netTx, prevContainer?.netTx),
+      };
+      prevContainer = { at: now, netRx: s.netRx, netTx: s.netTx, read: s.blockRead, write: s.blockWrite, baseRx, baseTx };
+    } else {
+      stats = await readProcessStats(child.pid);
+    }
     instance.lastStats = stats;
     publish(consoleTopic(serverId), { type: 'stats', ...stats });
   }, STATS_INTERVAL_MS);
@@ -382,7 +531,11 @@ export async function startServer(serverId: string): Promise<void> {
 
 export function stopServer(serverId: string, options: { force?: boolean } = {}): void {
   const instance = running.get(serverId);
-  if (!instance) throw new HttpError(409, 'Server is not running');
+  if (!instance) {
+    // "Stop" on a crashed instance that's waiting to auto-restart cancels the restart.
+    if (cancelAutoRestart(serverId, 'stopped from the panel')) return;
+    throw new HttpError(409, 'Server is not running');
+  }
   instance.manualStop = true;
 
   if (options.force) {
@@ -455,7 +608,10 @@ export function getLogBuffer(serverId: string): string[] {
 
 /** Called at server shutdown so child MC processes don't become orphaned. */
 export function stopAllForShutdown(): void {
+  shuttingDown = true;
+  for (const timer of pendingRestarts.values()) clearTimeout(timer.timer);
   for (const [serverId, instance] of running) {
+    instance.manualStop = true;
     try {
       issueStop(serverId, instance);
     } catch {

@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useServerDetail } from './ServerContext.js';
 import { api, ApiError } from '../../api/client.js';
-import type { PropertyEntry } from '../../api/types.js';
-import { Button, Card, ErrorText, Field, Input } from '../../components/ui.js';
+import type { PropertyEntry, RestartPolicy } from '../../api/types.js';
+import { Button, Card, ErrorText, Field, Input, Select } from '../../components/ui.js';
 import { InstanceAdminCards } from './AdminCards.js';
 import { LaunchCard } from './LaunchCard.js';
+import { DockerCard } from './DockerCard.js';
+import { IsolationCard } from './IsolationCard.js';
 import { isMinecraftPlatform } from '../../api/types.js';
 
 export function SettingsTab() {
@@ -17,6 +19,9 @@ export function SettingsTab() {
   const [extraJavaArgs, setExtraJavaArgs] = useState('');
   const [extraArgs, setExtraArgs] = useState('');
   const [autoStart, setAutoStart] = useState(false);
+  const [restartPolicy, setRestartPolicy] = useState<RestartPolicy>('never');
+  const [restartDelaySec, setRestartDelaySec] = useState(10);
+  const [restartMaxAttempts, setRestartMaxAttempts] = useState(0);
   const [serverIp, setServerIp] = useState('');
   const [steamLogin, setSteamLogin] = useState('anonymous');
   const [steamExtraFlags, setSteamExtraFlags] = useState('');
@@ -33,6 +38,9 @@ export function SettingsTab() {
     setExtraJavaArgs(server.extra_java_args);
     setExtraArgs(server.extra_args);
     setAutoStart(!!server.auto_start);
+    setRestartPolicy(server.restart_policy ?? 'never');
+    setRestartDelaySec(server.restart_delay_sec ?? 10);
+    setRestartMaxAttempts(server.restart_max_attempts ?? 0);
     setSteamLogin(server.steam_login || 'anonymous');
     setSteamExtraFlags(server.steam_extra_flags || '');
     if (server.platform === 'java') {
@@ -56,6 +64,9 @@ export function SettingsTab() {
         extraJavaArgs,
         extraArgs,
         autoStart,
+        restartPolicy,
+        restartDelaySec,
+        restartMaxAttempts,
         ...(server!.platform === 'steam' ? { steamLogin: steamLogin.trim() || 'anonymous', steamExtraFlags } : {}),
       });
       if (server!.platform === 'java') {
@@ -140,6 +151,51 @@ export function SettingsTab() {
           <input type="checkbox" checked={autoStart} onChange={(e) => setAutoStart(e.target.checked)} disabled={!canWrite} />
           Automatically start this instance when the panel boots
         </label>
+
+        <div className="mt-5 rounded-2xl bg-surface-900 p-4">
+          <p className="mb-1 text-sm font-medium text-ink-100">Automatic restart</p>
+          <p className="mb-3 text-xs text-ink-400">
+            Bring the instance back up when its process stops on its own. Stopping it from the panel never triggers a restart, and
+            pressing Stop while a restart is pending cancels it.
+          </p>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <Field label="Restart when it">
+              <Select value={restartPolicy} onChange={(e) => setRestartPolicy(e.target.value as RestartPolicy)} disabled={!canWrite}>
+                <option value="never">Never restart automatically</option>
+                <option value="on-crash">Crashes or fails (non-zero exit / killed)</option>
+                <option value="always">Stops for any reason (incl. in-game stop)</option>
+              </Select>
+            </Field>
+            <Field label="Wait before restarting (seconds)">
+              <Input
+                type="number"
+                min={1}
+                max={3600}
+                value={restartDelaySec}
+                onChange={(e) => setRestartDelaySec(Number(e.target.value))}
+                disabled={!canWrite || restartPolicy === 'never'}
+              />
+            </Field>
+            <Field label="Give up after (attempts, 0 = never)">
+              <Input
+                type="number"
+                min={0}
+                max={10000}
+                value={restartMaxAttempts}
+                onChange={(e) => setRestartMaxAttempts(Number(e.target.value))}
+                disabled={!canWrite || restartPolicy === 'never'}
+              />
+            </Field>
+          </div>
+          {restartPolicy !== 'never' && (
+            <p className="mt-3 text-xs text-ink-500">
+              {restartMaxAttempts === 0
+                ? 'It keeps restarting for as long as it keeps stopping.'
+                : `It stops trying after ${restartMaxAttempts} restart${restartMaxAttempts === 1 ? '' : 's'} in a row.`}{' '}
+              A run of 10 minutes or more counts as healthy and resets the count.
+            </p>
+          )}
+        </div>
         <p className="mt-2 text-xs text-ink-500">
           Memory and argument changes take effect the next time the server starts.
         </p>
@@ -154,7 +210,8 @@ export function SettingsTab() {
         )}
       </Card>
 
-      <LaunchCard />
+      {server.platform === 'docker' ? <DockerCard /> : <LaunchCard />}
+      <IsolationCard />
 
       {!isMinecraftPlatform(server.platform) ? (
         <Card className="p-5">

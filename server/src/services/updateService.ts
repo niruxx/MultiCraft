@@ -1,3 +1,4 @@
+import { pullImage } from './containerService.js';
 import fs from 'node:fs';
 import path from 'node:path';
 import AdmZip from 'adm-zip';
@@ -24,6 +25,17 @@ export interface UpdateCheckResult {
 }
 
 export async function checkForUpdate(server: ServerRecord): Promise<UpdateCheckResult> {
+  if (server.platform === 'docker') {
+    return {
+      currentVersion: server.version,
+      currentBuild: null,
+      latestVersion: server.version,
+      latestBuild: null,
+      updateAvailable: true,
+      note: 'Updating pulls the image tag again; the new image is used from the next start.',
+    };
+  }
+
   if (server.platform === 'custom') {
     return {
       currentVersion: server.version,
@@ -148,6 +160,11 @@ export async function performUpdate(
 ): Promise<UpdateResult> {
   const dir = instanceDir(server.id);
   if (server.platform === 'custom') throw new Error('Custom instances have no managed updates');
+  if (server.platform === 'docker') {
+    await pullImage(server.version, (line) => onLog?.(line));
+    onProgress?.(100, 'Image pulled');
+    return { version: server.version, build: null, jarFile: null };
+  }
 
   if (server.platform === 'steam') {
     if (!server.steam_app_id) throw new Error('This server has no Steam App ID recorded');

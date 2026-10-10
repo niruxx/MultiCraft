@@ -1,3 +1,4 @@
+import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -50,4 +51,50 @@ export function safeJoin(base: string, relative: string): string {
     throw new Error('Path escapes the allowed directory');
   }
   return target;
+}
+
+/**
+ * Like safeJoin, but also follows symlinks: the deepest part of the path that exists on disk
+ * must *really* live inside `base`. Game servers, plugins and scripts can create symlinks in their
+ * own folder (`ln -s / escape`); a lexical check alone would let the panel follow them out.
+ * Broken symlinks are rejected, since where they'd lead can't be verified.
+ */
+export function safeJoinReal(base: string, relative: string): string {
+  const target = safeJoin(base, relative);
+  let realBase: string;
+  try {
+    realBase = fs.realpathSync(base);
+  } catch {
+    return target; // base doesn't exist yet — nothing under it can be a symlink
+  }
+  let probe = target;
+  for (;;) {
+    try {
+      fs.lstatSync(probe);
+      break;
+    } catch {
+      if (probe === base || path.dirname(probe) === probe) return target;
+      probe = path.dirname(probe);
+    }
+  }
+  let real: string;
+  try {
+    real = fs.realpathSync(probe);
+  } catch {
+    throw new Error('Path goes through a broken symlink');
+  }
+  if (real !== realBase && !real.startsWith(realBase + path.sep)) {
+    throw new Error('Path escapes the allowed directory through a symlink');
+  }
+  return target;
+}
+
+/** True when `relative` is a symlink itself (lexically inside base) — e.g. so it can be deleted
+ *  without following it. */
+export function isSymlinkAt(base: string, relative: string): boolean {
+  try {
+    return fs.lstatSync(safeJoin(base, relative)).isSymbolicLink();
+  } catch {
+    return false;
+  }
 }
