@@ -80,7 +80,7 @@ export function OperatorTab() {
   const isJava = server?.platform === 'java';
 
   return (
-    <div className="space-y-6">
+    <div className="stagger space-y-6">
       {!running && (
         <p className="rounded-lg border border-yellow-500/30 bg-yellow-500/10 px-3 py-2 text-sm text-yellow-400">
           Start the server to use operator tools — these actions run through the live console.

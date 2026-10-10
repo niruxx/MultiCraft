@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { api, ApiError } from '../api/client.js';
-import type { Loader, Platform, ServerRecord, SteamGameOption, VersionOption } from '../api/types.js';
+import type { LaunchConfig, Loader, Platform, ServerRecord, SteamGameOption, VersionOption } from '../api/types.js';
+import { useAuth } from '../state/AuthContext.js';
+import { LaunchEditor, cleanLaunchConfig } from './LaunchEditor.js';
 import { Button, ErrorText, Field, Input, Modal, Select, Spinner } from './ui.js';
 
 const LOADERS_BY_PLATFORM: Record<Platform, { value: Loader; label: string }[]> = {
@@ -12,11 +14,15 @@ const LOADERS_BY_PLATFORM: Record<Platform, { value: Loader; label: string }[]> 
   ],
   bedrock: [{ value: 'bedrock', label: 'Bedrock Dedicated Server' }],
   steam: [{ value: 'steam', label: 'Steam Dedicated Server' }],
+  custom: [{ value: 'custom', label: 'Custom' }],
 };
 
 const CUSTOM_STEAM_GAME = '__custom__';
 
 export function CreateServerModal({ open, onClose, onCreated }: { open: boolean; onClose: () => void; onCreated: (s: ServerRecord) => void }) {
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
+  const [launch, setLaunch] = useState<LaunchConfig>({ executable: 'start.sh', stop: { kind: 'signal', signal: 'SIGTERM' } });
   const [name, setName] = useState('');
   const [platform, setPlatform] = useState<Platform>('java');
   const [loader, setLoader] = useState<Loader>('vanilla');
@@ -38,7 +44,7 @@ export function CreateServerModal({ open, onClose, onCreated }: { open: boolean;
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open || platform === 'custom') return;
     setLoadingVersions(true);
     setVersion('');
     api
@@ -50,7 +56,7 @@ export function CreateServerModal({ open, onClose, onCreated }: { open: boolean;
       })
       .catch(() => setVersions([]))
       .finally(() => setLoadingVersions(false));
-  }, [loader, open]);
+  }, [loader, open, platform]);
 
   useEffect(() => {
     if (!open || platform !== 'steam') return;
@@ -67,7 +73,7 @@ export function CreateServerModal({ open, onClose, onCreated }: { open: boolean;
   }, [platform, open]);
 
   useEffect(() => {
-    setServerPort(platform === 'bedrock' ? 19132 : 25565);
+    setServerPort(platform === 'bedrock' ? 19132 : platform === 'custom' ? 27015 : 25565);
     setLoader(LOADERS_BY_PLATFORM[platform][0].value);
   }, [platform]);
 
@@ -82,7 +88,8 @@ export function CreateServerModal({ open, onClose, onCreated }: { open: boolean;
   async function submit() {
     setError('');
     if (!name.trim()) return setError('Instance name is required');
-    if (!version) return setError('Choose a version');
+    if (platform === 'custom' && !launch.executable?.trim()) return setError('Enter the executable, script or command to launch');
+    if (platform !== 'custom' && !version) return setError('Choose a version');
     if (platform === 'java' && !acceptEula) return setError("You must accept Mojang's EULA");
     if (platform === 'steam' && steamGameChoice === CUSTOM_STEAM_GAME) {
       if (!/^\d+$/.test(customAppId.trim())) return setError('Enter a numeric Steam App ID');
@@ -94,7 +101,7 @@ export function CreateServerModal({ open, onClose, onCreated }: { open: boolean;
         name: name.trim(),
         platform,
         loader,
-        version,
+        version: platform === 'custom' ? 'custom' : version,
         minMemoryMb,
         maxMemoryMb,
         serverPort,
@@ -103,6 +110,7 @@ export function CreateServerModal({ open, onClose, onCreated }: { open: boolean;
         customExecutable: platform === 'steam' && !selectedSteamGame ? customExecutable.trim() : undefined,
         steamLogin: platform === 'steam' ? steamLogin.trim() || 'anonymous' : undefined,
         steamExtraFlags: platform === 'steam' ? steamExtraFlags.trim() : undefined,
+        launch: platform === 'custom' ? cleanLaunchConfig(launch) : undefined,
       });
       onCreated(server);
       onClose();
@@ -116,9 +124,9 @@ export function CreateServerModal({ open, onClose, onCreated }: { open: boolean;
   }
 
   return (
-    <Modal open={open} onClose={onClose} title="Create a new instance">
+    <Modal open={open} onClose={onClose} title="Create a new instance" size={platform === 'custom' ? 'lg' : 'md'}>
       <div className="space-y-4">
-        <Field label="Server name">
+        <Field label="Instance name">
           <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="My Survival Server" autoFocus />
         </Field>
 
@@ -128,9 +136,10 @@ export function CreateServerModal({ open, onClose, onCreated }: { open: boolean;
               <option value="java">Minecraft: Java Edition</option>
               <option value="bedrock">Minecraft: Bedrock Edition</option>
               <option value="steam">Steam Dedicated Server</option>
+              {isAdmin && <option value="custom">Custom server (binary or shell script)</option>}
             </Select>
           </Field>
-          {platform !== 'steam' && (
+          {(platform === 'java' || platform === 'bedrock') && (
             <Field label="Server software">
               <Select value={loader} onChange={(e) => setLoader(e.target.value as Loader)}>
                 {LOADERS_BY_PLATFORM[platform].map((l) => (
@@ -221,7 +230,17 @@ export function CreateServerModal({ open, onClose, onCreated }: { open: boolean;
           </div>
         )}
 
-        {platform !== 'steam' && (
+        {platform === 'custom' && (
+          <div className="space-y-3">
+            <p className="rounded-2xl bg-tertiary-container px-3 py-2 text-xs text-tertiary-on-container">
+              Runs any Linux server binary or shell script as the panel's user. After creating it, upload your server files in File
+              Management (or point at an absolute path), then start it. Everything here can be changed later under Configuration → Launch.
+            </p>
+            <LaunchEditor value={launch} onChange={setLaunch} platform="custom" isAdmin={isAdmin} />
+          </div>
+        )}
+
+        {(platform === 'java' || platform === 'bedrock') && (
           <Field label="Version">
             {loadingVersions ? (
               <div className="flex items-center gap-2 text-sm text-ink-400">
@@ -248,7 +267,7 @@ export function CreateServerModal({ open, onClose, onCreated }: { open: boolean;
           </p>
         )}
 
-        <div className={platform === 'steam' ? 'grid grid-cols-1 gap-3' : 'grid grid-cols-3 gap-3'}>
+        <div className={platform === 'steam' ? 'grid grid-cols-1 gap-3' : 'grid grid-cols-1 gap-3 sm:grid-cols-3'}>
           {platform !== 'steam' && (
             <>
               <Field label="Min memory (MB)">

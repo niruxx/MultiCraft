@@ -24,6 +24,17 @@ export interface UpdateCheckResult {
 }
 
 export async function checkForUpdate(server: ServerRecord): Promise<UpdateCheckResult> {
+  if (server.platform === 'custom') {
+    return {
+      currentVersion: server.version,
+      currentBuild: null,
+      latestVersion: server.version,
+      latestBuild: null,
+      updateAvailable: false,
+      note: 'Custom instances run your own files — update them through File Management.',
+    };
+  }
+
   if (server.platform === 'steam') {
     // steamcmd has no cheap "is a newer build available" query short of a full app_update run —
     // always offer to re-run it, same precedent as Spigot's no-version-tracked-builds case.
@@ -136,6 +147,7 @@ export async function performUpdate(
   onLog?: LogFn
 ): Promise<UpdateResult> {
   const dir = instanceDir(server.id);
+  if (server.platform === 'custom') throw new Error('Custom instances have no managed updates');
 
   if (server.platform === 'steam') {
     if (!server.steam_app_id) throw new Error('This server has no Steam App ID recorded');

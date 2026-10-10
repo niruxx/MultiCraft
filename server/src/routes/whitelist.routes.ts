@@ -11,7 +11,7 @@ import {
   whitelistCommand,
 } from '../services/whitelistService.js';
 import { logAudit } from '../services/userService.js';
-import { isSteamPlatform, type Role } from '../types/index.js';
+import { isMinecraftPlatform } from '../types/index.js';
 
 export const whitelistRouter = Router({ mergeParams: true });
 whitelistRouter.use(requireAuth, requireServerAccess());
@@ -20,7 +20,7 @@ whitelistRouter.use(requireAuth, requireServerAccess());
 function requireServer(serverId: string) {
   const server = getServer(serverId);
   if (!server) throw new HttpError(404, 'Server not found');
-  if (isSteamPlatform(server.platform)) throw new HttpError(400, 'Steam-platform servers have no allowlist concept');
+  if (!isMinecraftPlatform(server.platform)) throw new HttpError(400, 'Only Minecraft instances have an allowlist concept');
   return server;
 }
 

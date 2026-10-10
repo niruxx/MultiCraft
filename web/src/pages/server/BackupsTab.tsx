@@ -342,7 +342,7 @@ export function BackupsTab() {
   }
 
   return (
-    <div className="space-y-5">
+    <div className="stagger space-y-5">
       <ErrorText>{error}</ErrorText>
 
       <Card className="p-5">

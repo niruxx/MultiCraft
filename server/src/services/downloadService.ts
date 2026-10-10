@@ -56,6 +56,28 @@ export function runStreamed(cmd: string, args: string[], cwd: string, onLog?: Lo
 }
 
 /** Lists installable versions for a given loader, newest first. */
+const isPrerelease = (v: string) => /-(rc|pre|beta|alpha|snapshot)/i.test(v);
+
+/** Orders by version number (newest first), stable before pre-release of the same number. */
+export function compareVersionsDesc(a: string, b: string): number {
+  const nums = (v: string) => v.split('-')[0].split('.').map((n) => Number(n) || 0);
+  const [x, y] = [nums(a), nums(b)];
+  for (let i = 0; i < Math.max(x.length, y.length); i++) {
+    const d = (y[i] ?? 0) - (x[i] ?? 0);
+    if (d) return d;
+  }
+  if (isPrerelease(a) !== isPrerelease(b)) return isPrerelease(a) ? 1 : -1;
+  return b.localeCompare(a, undefined, { numeric: true });
+}
+
+/** Sorts a version list newest-first and recommends the newest stable release. Doesn't depend on
+ *  the upstream API's own ordering (PaperMC's flipped between API versions). */
+function newestFirst(versions: string[]): VersionOption[] {
+  const sorted = [...new Set(versions)].sort(compareVersionsDesc);
+  const recommended = sorted.find((v) => !isPrerelease(v)) ?? sorted[0];
+  return sorted.map((v) => ({ version: v, recommended: v === recommended }));
+}
+
 export async function listAvailableVersions(loader: Loader): Promise<VersionOption[]> {
   if (loader === 'vanilla' || loader === 'spigot') {
     const manifest = await fetchJson<{
@@ -68,12 +90,11 @@ export async function listAvailableVersions(loader: Loader): Promise<VersionOpti
   }
   if (loader === 'paper') {
     const data = await fetchJson<{ versions: Record<string, string[]> }>(`${PAPER_API}/paper`);
-    const versions = Object.values(data.versions).flat();
-    return versions.map((v, i) => ({ version: v, recommended: i === versions.length - 1 })).reverse();
+    return newestFirst(Object.values(data.versions).flat());
   }
   if (loader === 'purpur') {
     const data = await fetchJson<{ versions: string[] }>(PURPUR_API);
-    return data.versions.map((v, i) => ({ version: v, recommended: i === data.versions.length - 1 })).reverse();
+    return newestFirst(data.versions);
   }
   if (loader === 'bedrock') {
     // Bedrock dedicated server only ships the latest build; expose it as a single "latest" option.

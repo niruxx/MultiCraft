@@ -301,7 +301,7 @@ export function ConfigurationPage() {
   const isAdmin = user?.role === 'admin';
   return (
     <Layout>
-      <div className="mx-auto max-w-5xl space-y-5 px-4 py-8 sm:px-8">
+      <div className="stagger mx-auto max-w-5xl space-y-5 px-4 py-8 sm:px-8">
         <PageHeader title="Configuration" subtitle="Panel-wide settings for this MultiCraft host." />
         <HostCard />
         {isAdmin ? (

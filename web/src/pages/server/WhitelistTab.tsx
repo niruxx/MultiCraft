@@ -73,7 +73,7 @@ export function WhitelistTab() {
   const label = server?.platform === 'bedrock' ? 'allowlist' : 'whitelist';
 
   return (
-    <div className="space-y-6">
+    <div className="stagger space-y-6">
       <Card className="p-5">
         <div className="flex items-center justify-between">
           <div>

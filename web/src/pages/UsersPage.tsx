@@ -284,6 +284,7 @@ const PERMISSION_GROUPS: { label: string; items: { key: ServerPermission; label:
     items: [
       { key: 'settings', label: 'Edit configuration' },
       { key: 'update', label: 'Update version' },
+      { key: 'launch', label: 'Edit launch command' },
     ],
   },
 ];
@@ -291,7 +292,8 @@ const PERMISSION_GROUPS: { label: string; items: { key: ServerPermission; label:
 const ALL_PERMISSIONS = PERMISSION_GROUPS.flatMap((g) => g.items.map((i) => i.key));
 
 function roleDefaults(role: Role): ServerPermission[] {
-  return role === 'viewer' ? ['files.read'] : ALL_PERMISSIONS;
+  // 'launch' lets someone run any program on the host, so it's never on by default.
+  return role === 'viewer' ? ['files.read'] : ALL_PERMISSIONS.filter((p) => p !== 'launch');
 }
 
 /** Pick any number of instances; each gets the role's defaults or its own permission set. */

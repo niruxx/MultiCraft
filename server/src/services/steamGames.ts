@@ -2,7 +2,7 @@ import type { ServerRecord } from '../types/index.js';
 
 export type StopStrategy =
   | { kind: 'stdin'; commands: string[]; delayMs: number }
-  | { kind: 'signal'; signal: 'SIGINT' | 'SIGTERM' }
+  | { kind: 'signal'; signal: 'SIGINT' | 'SIGTERM' | 'SIGQUIT' | 'SIGHUP' }
   | { kind: 'none' };
 
 export interface SteamGamePreset {

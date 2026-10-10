@@ -18,6 +18,7 @@ export interface CreateServerInput {
   steamAppId?: string | null;
   steamLogin?: string;
   steamExtraFlags?: string;
+  launchConfig?: string | null;
 }
 
 export function createServerRecord(input: CreateServerInput): ServerRecord {
@@ -26,8 +27,8 @@ export function createServerRecord(input: CreateServerInput): ServerRecord {
   fs.mkdirSync(backupDir(id), { recursive: true });
   prep(
     `INSERT INTO servers
-      (id, name, platform, loader, version, min_memory_mb, max_memory_mb, server_port, extra_java_args, extra_args, status, created_by, steam_app_id, steam_login, steam_extra_flags)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'installing', ?, ?, ?, ?)`
+      (id, name, platform, loader, version, min_memory_mb, max_memory_mb, server_port, extra_java_args, extra_args, status, created_by, steam_app_id, steam_login, steam_extra_flags, launch_config)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'installing', ?, ?, ?, ?, ?)`
   ).run(
     id,
     input.name,
@@ -42,7 +43,8 @@ export function createServerRecord(input: CreateServerInput): ServerRecord {
     input.createdBy,
     input.steamAppId ?? null,
     input.steamLogin ?? 'anonymous',
-    input.steamExtraFlags ?? ''
+    input.steamExtraFlags ?? '',
+    input.launchConfig ?? null
   );
   return getServer(id)!;
 }
@@ -131,4 +133,8 @@ export function applyTransferredFields(
     fields.extra_args,
     id
   );
+}
+
+export function setLaunchConfig(id: string, launchConfig: string | null) {
+  prep('UPDATE servers SET launch_config = ? WHERE id = ?').run(launchConfig, id);
 }

@@ -4,7 +4,7 @@ import type { ServerRecord } from '../api/types.js';
  * Small emblems that identify which game an instance runs. These are original, simplified
  * illustrations (a grass block, a horned helmet, …) — not the games' trademarked logos.
  */
-type DrawnKind = 'minecraft-java' | 'minecraft-bedrock' | 'palworld' | 'valheim' | 'zomboid' | 'terraria' | 'quake' | 'steam';
+type DrawnKind = 'minecraft-java' | 'minecraft-bedrock' | 'palworld' | 'valheim' | 'zomboid' | 'terraria' | 'quake' | 'custom' | 'steam';
 
 /** Games identified by a generic emblem: a crosshair for shooters, otherwise a short monogram. */
 interface MarkedGame {
@@ -61,12 +61,14 @@ const DRAWN_LABEL: Record<DrawnKind, string> = {
   zomboid: 'Project Zomboid',
   terraria: 'Terraria',
   quake: 'Quake Live',
+  custom: 'Custom server',
   steam: 'Steam dedicated server',
 };
 
 export function gameKindOf(server: Pick<ServerRecord, 'platform' | 'steam_app_id'>): GameKind {
   if (server.platform === 'java') return 'minecraft-java';
   if (server.platform === 'bedrock') return 'minecraft-bedrock';
+  if (server.platform === 'custom') return 'custom';
   const appId = server.steam_app_id ?? '';
   if (DRAWN_APP[appId]) return DRAWN_APP[appId];
   if (QUAKE_APP_IDS.has(appId)) return 'quake';
@@ -92,6 +94,7 @@ const TILE: Record<DrawnKind, string> = {
   zomboid: 'from-[#3d1717] to-[#220d0d]',
   terraria: 'from-[#1d3557] to-[#122036]',
   quake: 'from-[#3a1d12] to-[#1c0d08]',
+  custom: 'from-[#20262b] to-[#0f1316]',
   steam: 'from-[#22303f] to-[#141c26]',
 };
 
@@ -200,6 +203,15 @@ function Emblem({ kind }: { kind: GameKind }) {
         <g>
           <circle cx="16" cy="16" r="10" fill="none" stroke="#c46a2c" strokeWidth="2.2" />
           <path d="M17.5 7l-6 10h4.5l-1.5 8 6.5-11h-4.6z" fill="#e8893a" />
+        </g>
+      );
+    case 'custom':
+      // Terminal prompt
+      return (
+        <g>
+          <rect x="5" y="7" width="22" height="18" rx="3" fill="#0b0f0c" stroke="#5f6b62" strokeWidth="1.4" />
+          <path d="M9.5 13l3.5 3-3.5 3" fill="none" stroke="#78dc77" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          <path d="M15 19.5h6.5" stroke="#78dc77" strokeWidth="2" strokeLinecap="round" />
         </g>
       );
     default:

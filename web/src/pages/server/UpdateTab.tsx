@@ -67,7 +67,7 @@ export function UpdateTab() {
   const preserved = PRESERVED_BY_PLATFORM[server.platform] ?? [];
 
   return (
-    <div className="space-y-6">
+    <div className="stagger space-y-6">
       <Card className="p-5">
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-base font-medium text-ink-100">Version status</h2>

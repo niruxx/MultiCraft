@@ -74,6 +74,7 @@ const PERMISSION_LABEL: Record<ServerPermission, string> = {
   players: 'Manage players',
   settings: 'Edit configuration',
   update: 'Update server',
+  launch: 'Edit launch command',
 };
 
 /** Throws 403 unless the signed-in user holds `permission` on the instance in the route. */

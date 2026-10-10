@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { useServerDetail } from './ServerContext.js';
 import { useConsoleSocket } from '../../hooks/useConsoleSocket.js';
 import { useEndpoint } from '../../hooks/useEndpoint.js';
@@ -6,11 +6,7 @@ import { api, ApiError } from '../../api/client.js';
 import type { ResourcesInfo } from '../../api/types.js';
 import { Card, CardTitle, Notice, Skeleton } from '../../components/ui.js';
 import { Icon, type IconName } from '../../components/icons.js';
-
-interface ChartPoint {
-  t: number;
-  value: number;
-}
+import { Sparkline, type ChartPoint } from '../../components/charts.js';
 
 function formatUptime(ms: number): string {
   const s = Math.floor(ms / 1000);
@@ -47,89 +43,6 @@ const COLORS = {
   diskRead: '#c3c0ff',
   diskWrite: '#ffb4ab',
 };
-
-/** A single-series magnitude-over-time sparkline: thin 2px line, rounded end, hover crosshair + tooltip. */
-function Sparkline({
-  data,
-  color,
-  formatValue,
-  emptyLabel,
-}: {
-  data: ChartPoint[];
-  color: string;
-  formatValue: (v: number) => string;
-  emptyLabel: string;
-}) {
-  const width = 100; // viewBox units; scales responsively via SVG width=100%
-  const height = 48;
-  const pad = 3;
-  const [hoverIdx, setHoverIdx] = useState<number | null>(null);
-  const svgRef = useRef<SVGSVGElement>(null);
-
-  const values = data.map((d) => d.value);
-  if (values.length < 2) {
-    return <div className="flex h-12 items-center text-xs text-ink-600">{emptyLabel}</div>;
-  }
-
-  const max = Math.max(1, ...values);
-  const points = values.map((v, i) => {
-    const x = pad + (i / (values.length - 1)) * (width - pad * 2);
-    const y = height - pad - (v / max) * (height - pad * 2);
-    return [x, y] as const;
-  });
-  const linePath = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${p[0].toFixed(2)},${p[1].toFixed(2)}`).join(' ');
-  const areaPath = `${linePath} L${points[points.length - 1][0].toFixed(2)},${height - pad} L${pad},${height - pad} Z`;
-  const last = points[points.length - 1];
-  const hover = hoverIdx !== null ? points[hoverIdx] : null;
-
-  function onMove(e: React.MouseEvent<SVGSVGElement>) {
-    const rect = svgRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    const relX = ((e.clientX - rect.left) / rect.width) * width;
-    let nearest = 0;
-    let bestDist = Infinity;
-    points.forEach(([x], i) => {
-      const d = Math.abs(x - relX);
-      if (d < bestDist) {
-        bestDist = d;
-        nearest = i;
-      }
-    });
-    setHoverIdx(nearest);
-  }
-
-  return (
-    <div className="relative">
-      <svg
-        ref={svgRef}
-        viewBox={`0 0 ${width} ${height}`}
-        preserveAspectRatio="none"
-        className="h-12 w-full cursor-crosshair"
-        onMouseMove={onMove}
-        onMouseLeave={() => setHoverIdx(null)}
-      >
-        <defs>
-          <linearGradient id={`grad-${color.replace('#', '')}`} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={color} stopOpacity="0.28" />
-            <stop offset="100%" stopColor={color} stopOpacity="0" />
-          </linearGradient>
-        </defs>
-        <path d={areaPath} fill={`url(#grad-${color.replace('#', '')})`} stroke="none" />
-        <path d={linePath} fill="none" stroke={color} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
-        <circle cx={last[0]} cy={last[1]} r="1.8" fill={color} />
-        {hover && (
-          <line x1={hover[0]} x2={hover[0]} y1={pad} y2={height - pad} stroke="currentColor" strokeWidth="1" className="text-surface-600" vectorEffect="non-scaling-stroke" />
-        )}
-        {hover && <circle cx={hover[0]} cy={hover[1]} r="2.2" fill={color} stroke="black" strokeOpacity="0.4" />}
-      </svg>
-      {hoverIdx !== null && (
-        <div className="pointer-events-none absolute -top-7 rounded-md bg-ink-100 px-2 py-1 text-[11px] font-medium text-[#2e312b] shadow-card" style={{ left: `${(hover![0] / width) * 100}%`, transform: 'translateX(-50%)' }}>
-          {formatValue(values[hoverIdx])}
-        </div>
-      )}
-    </div>
-  );
-}
 
 /** MD3 metric card: icon + label, headline value, supporting line, optional sparkline. */
 function MetricCard({
@@ -254,14 +167,14 @@ export function StatusTab() {
   const dash = '—';
 
   return (
-    <div className="space-y-5">
+    <div className="stagger space-y-5">
       {!running && (
         <Notice tone="warning">The server is stopped — live metrics populate once it's running. Storage figures below are still current.</Notice>
       )}
 
       <ConnectionCard />
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+      <div className="stagger grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
         <MetricCard
           icon="cpu"
           label="CPU load"

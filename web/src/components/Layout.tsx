@@ -23,15 +23,25 @@ export function NavItem({
   onClick?: () => void;
 }) {
   return (
-    <NavLink to={to} end={end} onClick={onClick} className="block">
+    <NavLink to={to} end={end} onClick={onClick} className="group block">
       {({ isActive }) => (
         <span
-          className={`state-layer flex h-12 items-center gap-3 rounded-full px-4 text-sm font-medium transition-colors ${
-            isActive ? 'bg-secondary-container text-secondary-on-container' : 'text-ink-300'
+          className={`state-layer relative flex h-12 items-center gap-3 rounded-full px-4 text-sm font-medium transition-colors duration-200 ${
+            isActive ? 'text-secondary-on-container' : 'text-ink-300'
           }`}
         >
-          <Icon name={icon} className="h-5 w-5" />
-          <span className="truncate">{label}</span>
+          {isActive && (
+            // One shared indicator that slides between items (MD3 navigation drawer).
+            <motion.span
+              layoutId="nav-active-indicator"
+              className="absolute inset-0 rounded-full bg-secondary-container"
+              transition={{ type: 'spring', stiffness: 520, damping: 40 }}
+            />
+          )}
+          <span className="relative z-10 transition-transform duration-200 group-hover:translate-x-0.5">
+            <Icon name={icon} className="h-5 w-5" />
+          </span>
+          <span className="relative z-10 truncate">{label}</span>
         </span>
       )}
     </NavLink>
@@ -44,21 +54,9 @@ export function NavSectionLabel({ children }: { children: ReactNode }) {
 
 function MainNav({ onNavigate }: { onNavigate?: () => void }) {
   const { user } = useAuth();
-  const location = useLocation();
-  // The instance list is "/", but it should also read as active nowhere else.
-  const onInstances = location.pathname === '/';
   return (
     <nav className="space-y-1">
-      <NavLink to="/" end onClick={onNavigate} className="block">
-        <span
-          className={`state-layer flex h-12 items-center gap-3 rounded-full px-4 text-sm font-medium ${
-            onInstances ? 'bg-secondary-container text-secondary-on-container' : 'text-ink-300'
-          }`}
-        >
-          <Icon name="instances" />
-          Instances
-        </span>
-      </NavLink>
+      <NavItem to="/" end icon="instances" label="Instances" onClick={onNavigate} />
       <NavItem to="/configuration" icon="configuration" label="Configuration" onClick={onNavigate} />
       <NavItem to="/files" icon="folder" label="File Management" onClick={onNavigate} />
       {user?.role === 'admin' && <NavItem to="/users" icon="users" label="Users" onClick={onNavigate} />}
@@ -71,7 +69,7 @@ function DrawerFooter({ system }: { system: SystemInfo | null }) {
   const navigate = useNavigate();
   return (
     <div className="mt-auto space-y-3 px-1 pt-4">
-      <div className="flex items-center gap-3 rounded-2xl bg-surface-850 p-3">
+      <motion.div layout className="flex items-center gap-3 rounded-2xl bg-surface-850 p-3 transition-colors hover:bg-surface-800">
         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent-container text-sm font-medium text-accent-on-container">
           {user?.username?.slice(0, 1).toUpperCase()}
         </div>
@@ -90,7 +88,7 @@ function DrawerFooter({ system }: { system: SystemInfo | null }) {
         >
           <Icon name="logout" />
         </button>
-      </div>
+      </motion.div>
       {system && (
         <p className="truncate px-3 text-[11px] text-ink-500" title={`Node ${system.nodeVersion} on ${system.hostname}`}>
           <span className="mr-1.5 inline-block h-1.5 w-1.5 rounded-full bg-accent-400 align-middle" />
@@ -101,6 +99,10 @@ function DrawerFooter({ system }: { system: SystemInfo | null }) {
     </div>
   );
 }
+
+// The drawer remounts with every page; remember which menu was showing so its entrance
+// animation only plays when it actually changes (main menu ↔ an instance's menu).
+let lastNavKey: string | null = null;
 
 /**
  * App shell: MD3 navigation drawer + content. Pages can replace the drawer's navigation with
@@ -121,13 +123,30 @@ export function Layout({ children, sidebar }: { children: ReactNode; sidebar?: (
   useEffect(() => setMobileOpen(false), [location.pathname]);
 
   const close = () => setMobileOpen(false);
+  // /instances/<id>/status → /instances/<id>: subpage changes are animated by the instance view itself.
+  const pageKey = location.pathname.split('/').slice(0, 3).join('/') || '/';
+  const navKey = sidebar ? pageKey : 'main';
+  const [animateNav] = useState(() => {
+    const changed = lastNavKey !== null && lastNavKey !== navKey;
+    lastNavKey = navKey;
+    return changed;
+  });
   const drawer = (
     <div className="flex h-full flex-col px-3 py-4">
       <div className="mb-4 flex items-center gap-3 px-4 py-2">
-        <Logo className="h-8 w-8 shrink-0 rounded-lg" />
+        <motion.div whileHover={{ rotate: -8, scale: 1.06 }} transition={{ type: 'spring', stiffness: 400, damping: 15 }}>
+          <Logo className="h-8 w-8 shrink-0 rounded-lg" />
+        </motion.div>
         <span className="text-lg font-medium tracking-tight text-ink-50">MultiCraft</span>
       </div>
-      <div className="min-h-0 flex-1 overflow-y-auto">{sidebar ? sidebar(close) : <MainNav onNavigate={close} />}</div>
+      <motion.div
+        className="min-h-0 flex-1 overflow-y-auto"
+        initial={animateNav ? { opacity: 0, x: -16 } : false}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ duration: 0.35, ease: [0.2, 0, 0, 1] }}
+      >
+        {sidebar ? sidebar(close) : <MainNav onNavigate={close} />}
+      </motion.div>
       <DrawerFooter system={system} />
     </div>
   );
@@ -163,7 +182,17 @@ export function Layout({ children, sidebar }: { children: ReactNode; sidebar?: (
           <Logo className="h-6 w-6 rounded-md" />
           <span className="font-medium text-ink-50">MultiCraft</span>
         </div>
-        <main className="min-h-0 flex-1 overflow-y-auto">{children}</main>
+        <main className="min-h-0 flex-1 overflow-y-auto">
+          <motion.div
+            key={pageKey}
+            className="min-h-full"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, ease: [0.2, 0, 0, 1] }}
+          >
+            {children}
+          </motion.div>
+        </main>
       </div>
     </div>
   );

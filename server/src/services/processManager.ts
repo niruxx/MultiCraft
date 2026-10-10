@@ -13,16 +13,29 @@ import { logger } from '../utils/logger.js';
 import { HttpError } from '../utils/asyncHandler.js';
 import { findPreset, type StopStrategy } from './steamGames.js';
 import type { ServerRecord } from '../types/index.js';
+import {
+  ensureExecutable,
+  expandVariables,
+  launchConfigOf,
+  launchEnv,
+  launchVariables,
+  resolveExecutable,
+  splitArgs,
+  type LaunchConfig,
+} from './launchConfig.js';
 
 const JAVA_READY_RE = /Done \(/i;
 const BEDROCK_READY_RE = /Server started\./i;
-const GRACEFUL_STOP_TIMEOUT_MS = 60_000;
+const DEFAULT_STOP_TIMEOUT_MS = 60_000;
 const STATS_INTERVAL_MS = 4000;
 
 const JAVA_STOP: StopStrategy = { kind: 'stdin', commands: ['stop'], delayMs: 0 };
 // Preserves Bedrock's existing exact behavior (stdin "stop") — not a signal change.
 const BEDROCK_STOP: StopStrategy = { kind: 'stdin', commands: ['stop'], delayMs: 0 };
 const CUSTOM_STEAM_STOP: StopStrategy = { kind: 'signal', signal: 'SIGTERM' };
+
+/** Built-in strategies plus a user-defined stop script (custom launch configs). */
+type StopPlan = StopStrategy | { kind: 'script'; command: string };
 
 interface RunningInstance {
   child: ChildProcessWithoutNullStreams;
@@ -32,7 +45,13 @@ interface RunningInstance {
   forceKillTimer?: NodeJS.Timeout;
   lastStats: ProcessStats;
   readyRegex: RegExp | null;
-  stopStrategy: StopStrategy;
+  stopStrategy: StopPlan;
+  stopTimeoutMs: number;
+  /** Signals go to the whole process group (custom instances run detached so scripts' children stop too). */
+  groupKill: boolean;
+  server: ServerRecord;
+  config: LaunchConfig;
+  cwd: string;
 }
 
 const running = new Map<string, RunningInstance>();
@@ -55,62 +74,188 @@ function appendLog(serverId: string, line: string, stream: 'stdout' | 'stderr' |
   }
 }
 
-function buildJavaCommand(server: ServerRecord, javaPath: string): { cmd: string; args: string[]; useShell: boolean } {
-  if (!server.jar_file) throw new HttpError(400, 'Server has not finished installing yet');
-  const args = [
-    `-Xms${server.min_memory_mb}M`,
-    `-Xmx${server.max_memory_mb}M`,
-    ...(server.extra_java_args ? server.extra_java_args.split(' ').filter(Boolean) : []),
-    '-jar',
-    server.jar_file,
-    'nogui',
-    ...(server.extra_args ? server.extra_args.split(' ').filter(Boolean) : []),
-  ];
-  return { cmd: javaPath, args, useShell: false };
+/** Everything needed to spawn an instance — also used to preview the command in the UI. */
+export interface LaunchPlan {
+  cmd: string;
+  args: string[];
+  useShell: boolean;
+  /** Spawn detached so signals can target the whole process group. */
+  detached: boolean;
+  cwd: string;
+  env: Record<string, string>;
+  /** Human-readable command line (env values omitted). */
+  display: string;
 }
 
-function buildBedrockCommand(server: ServerRecord, dir: string): { cmd: string; args: string[]; useShell: boolean } {
-  const exeName = process.platform === 'win32' ? 'bedrock_server.exe' : 'bedrock_server';
-  const exePath = path.join(dir, exeName);
-  if (!fs.existsSync(exePath)) {
-    throw new HttpError(400, 'Bedrock server executable not found; the install may have failed');
+const splitPlain = (value: string) => (value ? value.split(' ').filter(Boolean) : []);
+
+function requireFile(filePath: string, what: string) {
+  if (!fs.existsSync(filePath)) throw new HttpError(400, `${what} not found at ${filePath}`);
+}
+
+/** Runs a script file through /bin/sh when it has no shebang (an uploaded start.sh often doesn't). */
+function scriptCommand(exePath: string, args: string[]): { cmd: string; args: string[] } {
+  if (process.platform !== 'win32' && exePath.endsWith('.sh')) {
+    try {
+      const head = fs.readFileSync(exePath, { encoding: 'utf8', flag: 'r' }).slice(0, 2);
+      if (head !== '#!') return { cmd: '/bin/sh', args: [exePath, ...args] };
+    } catch {
+      // fall through; requireFile reports missing files
+    }
   }
+  return { cmd: exePath, args };
+}
+
+export async function buildLaunch(server: ServerRecord): Promise<LaunchPlan> {
+  const dir = instanceDir(server.id);
+  const config = launchConfigOf(server);
+  const vars = launchVariables(server);
+  const expand = (v: string) => expandVariables(v, vars);
+  const customArgs = config.args ? splitArgs(expand(config.args)) : null;
+  const cwd = config.workingDir ? resolveExecutable(server, config.workingDir) : dir;
+  const env = launchEnv(server, config);
+  // In shell mode `executable` is a command line, not a file.
+  const executable = config.executable && !config.useShell ? resolveExecutable(server, expand(config.executable)) : null;
+
+  let cmd: string;
+  let args: string[];
+  let useShell = false;
+
+  if (server.platform === 'java') {
+    const javaPath = config.javaPath ? expand(config.javaPath) : await findJava();
+    if (!javaPath) {
+      throw new HttpError(
+        400,
+        'No Java runtime was found on this machine. Install a Java Runtime Environment (Java 21+ recommended) and ensure `java` is on PATH or JAVA_HOME is set.'
+      );
+    }
+    const jar = executable ?? (server.jar_file ? path.join(dir, server.jar_file) : null);
+    if (!jar) throw new HttpError(400, 'Server has not finished installing yet');
+    requireFile(jar, 'Server jar');
+    cmd = javaPath;
+    args = [
+      `-Xms${server.min_memory_mb}M`,
+      `-Xmx${server.max_memory_mb}M`,
+      ...splitPlain(server.extra_java_args),
+      '-jar',
+      jar,
+      ...(customArgs ?? ['nogui', ...splitPlain(server.extra_args)]),
+    ];
+  } else if (server.platform === 'bedrock') {
+    const exe = executable ?? path.join(dir, process.platform === 'win32' ? 'bedrock_server.exe' : 'bedrock_server');
+    requireFile(exe, 'Bedrock server executable');
+    ({ cmd, args } = scriptCommand(exe, customArgs ?? splitPlain(server.extra_args)));
+  } else if (server.platform === 'steam') {
+    const preset = findPreset(server.steam_app_id);
+    const defaultExe = preset ? (process.platform === 'win32' ? preset.executable.win32 : preset.executable.linux) : server.jar_file;
+    const exe = executable ?? (defaultExe ? path.join(dir, defaultExe) : null);
+    if (!exe) throw new HttpError(400, 'No launch executable is configured for this server');
+    requireFile(exe, 'Server executable');
+    ({ cmd, args } = scriptCommand(exe, customArgs ?? (preset ? preset.buildLaunchArgs(server) : splitPlain(server.extra_args))));
+    useShell = process.platform === 'win32' && exe.toLowerCase().endsWith('.bat');
+  } else {
+    // custom: whatever the user configured
+    if (!config.executable) throw new HttpError(400, 'This custom instance has no executable configured — set one in Configuration → Launch');
+    const argList = customArgs ?? splitPlain(server.extra_args);
+    if (config.useShell) {
+      const line = [expand(config.executable), ...(config.args ? [expand(config.args)] : splitPlain(server.extra_args))].join(' ');
+      return {
+        cmd: process.platform === 'win32' ? line : '/bin/sh',
+        args: process.platform === 'win32' ? [] : ['-c', line],
+        useShell: process.platform === 'win32',
+        detached: process.platform !== 'win32',
+        cwd,
+        env,
+        display: line,
+      };
+    }
+    const exe = executable!;
+    requireFile(exe, 'Executable');
+    if (exe.startsWith(dir)) ensureExecutable(exe);
+    ({ cmd, args } = scriptCommand(exe, argList));
+  }
+
   return {
-    cmd: exePath,
-    args: server.extra_args ? server.extra_args.split(' ').filter(Boolean) : [],
-    useShell: false,
+    cmd,
+    args,
+    useShell,
+    detached: server.platform === 'custom' && process.platform !== 'win32',
+    cwd,
+    env,
+    display: [cmd, ...args].map((a) => (/\s/.test(a) ? `"${a}"` : a)).join(' '),
   };
 }
 
-function buildSteamCommand(server: ServerRecord, dir: string): { cmd: string; args: string[]; useShell: boolean } {
-  const preset = findPreset(server.steam_app_id);
-  const exeName = preset
-    ? (process.platform === 'win32' ? preset.executable.win32 : preset.executable.linux)
-    : server.jar_file; // custom App ID: the install-time-resolved relative executable path
-  if (!exeName) throw new HttpError(400, 'No launch executable is configured for this server');
-  const exePath = path.join(dir, exeName);
-  if (!fs.existsSync(exePath)) {
-    throw new HttpError(400, `Server executable not found at ${exeName} — the install may have failed`);
+function resolveReadyRegex(server: ServerRecord, config: LaunchConfig): RegExp | null {
+  if (config.readyPattern) {
+    try {
+      return new RegExp(config.readyPattern);
+    } catch {
+      // validated on save; ignore a corrupt value rather than refusing to start
+    }
   }
-  const args = preset ? preset.buildLaunchArgs(server) : (server.extra_args ? server.extra_args.split(' ').filter(Boolean) : []);
-  return { cmd: exePath, args, useShell: process.platform === 'win32' && exeName.toLowerCase().endsWith('.bat') };
-}
-
-function resolveReadyRegex(server: ServerRecord): RegExp | null {
   if (server.platform === 'java') return JAVA_READY_RE;
   if (server.platform === 'bedrock') return BEDROCK_READY_RE;
+  if (server.platform === 'custom') return null;
   return findPreset(server.steam_app_id)?.readyRegex ?? null;
 }
 
-function resolveStopStrategy(server: ServerRecord): StopStrategy {
+function resolveStopStrategy(server: ServerRecord, config: LaunchConfig): StopPlan {
+  const vars = launchVariables(server);
+  const stop = config.stop;
+  if (stop?.kind === 'stdin') return { kind: 'stdin', commands: stop.commands.map((c) => expandVariables(c, vars)), delayMs: stop.delayMs ?? 0 };
+  if (stop?.kind === 'signal') return { kind: 'signal', signal: stop.signal };
+  if (stop?.kind === 'script') return { kind: 'script', command: stop.command };
   if (server.platform === 'java') return JAVA_STOP;
   if (server.platform === 'bedrock') return BEDROCK_STOP;
+  if (server.platform === 'custom') return CUSTOM_STEAM_STOP;
   return findPreset(server.steam_app_id)?.stopStrategy ?? CUSTOM_STEAM_STOP;
+}
+
+/** Sends a signal to the instance — to its whole process group when it was spawned detached. */
+function signalInstance(instance: RunningInstance, signal: NodeJS.Signals) {
+  const pid = instance.child.pid;
+  if (instance.groupKill && pid) {
+    try {
+      process.kill(-pid, signal);
+      return;
+    } catch {
+      // group already gone; fall back to the direct child
+    }
+  }
+  instance.child.kill(signal);
+}
+
+/** Runs a configured stop/restart script with the instance's environment, streaming its output to the console. */
+function runScript(serverId: string, instance: Pick<RunningInstance, 'server' | 'config' | 'cwd'>, command: string, label: string): Promise<number | null> {
+  const line = expandVariables(command, launchVariables(instance.server));
+  appendLog(serverId, `[MultiCraft] Running ${label} script: ${line}`, 'system');
+  return new Promise((resolve) => {
+    const proc = spawn(process.platform === 'win32' ? line : '/bin/sh', process.platform === 'win32' ? [] : ['-c', line], {
+      cwd: instance.cwd,
+      env: { ...process.env, ...launchEnv(instance.server, instance.config) },
+      shell: process.platform === 'win32',
+      windowsHide: true,
+    });
+    const forward = (chunk: Buffer) => {
+      for (const l of chunk.toString('utf8').split(/\r?\n/)) if (l) appendLog(serverId, `[${label}] ${l}`, 'system');
+    };
+    proc.stdout.on('data', forward);
+    proc.stderr.on('data', forward);
+    proc.on('error', (err) => {
+      appendLog(serverId, `[MultiCraft] ${label} script failed to run: ${err.message}`, 'system');
+      resolve(null);
+    });
+    proc.on('exit', (code) => {
+      appendLog(serverId, `[MultiCraft] ${label} script exited with code ${code ?? 'null'}`, 'system');
+      resolve(code);
+    });
+  });
 }
 
 /** Issues a graceful-stop request per the resolved strategy. The caller is always responsible
  *  for arming a force-kill fallback timer — this never guarantees the process actually exits. */
-function issueStop(instance: RunningInstance) {
+function issueStop(serverId: string, instance: RunningInstance) {
   const strategy = instance.stopStrategy;
   if (strategy.kind === 'stdin') {
     void (async () => {
@@ -124,9 +269,11 @@ function issueStop(instance: RunningInstance) {
       }
     })();
   } else if (strategy.kind === 'signal') {
-    instance.child.kill(strategy.signal);
+    signalInstance(instance, strategy.signal);
+  } else if (strategy.kind === 'script') {
+    void runScript(serverId, instance, strategy.command, 'stop');
   } else {
-    instance.child.kill('SIGTERM');
+    signalInstance(instance, 'SIGTERM');
   }
 }
 
@@ -149,59 +296,38 @@ export async function startServer(serverId: string): Promise<void> {
   if (server.status === 'transferring') throw new HttpError(409, 'Server is being transferred to another node');
 
   const dir = instanceDir(serverId);
-  let cmd: string;
-  let args: string[];
-  let useShell = false;
-  const spawnEnv = { ...process.env };
+  const config = launchConfigOf(server);
+  const plan = await buildLaunch(server);
 
-  appendLog(
-    serverId,
-    `[MultiCraft] Host environment: ${process.platform} (${process.arch})`,
-    'system'
-  );
-
-  if (server.platform === 'java') {
-    const javaPath = await findJava();
-    if (!javaPath) {
-      throw new HttpError(
-        400,
-        'No Java runtime was found on this machine. Install a Java Runtime Environment (Java 21+ recommended) and ensure `java` is on PATH or JAVA_HOME is set.'
-      );
-    }
-    // Auto-accept EULA is handled at server-creation time (eula.txt is written there).
-    ({ cmd, args, useShell } = buildJavaCommand(server, javaPath));
-    appendLog(serverId, `[MultiCraft] Launching with ${javaPath} ${args.join(' ')}`, 'system');
-  } else if (server.platform === 'bedrock') {
-    ({ cmd, args, useShell } = buildBedrockCommand(server, dir));
-    appendLog(
-      serverId,
-      `[MultiCraft] Launching ${process.platform === 'win32' ? 'Windows' : 'Linux'} Bedrock binary: ${cmd}`,
-      'system'
-    );
-  } else {
-    ({ cmd, args, useShell } = buildSteamCommand(server, dir));
-    appendLog(serverId, `[MultiCraft] Launching Steam server: ${cmd} ${args.join(' ')}`, 'system');
-  }
+  appendLog(serverId, `[MultiCraft] Host environment: ${process.platform} (${process.arch})`, 'system');
+  appendLog(serverId, `[MultiCraft] Launching: ${plan.display}`, 'system');
+  if (config.env?.length) appendLog(serverId, `[MultiCraft] Extra environment: ${config.env.map((e) => e.key).join(', ')}`, 'system');
 
   resetOnlinePlayers(serverId);
   setServerStatus(serverId, 'starting');
   publish(consoleTopic(serverId), { type: 'status', status: 'starting' });
 
-  const child = spawn(cmd, args, {
-    cwd: dir,
+  const child = spawn(plan.cmd, plan.args, {
+    cwd: plan.cwd,
     windowsHide: true,
-    shell: useShell,
-    env: buildLaunchEnv(server, dir, spawnEnv),
+    shell: plan.useShell,
+    detached: plan.detached,
+    env: { ...buildLaunchEnv(server, dir, { ...process.env }), ...plan.env },
   });
 
-  const readyRegex = resolveReadyRegex(server);
+  const readyRegex = resolveReadyRegex(server, config);
   const instance: RunningInstance = {
     child,
     startedAt: Date.now(),
     manualStop: false,
     lastStats: emptyStats(),
     readyRegex,
-    stopStrategy: resolveStopStrategy(server),
+    stopStrategy: resolveStopStrategy(server, config),
+    stopTimeoutMs: (config.stopTimeoutSec ?? DEFAULT_STOP_TIMEOUT_MS / 1000) * 1000,
+    groupKill: plan.detached,
+    server,
+    config,
+    cwd: plan.cwd,
   };
   running.set(serverId, instance);
 
@@ -260,20 +386,46 @@ export function stopServer(serverId: string, options: { force?: boolean } = {}):
   instance.manualStop = true;
 
   if (options.force) {
-    instance.child.kill('SIGKILL');
+    signalInstance(instance, 'SIGKILL');
     return;
   }
 
   setServerStatus(serverId, 'stopping');
   publish(consoleTopic(serverId), { type: 'status', status: 'stopping' });
-  issueStop(instance);
+  issueStop(serverId, instance);
 
   instance.forceKillTimer = setTimeout(() => {
     if (running.has(serverId)) {
       appendLog(serverId, '[MultiCraft] Graceful stop timed out, forcing termination', 'system');
-      instance.child.kill('SIGKILL');
+      signalInstance(instance, 'SIGKILL');
     }
-  }, GRACEFUL_STOP_TIMEOUT_MS);
+  }, instance.stopTimeoutMs);
+}
+
+/**
+ * Restarts per the instance's launch config: by default stop → wait for exit → start; a console
+ * command (the server restarts itself) or a restart script can be configured instead.
+ */
+export async function restartServer(serverId: string): Promise<void> {
+  const instance = running.get(serverId);
+  // Use the saved config, not the one captured at start, so a just-changed restart method applies.
+  const current = getServer(serverId);
+  const restart = current ? launchConfigOf(current).restart : undefined;
+  if (instance && restart?.kind === 'stdin') {
+    for (const command of restart.commands) sendCommand(serverId, expandVariables(command, launchVariables(instance.server)));
+    return;
+  }
+  if (instance && restart?.kind === 'script') {
+    await runScript(serverId, { ...instance, server: current ?? instance.server }, restart.command, 'restart');
+    return;
+  }
+  if (instance) {
+    await new Promise<void>((resolve) => {
+      instance.child.once('exit', () => resolve());
+      stopServer(serverId);
+    });
+  }
+  await startServer(serverId);
 }
 
 export function sendCommand(serverId: string, command: string): void {
@@ -305,9 +457,9 @@ export function getLogBuffer(serverId: string): string[] {
 export function stopAllForShutdown(): void {
   for (const [serverId, instance] of running) {
     try {
-      issueStop(instance);
+      issueStop(serverId, instance);
     } catch {
-      instance.child.kill();
+      signalInstance(instance, 'SIGTERM');
     }
     logger.info(`Sent stop to server ${serverId} for panel shutdown`);
   }

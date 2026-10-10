@@ -36,6 +36,7 @@ CREATE TABLE IF NOT EXISTS servers (
   steam_app_id TEXT, -- Steam App ID actually installed, for platform = 'steam' servers
   steam_login TEXT NOT NULL DEFAULT 'anonymous', -- raw value passed after "+login" (e.g. "anonymous" or "user pass")
   steam_extra_flags TEXT NOT NULL DEFAULT '', -- extra steamcmd CLI flags spliced into the install/update invocation
+  launch_config TEXT, -- JSON LaunchConfig: executable/args/env/stop/restart overrides (required for platform = 'custom')
   suspended BOOLEAN NOT NULL DEFAULT 0,
   suspended_reason TEXT,
   suspended_at TEXT,

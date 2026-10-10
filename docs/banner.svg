@@ -1,0 +1,65 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="300" viewBox="0 0 1200 300" role="img" aria-label="MultiCraft — self-hosted game server panel">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#11140f"/>
+      <stop offset="1" stop-color="#1d211b"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.18" cy="0.35" r="0.6">
+      <stop offset="0" stop-color="#78dc77" stop-opacity="0.18"/>
+      <stop offset="1" stop-color="#78dc77" stop-opacity="0"/>
+    </radialGradient>
+    <pattern id="grid" width="32" height="32" patternUnits="userSpaceOnUse">
+      <path d="M32 0H0V32" fill="none" stroke="#ffffff" stroke-opacity="0.035"/>
+    </pattern>
+  </defs>
+  <rect width="1200" height="300" rx="28" fill="url(#bg)"/>
+  <rect width="1200" height="300" rx="28" fill="url(#grid)"/>
+  <rect width="1200" height="300" rx="28" fill="url(#glow)"/>
+
+  <!-- logo -->
+  <g transform="translate(80 86)">
+    <rect width="128" height="128" rx="26" fill="#0c0f0a" stroke="#32362f" stroke-width="2"/>
+    <rect x="28" y="36" width="26" height="26" fill="#4ade80"/>
+    <rect x="76" y="36" width="26" height="26" fill="#22c55e"/>
+    <rect x="52" y="68" width="26" height="26" fill="#4ade80"/>
+  </g>
+
+  <g font-family="'Segoe UI', Roboto, Helvetica, Arial, sans-serif">
+    <text x="244" y="148" font-size="64" font-weight="600" fill="#f1f4ea" letter-spacing="-1">MultiCraft</text>
+    <text x="246" y="190" font-size="22" fill="#c2c9bb">Self-hosted control panel for Minecraft, Steam &amp; custom game servers</text>
+
+    <!-- chips -->
+    <g font-size="15" font-weight="600">
+      <g transform="translate(246 216)">
+        <rect width="118" height="32" rx="10" fill="#3a4b37"/><text x="59" y="21" text-anchor="middle" fill="#d5e8ce">⛏ Minecraft</text>
+      </g>
+      <g transform="translate(374 216)">
+        <rect width="92" height="32" rx="10" fill="#1f4d55"/><text x="46" y="21" text-anchor="middle" fill="#bcebf4">🎮 Steam</text>
+      </g>
+      <g transform="translate(476 216)">
+        <rect width="104" height="32" rx="10" fill="#32362f"/><text x="52" y="21" text-anchor="middle" fill="#e1e4da">⌨ Custom</text>
+      </g>
+      <g transform="translate(590 216)">
+        <rect width="104" height="32" rx="10" fill="#32362f"/><text x="52" y="21" text-anchor="middle" fill="#e1e4da">🧩 Plugins</text>
+      </g>
+      <g transform="translate(704 216)">
+        <rect width="118" height="32" rx="10" fill="#32362f"/><text x="59" y="21" text-anchor="middle" fill="#e1e4da">📸 Snapshots</text>
+      </g>
+    </g>
+  </g>
+
+  <!-- decorative metric card -->
+  <g transform="translate(900 64)">
+    <rect width="236" height="172" rx="22" fill="#1d211b" stroke="#32362f"/>
+    <g transform="translate(64 86)">
+      <circle r="44" fill="none" stroke="#32362f" stroke-width="10"/>
+      <circle r="44" fill="none" stroke="#78dc77" stroke-width="10" stroke-linecap="round" stroke-dasharray="276" stroke-dashoffset="96" transform="rotate(-90)"/>
+      <text y="7" text-anchor="middle" font-family="'Segoe UI', Roboto, Arial, sans-serif" font-size="20" font-weight="600" fill="#f1f4ea">65%</text>
+    </g>
+    <g font-family="'Segoe UI', Roboto, Arial, sans-serif">
+      <text x="128" y="62" font-size="13" fill="#a3aa9d">CPU</text>
+      <text x="128" y="84" font-size="18" fill="#f1f4ea">12 threads</text>
+      <path d="M128 128 L144 116 L160 122 L176 104 L192 110 L208 92" fill="none" stroke="#9ecaff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+    </g>
+  </g>
+</svg>

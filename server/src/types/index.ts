@@ -11,14 +11,19 @@ export interface User {
 
 export type PublicUser = Omit<User, 'password_hash' | 'password_salt'>;
 
-export type Platform = 'java' | 'bedrock' | 'steam';
-export type Loader = 'vanilla' | 'paper' | 'purpur' | 'spigot' | 'bedrock' | 'steam';
+export type Platform = 'java' | 'bedrock' | 'steam' | 'custom';
+export type Loader = 'vanilla' | 'paper' | 'purpur' | 'spigot' | 'bedrock' | 'steam' | 'custom';
 
 /** Loaders that support the Bukkit plugin API (a /plugins directory of jars). */
 export const PLUGIN_CAPABLE_LOADERS: Loader[] = ['paper', 'purpur', 'spigot'];
 
 /** Steam-platform servers (Palworld, Valheim, etc.) have no Minecraft-specific concept of
  *  players/operators/whitelist/world maps — those tabs and routes are hidden/rejected for them. */
+/** Java/Bedrock instances have Minecraft features (players, ops, whitelist, maps, server.properties). */
+export function isMinecraftPlatform(platform: Platform): boolean {
+  return platform === 'java' || platform === 'bedrock';
+}
+
 export function isSteamPlatform(platform: Platform): boolean {
   return platform === 'steam';
 }
@@ -56,6 +61,8 @@ export interface ServerRecord {
   steam_extra_flags: string;
   /** Admin-imposed lock (non-payment, TOS violation, …): stopped, can't be started, and only
    *  admins can see or manage it through the panel/API until it's lifted. */
+  /** JSON-encoded LaunchConfig (see services/launchConfig.ts); null = platform defaults. */
+  launch_config: string | null;
   suspended: 0 | 1;
   suspended_reason: string | null;
   suspended_at: string | null;

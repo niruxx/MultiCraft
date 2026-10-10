@@ -205,6 +205,7 @@ type TransferMeta = Pick<
   | 'steam_app_id'
   | 'steam_login'
   | 'steam_extra_flags'
+  | 'launch_config'
 >;
 
 function setStatus(serverId: string, status: ServerStatus) {
@@ -255,6 +256,7 @@ export function startTransfer(serverId: string, nodeId: string, deleteSource: bo
     steam_app_id: server.steam_app_id,
     steam_login: server.steam_login,
     steam_extra_flags: server.steam_extra_flags,
+    launch_config: server.launch_config,
   };
 
   void (async () => {
@@ -323,7 +325,7 @@ export async function receiveTransfer(req: Request): Promise<ServerRecord> {
   } catch {
     throw new HttpError(400, 'Invalid instance metadata');
   }
-  if (!meta?.name || !['java', 'bedrock', 'steam'].includes(meta.platform)) throw new HttpError(400, 'Invalid instance metadata');
+  if (!meta?.name || !['java', 'bedrock', 'steam', 'custom'].includes(meta.platform)) throw new HttpError(400, 'Invalid instance metadata');
 
   const record = createServerRecord({
     name: meta.name,
@@ -339,6 +341,7 @@ export async function receiveTransfer(req: Request): Promise<ServerRecord> {
     steamAppId: meta.steam_app_id,
     steamLogin: meta.steam_login,
     steamExtraFlags: meta.steam_extra_flags,
+    launchConfig: meta.launch_config ?? null,
   });
   setServerStatus(record.id, 'transferring');
 

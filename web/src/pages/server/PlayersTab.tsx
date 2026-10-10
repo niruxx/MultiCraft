@@ -45,7 +45,7 @@ export function PlayersTab() {
   const offline = players?.filter((p) => !p.online) ?? [];
 
   return (
-    <div className="space-y-6">
+    <div className="stagger space-y-6">
       {!running && (
         <p className="rounded-md bg-yellow-500/10 border border-yellow-500/30 px-3 py-2 text-sm text-yellow-400">
           Start the server to op, whitelist, kick, or ban players — these actions run through the live console.

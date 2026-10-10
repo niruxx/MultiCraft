@@ -1,202 +1,323 @@
-# MultiCraft
+<p align="center">
+  <img src="docs/banner.svg" alt="MultiCraft — self-hosted control panel for Minecraft, Steam and custom game servers" width="100%">
+</p>
 
-A self-hosted, web-based control panel for creating and running Minecraft servers — Java Edition (Vanilla, Paper, Purpur, Spigot) and Bedrock Edition — plus other SteamCMD-based dedicated game servers (Palworld, Project Zomboid, Valheim, Terraria, and any other Steam App ID). Create servers from your browser, manage players and plugins, edit settings and files, run console commands live, monitor resource usage, and schedule automatic backups and updates.
+<p align="center">
+  <img alt="Node.js 22.5+" src="https://img.shields.io/badge/Node.js-22.5%2B-5fa04e?style=flat-square&logo=nodedotjs&logoColor=white&labelColor=1d211b">
+  <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-3178c6?style=flat-square&logo=typescript&logoColor=white&labelColor=1d211b">
+  <img alt="React 18" src="https://img.shields.io/badge/React-18-61dafb?style=flat-square&logo=react&logoColor=white&labelColor=1d211b">
+  <img alt="SQLite (built in)" src="https://img.shields.io/badge/SQLite-built--in-78dc77?style=flat-square&logo=sqlite&logoColor=white&labelColor=1d211b">
+  <img alt="Material 3 dark" src="https://img.shields.io/badge/UI-Material%203%20dark-a1ced7?style=flat-square&logo=materialdesign&logoColor=white&labelColor=1d211b">
+  <img alt="Linux · Windows · macOS" src="https://img.shields.io/badge/Linux%20·%20Windows%20·%20macOS-ecc65c?style=flat-square&labelColor=1d211b">
+</p>
 
-## Features
+<h3 align="center">🎮 Create, run and monitor game servers from your browser.</h3>
 
-- **Server creation** — pick a platform (Java/Bedrock/Steam) and loader (Vanilla, Paper, Purpur, Spigot, Bedrock Dedicated Server, or a SteamCMD game), choose a version from the live catalog, and MultiCraft downloads and installs it for you. Spigot is compiled from source on the host via BuildTools (requires a full JDK + git).
-- **Steam-based servers** — curated presets for Palworld, Project Zomboid, Valheim, and Terraria (correct App ID, default port, and shutdown behavior pre-filled), plus a free-form "Other" option for any Steam App ID. See [Steam-based servers](#steam-based-servers) below.
-- **Process control** — start, stop, restart, and force-kill servers; auto-start on panel boot.
-- **Live console** — real-time console output over WebSocket, with a command input, history (↑/↓), and verbose install/update progress streaming.
-- **Players** — see online/known players, op/de-op, whitelist, kick, and ban.
-- **Operator tools** — broadcast messages, save-all, difficulty/gamemode/time/weather controls, and kick/ban/pardon by name, all from one tab.
-- **Whitelist / allowlist** — a dedicated tab to enable enforcement and add/remove players. Works even while the server is stopped (edits `whitelist.json`/`allowlist.json` directly, resolving real Mojang UUIDs or the offline-mode UUID as appropriate).
-- **Plugins** (Paper/Purpur/Spigot) — enable/disable/delete installed plugins, and a built-in Modrinth-powered search to find and install plugins, with a picker for which server to install to.
-- **Settings editor** — memory, port, bind IP (`server-ip`), extra JVM/server args, and the raw `server.properties` file, all from the UI.
-- **File manager** — browse, create, rename, delete, upload, download, and edit text files directly inside each server's directory (path-traversal safe).
-- **Backups** — one-click manual backups (zip), download/restore/delete, and cron-based automatic backup schedules with retention limits.
-- **Updates** — checks for newer builds/versions and updates a server in place, always preserving world data, `server.properties`, and allowlist/permissions files.
-- **Resources monitor** — live CPU/RAM sparkline charts, host machine totals, and disk usage for each server.
-- **Multi-user accounts with roles** — `admin` (full control + user management), `moderator` (manage assigned servers), `viewer` (read-only on assigned servers). Non-admins can be scoped to specific servers.
-- **Environment backup & restore** — admins can export the *entire* install (database, every server, all backups) as one zip from the Users page, and import it into a fresh install to migrate or restore everything at once. See [Backing up and restoring the whole environment](#backing-up-and-restoring-the-whole-environment).
-- **Factory reset** — a "Danger zone" on the Users page lets an admin wipe every account, server, and backup and return to the first-run setup wizard, gated behind a multi-step confirmation (what's deleted, a typed confirmation phrase, and your password).
+<p align="center">
+  ⛏️ Minecraft Java &amp; Bedrock &nbsp;·&nbsp; 🐾 Palworld &nbsp;·&nbsp; 🪖 Valheim &nbsp;·&nbsp; 🧟 Project Zomboid &nbsp;·&nbsp; 🌳 Terraria &nbsp;·&nbsp; 🎯 any Steam App ID &nbsp;·&nbsp; ⌨️ your own scripts
+</p>
 
-## Architecture
+<p align="center">
+  <a href="#-quick-start"><b>🚀 Quick start</b></a> &nbsp;•&nbsp;
+  <a href="#-features"><b>✨ Features</b></a> &nbsp;•&nbsp;
+  <a href="#-supported-games"><b>🎮 Games</b></a> &nbsp;•&nbsp;
+  <a href="#-guides"><b>📚 Guides</b></a> &nbsp;•&nbsp;
+  <a href="#%EF%B8%8F-operations"><b>🛠️ Operations</b></a> &nbsp;•&nbsp;
+  <a href="#%EF%B8%8F-roadmap"><b>🗺️ Roadmap</b></a>
+</p>
 
-```
-MultiCraft/
-├── server/     Node.js + TypeScript API (Express, ws, node:sqlite — zero native build deps)
-└── web/        React + TypeScript + Vite + Tailwind single-page app
-```
+<br>
 
-- **Database**: SQLite via Node's built-in `node:sqlite` — no external DB server, no native compilation.
-- **Auth**: HMAC-signed session tokens + `scrypt` password hashing, both from Node's built-in `node:crypto` — no bcrypt/JWT native deps.
-- **Process management**: server processes are plain child processes (`java -jar ...`, `bedrock_server`, or a game's own dedicated-server binary via steamcmd); console I/O and player join/leave events are parsed from stdout and streamed to the browser over WebSocket.
-- **Downloads**: Vanilla via Mojang's version manifest, Paper via the PaperMC Fill API, Purpur via the PurpurMC API, Spigot via BuildTools (SpigotMC), Bedrock via Mojang's official download-links endpoint, Steam-based games via SteamCMD (downloaded automatically on first use). Plugin search/install uses the Modrinth API.
-- **Updates**: Java loaders are updated by re-installing into the existing server directory (the installer only ever writes the jar, so world/config files are untouched); Bedrock is updated by extracting the new release over the existing directory while explicitly skipping `worlds/`, `server.properties`, `allowlist.json`, `whitelist.json`, and `permissions.json`; Steam-based games are updated by re-running `steamcmd +app_update`, which only touches files tracked by the game's own depot manifest.
+<p align="center">
+  <img src="docs/preview.svg" alt="Illustration of the MultiCraft dashboard" width="92%">
+  <br>
+  <sub><i>Illustration of the dashboard — navigation drawer, live host gauges, and instances with per-instance metrics.</i></sub>
+</p>
 
-## Steam-based servers
+---
 
-MultiCraft can also host dedicated servers for non-Minecraft games distributed via SteamCMD. When you create a server, choose the **Steam** platform, then pick a game:
+## 🚀 Quick start
 
-- **Palworld** — App ID 2394010, default port 8211/UDP. Its dedicated server doesn't reliably respond to a clean stop signal (Pocketpair's own guidance is that graceful shutdown needs RCON), so MultiCraft force-stops it after a short grace period on Stop — its own periodic autosave is what's preserved, not a save-on-exit.
-- **Project Zomboid** — App ID 380870, default port 16261/UDP. Stops cleanly via its own console `save`/`quit` sequence.
-- **Valheim** — App ID 896660, default port 2456/UDP. Stops via SIGINT (Valheim only saves its world on SIGINT, not SIGTERM).
-- **Terraria** — App ID 105600, default port 7777/TCP. Always started with `-autocreate`/`-world` so it never blocks waiting for interactive console input.
-- **Other (custom App ID)** — enter any Steam App ID plus the relative path to its server executable. MultiCraft doesn't know a custom game's launch/shutdown behavior, so it sends SIGTERM (falling back to a forced stop after 60s) and marks it "running" as soon as the process starts.
-
-Config files for Steam-based servers aren't parsed or edited by MultiCraft directly — use the **Files** tab to open whatever config file the game writes (INI, JSON, or otherwise). The Players, Operator, Whitelist, and Maps tabs are Minecraft-specific and don't apply to Steam-based servers.
-
-SteamCMD itself is downloaded automatically (once, shared across all Steam-based servers) the first time you create one. On Linux, steamcmd is a 32-bit binary and needs matching 32-bit runtime libraries that most 64-bit-only servers don't have installed by default:
-
-| Distro | Command |
-|---|---|
-| Debian/Ubuntu | `sudo dpkg --add-architecture i386 && sudo apt-get update && sudo apt-get install lib32gcc-s1 lib32stdc++6` |
-| Fedora | `sudo dnf install glibc.i686 libstdc++.i686` |
-| openSUSE | `sudo zypper install libstdc++6-32bit glibc-32bit` |
-| Arch | Enable `[multilib]` in `/etc/pacman.conf` first, then `sudo pacman -S lib32-gcc-libs` |
-
-**Where SteamCMD comes from** is configurable from the Users page (admin-only, "SteamCMD" section): leave it blank for the default (download the official archive from Valve automatically), point it at a URL to use a mirror instead, point it at a local archive file to extract it with no network access at all, or point it at a directory that already has SteamCMD extracted in it to use that install as-is.
-
-**Per-server SteamCMD options**: each server has a "Steam login" (defaults to `anonymous`; a real `username password` is needed for games that require an owned license — interactive Steam Guard prompts aren't supported) and "Extra steamcmd flags" field (raw arguments spliced into the install/update command line), both editable under Advanced options when creating a server and again later on its Settings tab.
-
-`install.sh` offers to install these for you (opt-in, defaults to no) — see [Installation](#installation).
-
-## Requirements
-
-- **Node.js 22.5+** (for built-in `node:sqlite`) — Node 24 recommended.
-- **Java 21+** on PATH (or `JAVA_HOME` set) — required to run Vanilla/Paper/Purpur/Spigot servers. Not needed for Bedrock- or Steam-only use.
-- **A full JDK + git** — only if you plan to create Spigot servers (BuildTools compiles Spigot from source on the host).
-- **32-bit runtime libraries** on Linux — only if you plan to create Steam-based servers (steamcmd itself is a 32-bit binary). See [Steam-based servers](#steam-based-servers) below.
-- Windows, Linux, or macOS.
-
-All server data (the SQLite database, every Minecraft server's files, and backups) lives under **`server/data/`** by default — this whole directory is git-ignored and is the only thing you need to preserve across updates, backups, or migrations. See [Moving `server/data/` outside the repo](#moving-serverdata-outside-the-repo-recommended-for-production) below.
-
-## Installation
-
-### Quick install (Linux)
-
-On Debian/Ubuntu, Arch/Manjaro, or Fedora/RHEL, `install.sh` does steps 1–3 below for you — detects your distro, installs Node.js 22.5+/git/(optionally) Java, runs `npm run setup` and `npm run build`, verifies the panel actually responds, and asks whether to set it up as a systemd service that starts on boot:
+> [!TIP]
+> On **Debian/Ubuntu, Arch or Fedora**, `./install.sh` does all of this for you — Node.js, Java, build, a health check, and an optional systemd service.
 
 ```bash
-git clone <this-repo-url> MultiCraft
-cd MultiCraft
-./install.sh
+git clone <this-repo-url> MultiCraft && cd MultiCraft
+npm run setup        # 📦 install dependencies
+npm run build        # 🏗️ build API + UI
+npm start            # ▶️ http://localhost:8642
 ```
 
-Pass `-y` to accept every default non-interactively (installs Java, skips the systemd prompt). Skip to [Running MultiCraft](#running-multicraft) once it finishes, or keep reading for the manual steps (also what the script does under the hood, if you want to follow along or you're on Windows/macOS/another distro).
+Open **http://localhost:8642** — the first visit walks you through creating the admin account. 🎉
 
-### 1. Install the prerequisites
+| You need | For |
+|---|---|
+| 🟩 **Node.js 22.5+** (24 recommended) | the panel itself |
+| ☕ **Java 21+** | Vanilla / Paper / Purpur / Spigot servers |
+| 🛠️ **JDK + git** | building Spigot from source |
+| 🧱 **32-bit libraries** (Linux) | Steam-based servers — [see Guides → Steam](#-guides) |
 
-| | Windows | Linux (Debian/Ubuntu) | macOS |
+---
+
+## ✨ Features
+
+<table>
+  <tr>
+    <td width="33%" valign="top">
+      <h4>🏗️ One-click installs</h4>
+      Pick a platform and version from the live catalog — MultiCraft downloads and installs it. Spigot builds from source via BuildTools.
+    </td>
+    <td width="33%" valign="top">
+      <h4>🚀 Launch control</h4>
+      Choose the exact binary or jar, arguments, env vars, ready-detection and stop/restart behaviour — per instance.
+    </td>
+    <td width="33%" valign="top">
+      <h4>⌨️ Custom servers</h4>
+      Run any Linux server binary or shell script, with <code>{{PORT}}</code>-style variables and process-group shutdown.
+    </td>
+  </tr>
+  <tr>
+    <td valign="top">
+      <h4>🖥️ Live console</h4>
+      Real-time output over WebSocket, command history (↑/↓), and streamed install/update progress.
+    </td>
+    <td valign="top">
+      <h4>📊 Metrics everywhere</h4>
+      Host gauges and throughput on the dashboard; per-instance CPU, RAM, network, disk I/O and uptime.
+    </td>
+    <td valign="top">
+      <h4>🧩 Plugins &amp; mods</h4>
+      Modrinth search for plugins and data packs, plus uploads for Bedrock packs, BepInEx and <code>.pak</code> mods.
+    </td>
+  </tr>
+  <tr>
+    <td valign="top">
+      <h4>📸 Snapshots</h4>
+      Manual or scheduled, with retention. Restore everything — or diff one file against live and restore just that.
+    </td>
+    <td valign="top">
+      <h4>👥 Fine-grained access</h4>
+      Roles plus per-instance permissions, any number of instances per user — enforced by the API, not just the UI.
+    </td>
+    <td valign="top">
+      <h4>🛑 Suspension</h4>
+      Stop and lock an instance (non-payment, TOS). Owners lose panel and API access until it's lifted.
+    </td>
+  </tr>
+  <tr>
+    <td valign="top">
+      <h4>🌐 Multi-node</h4>
+      Link other MultiCraft hosts and transfer an instance's files and settings between them.
+    </td>
+    <td valign="top">
+      <h4>👤 Players &amp; operators</h4>
+      Op, kick, ban, whitelist/allowlist, broadcasts, time, weather and difficulty — from one page.
+    </td>
+    <td valign="top">
+      <h4>🎨 Material 3 dark</h4>
+      Tonal surfaces, a navigation drawer, list / grid / box views and smooth motion that respects <i>reduce motion</i>.
+    </td>
+  </tr>
+</table>
+
+<details>
+<summary><b>…and the rest</b> 📁 files · ⬆️ updates · 💾 environment backup · 🧹 factory reset</summary>
+<br>
+
+- 📁 **File management** — browse, edit, upload, download, rename and delete (path-traversal safe).
+- ⬆️ **Updates** — update a server in place while keeping worlds, `server.properties` and permission files.
+- 💾 **Environment backup** — export/import the whole install as one zip.
+- 🧹 **Factory reset** — wipe everything behind a multi-step confirmation (your old data is kept aside).
+</details>
+
+---
+
+## 🎮 Supported games
+
+| | Game | Plugins / mods | Default port |
+|:-:|---|---|---|
+| ⛏️ | **Minecraft: Java** — Paper · Purpur · Spigot | 🧩 Bukkit plugins — Modrinth + upload | `25565/tcp` |
+| ⛏️ | **Minecraft: Java** — Vanilla | 📦 Data packs — Modrinth + upload | `25565/tcp` |
+| 🪨 | **Minecraft: Bedrock** | 🎒 `.mcpack` / `.mcaddon`, auto-activated per world | `19132/udp` |
+| 🪖 | **Valheim** | 🔌 BepInEx plugins (`.dll` / `.zip`) | `2456/udp` |
+| 🐾 | **Palworld** | 📦 `.pak` mods | `8211/udp` |
+| 🧟 | **Project Zomboid** | — *(Workshop IDs live in its own `.ini`)* | `16261/udp` |
+| 🌳 | **Terraria** | — *(the vanilla server has no mod loader)* | `7777/tcp` |
+| 🎯 | **Any Steam App ID** — CS2, TF2, Rust, ARK, Quake Live… | — | your choice |
+| ⌨️ | **Custom** — any binary or shell script | — | your choice |
+
+Known titles get their own emblem in the UI, and running instances wear a live 🟢 dot.
+
+---
+
+## 📚 Guides
+
+<details>
+<summary><h3>🚀 Custom servers &amp; launch settings</h3></summary>
+
+**Custom instances** (admins only) run any Linux server binary or shell script. There's no download step: create it, upload your files in **File Management** (or point at an absolute path), and start it.
+
+Every instance — custom or not — has a **Launch** card under **Configuration**, with a live preview of the exact command it will run:
+
+| | Setting | What it does |
+|:-:|---|---|
+| 📄 | **Executable / jar** | Which binary, script or `.jar` starts (relative to the instance folder). |
+| ☕ | **Java binary** | A specific `java` instead of the auto-detected one. *(admin)* |
+| 🔤 | **Arguments** | Replaces the default arguments; quotes group words. |
+| 🐚 | **Shell mode** | Runs through `/bin/sh -c` for pipes, `&&` and `$VARS`. *(admin, custom only)* |
+| 📂 | **Working directory** | A subfolder to run in. |
+| 🌱 | **Environment** | Extra variables for the process. |
+| ✅ | **Ready pattern** | Output regex that marks the instance *running*. |
+| 🛑 | **Stop by** | Console command(s), `SIGTERM`/`SIGINT`/`SIGQUIT`/`SIGHUP`, or a stop script *(admin)*. |
+| 🔁 | **Restart by** | Stop → start, console command(s), or a restart script *(admin)*. |
+| ⏱️ | **Force-stop after** | Seconds before a hung stop is killed (default 60). |
+
+**Variables** work in the command, arguments, env values and scripts — and are exported to the process:
+
+| Placeholder | Environment variable | Value |
+|---|---|---|
+| `{{PORT}}` | `SERVER_PORT` | the instance's port |
+| `{{NAME}}` | `SERVER_NAME` | its name |
+| `{{ID}}` | `SERVER_ID` | its internal id |
+| `{{DIR}}` | `SERVER_DIR` | absolute path of its folder |
+| `{{MIN_MEMORY}}` · `{{MAX_MEMORY}}` | `SERVER_MIN_MEMORY_MB` · `SERVER_MAX_MEMORY_MB` | memory settings (MB) |
+
+> [!WARNING]
+> A launch command can run **any program on the host** as the panel's user. Editing it needs the **Edit launch command** permission, which is never on by default — an admin grants it per user, per instance. Shell mode, absolute paths, a custom Java binary and stop/restart scripts stay admin-only.
+
+</details>
+
+<details>
+<summary><h3>🧩 Plugins, data packs &amp; mods</h3></summary>
+
+The **Manage → Plugins** page (called *Data Packs*, *Add-ons* or *Mods* where that fits) adapts to each game:
+
+- **⛏️ Paper / Purpur / Spigot** — search Modrinth and install in one click (falling back to the newest build if your exact version isn't listed), or upload `.jar`s. Disabling renames to `.jar.disabled`.
+- **⛏️ Vanilla** — data packs from Modrinth or uploaded `.zip`s into `<world>/datapacks`; they load on restart or with `/reload`.
+- **🪨 Bedrock** — upload `.mcpack`, `.mcaddon` (nested packs included) or `.zip`. Packs are unpacked into `behavior_packs`/`resource_packs` and **activated for the world**; toggling adds/removes them.
+- **🪖 Valheim** — BepInEx plugins (`.dll`, or a Thunderstore-style `.zip` unpacked into its own folder). Upload *BepInExPack_Valheim* to the instance root once and MultiCraft loads it automatically on Linux.
+- **🐾 Palworld** — `.pak` mods into `Pal/Content/Paks/~mods`.
+
+</details>
+
+<details>
+<summary><h3>📸 Snapshots</h3></summary>
+
+Under each instance's **Backup Schedule**:
+
+- ➕ **Create snapshot** — optionally labelled, e.g. `before-1.21-update`.
+- ⏰ **Schedule** — presets or any cron expression, keeping the last *N*.
+- ♻️ **Restore all** — replaces the instance's files (stop the server first).
+- 🔀 **Restore one file** — open a snapshot, pick a file, review a **line-by-line diff** against the live copy, then restore just that file (works while running).
+
+</details>
+
+<details>
+<summary><h3>👥 Users &amp; permissions</h3></summary>
+
+Roles set the defaults; each user can be assigned **any number of instances**, each with its own permission set.
+
+| Permission | Allows | Moderator | Viewer |
+|---|---|:-:|:-:|
+| ⚡ Start / stop | start, stop, restart, kill, retry install | ✅ | — |
+| ⌨️ Console commands | send commands | ✅ | — |
+| 👀 View files | browse/download files and snapshot contents | ✅ | ✅ |
+| ✏️ Edit files | edit, upload, rename, delete | ✅ | — |
+| 📸 Create snapshots | create/delete snapshots, edit the schedule | ✅ | — |
+| ♻️ Restore snapshots | whole snapshots or single files | ✅ | — |
+| 🧩 Plugins | install/toggle/remove plugins, mods, packs | ✅ | — |
+| 👤 Players | op, kick, ban, whitelist | ✅ | — |
+| ⚙️ Configuration | instance settings and `server.properties` | ✅ | — |
+| ⬆️ Update | update the server software | ✅ | — |
+| 🚀 Edit launch command | change what runs | — | — |
+
+Admins can do everything. Every assigned user can see status, console output and the player list.
+
+</details>
+
+<details>
+<summary><h3>🛑 Suspension &amp; 🌐 multiple nodes</h3></summary>
+
+**🛑 Suspension** — in an instance's **Configuration** (admin): pick a reason and an optional note. The instance stops (gracefully, or killed immediately), can't be started, and its users see a *suspended* screen with the reason — in the panel and the API alike. Admins keep full access.
+
+**🌐 Nodes** — under **Configuration → Nodes** every panel shows its *node key*. Add another MultiCraft host by URL + key, then transfer a stopped instance from its **Configuration** page; its files and settings stream across. Keep a stopped copy or remove the original afterwards.
+
+> [!NOTE]
+> Transfers move instances between hosts — they aren't automatic failover. Use HTTPS or a private network between nodes, since instance files travel over that connection.
+
+</details>
+
+<details>
+<summary><h3>🎯 Steam-based servers</h3></summary>
+
+Choose **Steam** when creating an instance, then a game:
+
+| Game | App ID | Port | Notes |
 |---|---|---|---|
-| **Node.js 22.5+** | [nodejs.org](https://nodejs.org) installer, or `winget install OpenJS.NodeJS.LTS` | `curl -fsSL https://deb.nodesource.com/setup_22.x \| sudo bash -` then `sudo apt install -y nodejs` (or use [nvm](https://github.com/nvm-sh/nvm)) | `brew install node` |
-| **Java 21+** (Java servers only) | `winget install EclipseAdoptium.Temurin.21.JDK` | `sudo apt install -y openjdk-21-jre-headless` (or `-jdk` if you'll build Spigot) | `brew install openjdk@21` then `sudo ln -sfn $(brew --prefix openjdk@21)/libexec/openjdk.jdk /Library/Java/JavaVirtualMachines/openjdk-21.jdk` |
-| **Git** (Spigot builds only) | `winget install Git.Git` | `sudo apt install -y git` | `brew install git` (or the Xcode Command Line Tools) |
+| 🐾 Palworld | 2394010 | `8211/udp` | Doesn't reliably stop on a signal; force-stopped after a grace period (its autosave is kept). |
+| 🧟 Project Zomboid | 380870 | `16261/udp` | Stops cleanly with `save` → `quit`. |
+| 🪖 Valheim | 896660 | `2456/udp` | Stops with SIGINT — it only saves its world on SIGINT. |
+| 🌳 Terraria | 105600 | `7777/tcp` | Fetched from terraria.org; started with `-autocreate`/`-world`. |
+| 🎯 Other | any | any | Give its executable path; tune stop/restart under **Configuration → Launch**. |
 
-Verify with `node -v`, `java -version`, and `git --version`. Running on Arch, Fedora, or openSUSE? See the per-distro package commands in [Running 24/7 → systemd](#option-b--systemd-linux-recommended-for-serversvps).
+Game config files are edited in **File Management**. Players, Operators, Whitelist and Map are Minecraft-only.
 
-### 2. Get the code
-
-```bash
-git clone <this-repo-url> MultiCraft
-cd MultiCraft
-```
-
-(No remote yet? Just keep working from the folder you already have — everything below works the same either way.)
-
-### 3. Install dependencies
-
-```bash
-npm run setup
-```
-
-This installs dependencies for the root, `server`, and `web` workspaces in one go (equivalent to `npm install` at the repo root).
-
-## Running MultiCraft
-
-These commands are identical on Windows, Linux, and macOS — they're plain `npm` scripts, run from the repo root in PowerShell, Terminal, or any shell.
-
-### Development mode
-
-```bash
-npm run dev
-```
-
-Starts the API on `:8642` and the Vite dev UI on `:5173` together, with hot-reload. Open **http://localhost:5173** — the first visit walks you through creating the initial admin account.
-
-### Production mode
-
-```bash
-npm run build      # builds server/dist and web/dist
-npm start           # serves the API + the built frontend together on one port
-```
-
-Open **http://localhost:8642** (or whatever `PORT` you set). Use production mode for anything you intend to leave running — it's a single Node process instead of two dev servers.
-
-### Platform notes
-
-- **Windows**: run the commands above from PowerShell or `cmd.exe` in the repo folder. If you can't reach the panel from another device on your network, allow the port through **Windows Defender Firewall → Advanced settings → Inbound Rules → New Rule → Port** (TCP, the port from `PORT`, default `8642`).
-- **Linux**: no special steps — works the same from any shell. If you're running headless on a VPS, see [Running 24/7](#running-247) below rather than leaving a terminal session open.
-- **macOS**: no special steps. The first time you run `bedrock_server` or a downloaded jar, Gatekeeper may prompt about an unidentified developer — approve it once in **System Settings → Privacy & Security**.
-
-## Running 24/7
-
-Leaving a `npm start` terminal window open works, but it stops the moment you close the terminal, log out, or reboot. For an always-on panel, use a process manager appropriate to your OS. All of these restart MultiCraft automatically if it crashes and can start it on boot.
-
-### Option A — pm2 (simplest, works on Windows/Linux/macOS)
-
-```bash
-npm install -g pm2
-npm run build
-pm2 start npm --name multicraft -- start
-pm2 save
-pm2 startup        # prints a command to run once, so pm2 restores on reboot
-```
-
-Useful commands: `pm2 logs multicraft`, `pm2 restart multicraft`, `pm2 stop multicraft`.
-
-### Option B — systemd (Linux, recommended for servers/VPS)
-
-This is the same procedure on Arch, Debian/Ubuntu, Fedora/RHEL, openSUSE, or anything else running systemd — only the package-manager command in step 1 changes. Run everything below as a regular user with `sudo` access; don't run MultiCraft itself as root.
-
-**1. Install prerequisites**
+SteamCMD downloads itself once, automatically. On Linux it's 32-bit and needs:
 
 | Distro | Command |
 |---|---|
-| **Arch / Manjaro** | `sudo pacman -Syu --needed nodejs npm git jdk21-openjdk` |
-| **Debian / Ubuntu** | `curl -fsSL https://deb.nodesource.com/setup_22.x \| sudo bash -` then `sudo apt install -y nodejs git openjdk-21-jre-headless` |
-| **Fedora / RHEL** | `sudo dnf install -y nodejs npm git java-21-openjdk-headless` |
-| **openSUSE** | `sudo zypper install -y nodejs22 npm22 git java-21-openjdk-headless` |
+| 🍥 Debian/Ubuntu | `sudo dpkg --add-architecture i386 && sudo apt-get update && sudo apt-get install lib32gcc-s1 lib32stdc++6` |
+| 🎩 Fedora | `sudo dnf install glibc.i686 libstdc++.i686` |
+| 🦎 openSUSE | `sudo zypper install libstdc++6-32bit glibc-32bit` |
+| 🏔️ Arch | enable `[multilib]` in `/etc/pacman.conf`, then `sudo pacman -S lib32-gcc-libs` |
 
-Only install a JDK/JRE if you'll run Java-edition (Vanilla/Paper/Purpur/Spigot) servers — skip it for a Bedrock-only panel. Building Spigot needs the full `-jdk` package (e.g. `jdk21-openjdk` on Arch), not just the headless JRE. Verify with `node -v` (needs 22.5+) and `java -version`.
+- **Source of SteamCMD** — **Configuration → SteamCMD** (admin): Valve's official archive (default), a mirror URL, a local archive, or an existing install folder.
+- **Per-instance options** — a *Steam login* (default `anonymous`; owned-license games need `username password`, Steam Guard prompts aren't supported) and *extra steamcmd flags*.
 
-**2. Create a dedicated system user**
+</details>
 
-Running the panel as its own unprivileged user (rather than your login user or root) means a bug in a Minecraft server it manages can't touch the rest of the system.
+---
+
+## 🛠️ Operations
+
+<details>
+<summary><b>🧰 Manual install</b> — Windows · Linux · macOS</summary>
+<br>
+
+| | 🪟 Windows | 🐧 Debian/Ubuntu | 🍎 macOS |
+|---|---|---|---|
+| **Node.js 22.5+** | `winget install OpenJS.NodeJS.LTS` | `curl -fsSL https://deb.nodesource.com/setup_22.x \| sudo bash -` → `sudo apt install -y nodejs` | `brew install node` |
+| **Java 21+** | `winget install EclipseAdoptium.Temurin.21.JDK` | `sudo apt install -y openjdk-21-jre-headless` (`-jdk` for Spigot) | `brew install openjdk@21` |
+| **Git** *(Spigot)* | `winget install Git.Git` | `sudo apt install -y git` | `brew install git` |
+
+Then `npm run setup`, `npm run build`, `npm start`. For development with hot reload: `npm run dev` (API on `:8642`, UI on **http://localhost:5173**).
+
+- 🪟 Can't reach the panel from another device? Allow TCP `8642` in **Windows Defender Firewall → Inbound Rules**.
+- 🍎 Gatekeeper may ask about `bedrock_server` or a downloaded jar once — approve it in **System Settings → Privacy & Security**.
+</details>
+
+<details>
+<summary><b>🔁 Running 24/7</b> — pm2 · systemd · Windows service · launchd</summary>
+<br>
+
+**🅰️ pm2** (any OS)
+
+```bash
+npm install -g pm2 && npm run build
+pm2 start npm --name multicraft -- start
+pm2 save && pm2 startup
+```
+
+**🅱️ systemd** (Linux) — run the panel as its own unprivileged user:
 
 ```bash
 sudo useradd --system --create-home --home-dir /opt/multicraft --shell "$(command -v nologin)" multicraft
-```
-
-(`nologin` lives at `/usr/sbin/nologin` on Debian/Ubuntu but `/usr/bin/nologin` on Arch/Fedora/openSUSE — `command -v nologin` finds whichever one applies.)
-
-**3. Get the code and hand it to that user**
-
-```bash
-sudo git clone <this-repo-url> /opt/multicraft/app
-sudo chown -R multicraft:multicraft /opt/multicraft
-```
-
-(No git remote yet? `sudo cp -r /path/to/your/MultiCraft/checkout /opt/multicraft/app` instead, then `chown` as above.)
-
-**4. Install dependencies and build, as that user**
-
-```bash
+sudo git clone <this-repo-url> /opt/multicraft/app && sudo chown -R multicraft:multicraft /opt/multicraft
 sudo -u multicraft bash -c 'cd /opt/multicraft/app && npm run setup && npm run build'
+sudo -u multicraft mkdir -p /opt/multicraft/data
 ```
 
-**5. Create the systemd unit** at `/etc/systemd/system/multicraft.service`:
+`/etc/systemd/system/multicraft.service`:
 
 ```ini
 [Unit]
@@ -207,7 +328,6 @@ After=network.target
 Type=simple
 WorkingDirectory=/opt/multicraft/app
 ExecStart=/usr/bin/npm start
-# If `which npm` printed something else (e.g. an nvm install), use that path instead.
 Restart=on-failure
 User=multicraft
 Environment=PORT=8642
@@ -217,177 +337,121 @@ Environment=MULTICRAFT_DATA_DIR=/opt/multicraft/data
 WantedBy=multi-user.target
 ```
 
-`MULTICRAFT_DATA_DIR` keeps the database, every server's files, and backups outside the git checkout — see [Moving `server/data/` outside the repo](#moving-serverdata-outside-the-repo-recommended-for-production). Create it once: `sudo -u multicraft mkdir -p /opt/multicraft/data`.
-
-**6. Enable and start it**
-
 ```bash
-sudo systemctl daemon-reload
-sudo systemctl enable --now multicraft
-sudo systemctl status multicraft      # should show "active (running)"
-journalctl -u multicraft -f           # follow logs; Ctrl+C to stop watching
+sudo systemctl daemon-reload && sudo systemctl enable --now multicraft
+journalctl -u multicraft -f
 ```
 
-Open `http://<server-ip>:8642` from another machine to reach the panel.
+Packages for other distros: 🏔️ `pacman -S nodejs npm git jdk21-openjdk` · 🎩 `dnf install nodejs npm git java-21-openjdk-headless` · 🦎 `zypper install nodejs22 npm22 git java-21-openjdk-headless`.
 
-**7. Open the ports you need**
+Open ports: the panel's `8642` only needs to reach admins (consider HTTPS via a reverse proxy, or a VPN); each game server needs its own port open to players — e.g. `sudo ufw allow 25565/tcp` or `sudo firewall-cmd --permanent --add-port=25565/tcp && sudo firewall-cmd --reload`.
 
-The panel's own port (`8642` by default) only needs to be reachable by whoever administers it — consider putting it behind a reverse proxy with HTTPS and/or restricting it to a VPN rather than exposing it publicly. Each *Minecraft* server you create needs its own port open to players: the port you set when creating it (default `25565/tcp` for Java, `19132/udp` for Bedrock).
+**🪟 Windows service** — with [NSSM](https://nssm.cc/download): `nssm install MultiCraft` → Path `C:\Program Files\nodejs\node.exe`, Startup directory = the MultiCraft folder, Arguments `server\dist\index.js` → `nssm start MultiCraft`.
 
-- **Arch** ships with no firewall enabled by default. If you've installed one:
-  - `ufw`: `sudo ufw allow 8642/tcp && sudo ufw allow 25565/tcp && sudo ufw allow 19132/udp`
-  - `firewalld`: `sudo firewall-cmd --permanent --add-port=8642/tcp --add-port=25565/tcp --add-port=19132/udp && sudo firewall-cmd --reload`
-  - plain `nftables`/`iptables`: add the equivalent `ACCEPT` rules for those ports in your existing ruleset.
-- **Debian/Ubuntu** (`ufw`) and **Fedora/RHEL/openSUSE** (`firewalld`) — use the matching command above.
-- If the machine is behind a home router, also forward those same ports to it there.
-
-### Option C — Windows Service (via NSSM)
-
-1. Download [NSSM](https://nssm.cc/download) and unzip it somewhere.
-2. `npm run build` in the MultiCraft folder first.
-3. From an elevated PowerShell:
-   ```powershell
-   nssm install MultiCraft
-   ```
-4. In the dialog: **Path** = `C:\Program Files\nodejs\node.exe`, **Startup directory** = your MultiCraft folder, **Arguments** = `server\dist\index.js`.
-5. `nssm start MultiCraft` — it now runs as a service and survives reboots/logout. Manage it from `services.msc` or `nssm stop|restart MultiCraft`.
-
-### Option D — macOS launchd
-
-Create `~/Library/LaunchAgents/com.multicraft.panel.plist`:
+**🍎 launchd** — `~/Library/LaunchAgents/com.multicraft.panel.plist`:
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
   <key>Label</key><string>com.multicraft.panel</string>
-  <key>ProgramArguments</key>
-  <array><string>/usr/local/bin/npm</string><string>start</string></array>
+  <key>ProgramArguments</key><array><string>/usr/local/bin/npm</string><string>start</string></array>
   <key>WorkingDirectory</key><string>/path/to/MultiCraft</string>
   <key>RunAtLoad</key><true/>
   <key>KeepAlive</key><true/>
 </dict></plist>
 ```
 
-Then `launchctl load ~/Library/LaunchAgents/com.multicraft.panel.plist`.
+then `launchctl load ~/Library/LaunchAgents/com.multicraft.panel.plist`.
 
-> **Note:** the process manager above keeps the *panel itself* running. Whether an individual Minecraft server comes back up after a panel restart is controlled separately, per-server, by the **"Automatically start this server when the panel boots"** checkbox in that server's **Settings** tab.
+> [!NOTE]
+> These keep the *panel* running. Whether an instance starts with it is the **“Automatically start this instance when the panel boots”** box in its **Configuration**.
+</details>
 
-## Wiping the database and starting fresh
-
-Everything MultiCraft knows — user accounts, server records, every Minecraft server's files, and all backups — lives under `server/data/` (or wherever `MULTICRAFT_DATA_DIR` points). Wiping it resets MultiCraft to a brand-new install: the next page load shows the first-run setup wizard again.
-
-**Easiest: do it from the UI.** As an admin, open the **Users** page and scroll to the **Danger zone** card → **Delete everything & start fresh**. It walks you through three confirmations (what gets deleted, typing `DELETE EVERYTHING`, and your password), then wipes every account, every server and its worlds, and every backup, and restarts the panel into the setup wizard. Your previous data isn't deleted outright — it's kept on disk as a timestamped `data-pre-reset-…` folder in case you didn't mean it, though restoring it means stopping MultiCraft and renaming that folder back to `data` by hand.
-
-The manual, file-level equivalent (useful if the panel won't start at all, or you're scripting it) is below.
-
-**This deletes all Minecraft worlds and backups too.** Back up `server/data/` first if there's anything in it you might want later (right-click → copy, or `cp -r`/`Copy-Item`).
-
-1. Stop MultiCraft (`Ctrl+C` the dev/start process, or `pm2 stop multicraft` / `sudo systemctl stop multicraft` / `nssm stop MultiCraft`, etc.).
-2. Delete the contents of the data directory:
-
-   **Windows (PowerShell)**
-   ```powershell
-   Remove-Item -Recurse -Force .\server\data\*
-   ```
-
-   **Linux / macOS**
-   ```bash
-   rm -rf server/data/*
-   ```
-3. Start MultiCraft again. It recreates an empty database and shows the setup wizard on first load.
-
-If you only want to reset *accounts and panel settings* while keeping your existing Minecraft servers untouched, that's not a simple file delete — server records in the database and the server folders on disk are linked by ID. Take a full backup of `server/data/` if you're unsure before deleting anything.
-
-Tip: [exporting the environment](#backing-up-and-restoring-the-whole-environment) first gives you a single zip you can restore from if you change your mind, instead of a manual folder copy.
-
-## Backing up and restoring the whole environment
-
-Per-server backups (in each server's **Backups** tab) only cover that one server. For the whole install — every user account, every server's files and worlds, all of their backups, and the panel's settings — sign in as an **admin** and use the **Environment backup & restore** card at the top of the **Users** page:
-
-- **Export environment** downloads a single `.zip` containing everything under `server/data/`. Use this to move MultiCraft to a new machine, or as a full-install safety net before something risky (an update, a database wipe, an import).
-- **Import environment…** uploads a `.zip` from a previous export and replaces *everything* in the current install with it — all current users, servers, and backups are swapped out. This is for restoring a backup or migrating into a fresh install, not for merging.
-
-What happens on import:
-
-1. MultiCraft refuses if any server is currently running — stop them all first.
-2. The archive is validated (it must actually contain a `multicraft.db`) and extracted.
-3. Your **current** `server/data/` is renamed to `server/data-pre-import-<timestamp>/` — it is *not* deleted, so if anything looks wrong afterward you can stop MultiCraft, delete the new `data/`, and rename this folder back to `data/` to undo the import by hand.
-4. The imported files take its place, and the panel process restarts itself to open the restored database.
-
-After it restarts, reload the page and **sign in with an admin account from the backup you imported** — not necessarily the one you were using before, since the import may have replaced it.
-
-Cross-platform reminder: importing an environment created on a different OS won't carry over platform-specific binaries — a Bedrock server exported from Windows still has `bedrock_server.exe`, not the Linux binary. Use that server's **Update** tab after importing to fetch the right one, or just recreate the server.
-
-## Updating MultiCraft
-
-Updating means replacing the application code while leaving `server/data/` completely alone.
-
-### Option A — `update.sh` (recommended)
+<details>
+<summary><b>⬆️ Updating MultiCraft</b></summary>
+<br>
 
 ```bash
-./update.sh
+./update.sh               # recommended
 ```
 
-This does the whole update for you, safely: backs up `server/data/` to a timestamped `.tar.gz` *before* touching anything, records the current commit so the code can be rolled back too, pulls with `git pull --ff-only` (refuses to guess through a merge — it stops and tells you what to do instead of forcing anything), rebuilds, and offers to start the new build once to confirm `/api/health` responds before it touches your live service. If that check fails, it offers to roll straight back to the exact commit you were on and rebuilds that instead. Nothing here ever deletes or modifies `server/data/`.
+Backs up `server/data/` first, records the current commit, `git pull --ff-only`s, rebuilds, and test-starts the new build before touching your live service — offering an instant rollback if it fails. `-y` runs it unattended; `--rollback` restores the previous commit.
 
-Flags: `./update.sh -y` runs it non-interactively (stashes local changes if any, tests the build, restarts a detected `multicraft.service` on success). `./update.sh --rollback` skips updating entirely and just restores the last pre-update commit it recorded, if you find a problem after the fact.
+Manual: `git pull && npm run setup && npm run build`, then restart (`pm2 restart multicraft` / `sudo systemctl restart multicraft` / …).
 
-If you want an extra safety net on top of this regardless, [export the environment](#backing-up-and-restoring-the-whole-environment) first too.
+> [!CAUTION]
+> Never run `git clean -fdx` in the repo — `server/data/` is git-ignored, and `git clean` deletes ignored files: your database, every instance and every snapshot.
+</details>
 
-### Option B — manual
+<details>
+<summary><b>💾 Backing up, moving &amp; wiping data</b></summary>
+<br>
+
+Everything — database, instances, snapshots — lives in **`server/data/`** (or `MULTICRAFT_DATA_DIR`).
+
+- 📤 **Export / 📥 import** — **Configuration → Environment backup & restore** (admin). Import replaces the whole install; your current data is renamed to `server/data-pre-import-<timestamp>/`, not deleted. Sign in afterwards with an admin from the *imported* backup.
+- 📦 **Move it out of the repo** (recommended for production) — set `MULTICRAFT_DATA_DIR=/var/lib/multicraft` in your service definition.
+- 🧹 **Start fresh** — **Configuration → Danger zone → Delete everything & start fresh** (three confirmations; old data is kept as `data-pre-reset-…`). By hand: stop MultiCraft and empty `server/data/`.
+
+Importing across operating systems doesn't convert platform binaries (e.g. `bedrock_server.exe`) — use the instance's **Update** page afterwards.
+</details>
+
+<details>
+<summary><b>🗑️ Uninstalling (Linux)</b></summary>
+<br>
 
 ```bash
-git pull                     # or however you fetch the new version
-npm run setup                # picks up any new/changed dependencies
-npm run build                # rebuild server/dist and web/dist
+./uninstall.sh            # asks before every step
+./uninstall.sh -y         # removes service, processes and build output; keeps data + packages
+./uninstall.sh -y --purge # removes everything, including data, packages and the checkout
 ```
 
-Then restart however you're running it:
+It stops the panel and its game servers, removes `multicraft.service` or the pm2 entry and the panel's firewall rule, deletes data and `update.sh` backups (typing `delete` to confirm), and offers to remove Node.js, Java, steamcmd's 32-bit libraries and the `multicraft` user. git and curl are never removed without asking.
+</details>
 
-- Plain `npm start` — stop it (`Ctrl+C`) and start it again.
-- pm2 — `pm2 restart multicraft`
-- systemd — `sudo systemctl restart multicraft`
-- NSSM — `nssm restart MultiCraft`
-- launchd — `launchctl kickstart -k gui/$UID/com.multicraft.panel`
+---
 
-**⚠️ Do not run `git clean -fdx` (or `-fd`) in the repo.** `server/data/` is git-ignored specifically so updates never touch it — but `git clean` deletes ignored files too, and would wipe your entire database, every Minecraft server, and all backups along with normal build output. Plain `git pull`, `npm install`, and `npm run build` are all safe; they only ever touch tracked source files and the `dist`/`node_modules` folders.
+## 🏗️ Architecture
 
-### Moving `server/data/` outside the repo (recommended for production)
-
-For extra safety, point MultiCraft at a data directory outside the git repository entirely, so updates can never come near it regardless of what commands you run:
-
-```bash
-# Linux/macOS
-export MULTICRAFT_DATA_DIR=/var/lib/multicraft
-# Windows (PowerShell)
-$env:MULTICRAFT_DATA_DIR = "C:\MultiCraftData"
+```mermaid
+flowchart LR
+  B["🌐 Browser<br/>React · Vite · Tailwind"] -- "REST + WebSocket" --> P["⚙️ MultiCraft API<br/>Node.js · Express · ws"]
+  P --> DB[("🗄️ SQLite<br/>node:sqlite")]
+  P --> S1["⛏️ java -jar paper.jar"]
+  P --> S2["🪨 bedrock_server"]
+  P --> S3["🎮 Steam game binary"]
+  P --> S4["⌨️ your script"]
+  P <-->|node key| N["🌐 Other MultiCraft nodes"]
+  P -.-> X["⬇️ Mojang · PaperMC · Purpur<br/>SteamCMD · Modrinth"]
 ```
 
-Set this permanently in your service definition (see the `systemd`/NSSM examples above) rather than just in your shell, so it's picked up every time MultiCraft starts.
+- 🗄️ **Zero native dependencies** — SQLite via `node:sqlite`; HMAC session tokens and `scrypt` hashing via `node:crypto`.
+- ⚙️ **Plain child processes** — console output and player events stream to the browser over WebSocket; custom instances run in their own process group so scripts' children stop too.
+- 📊 **Metrics from `/proc`** on Linux (`Get-Process` on Windows). Network figures are host-wide — the OS doesn't count network bytes per process.
+- ⬆️ **Safe updates** — Java re-installs only the jar; Bedrock skips `worlds/`, `server.properties` and permission files; Steam re-runs `steamcmd +app_update`.
 
-## Uninstalling (Linux)
-
-```bash
-./uninstall.sh
+```
+MultiCraft/
+├── server/   ⚙️  API — Express, ws, node:sqlite
+├── web/      🎨  UI — React, Vite, Tailwind (Material 3 dark)
+└── docs/     🖼️  README artwork
 ```
 
-Walks back everything `install.sh` (and the systemd/pm2 setup above) may have changed, asking before each step: stops the panel and any game servers it launched, stops/disables/removes `multicraft.service` (or the pm2 entry), removes the firewall rule for the panel port, deletes the data directory (it reads `MULTICRAFT_DATA_DIR` from the service file, so a relocated data dir is found too) and `update.sh`'s backups, deletes `node_modules`/build output, offers to remove Node.js (plus the NodeSource repo), Java and steamcmd's 32-bit libraries, removes the dedicated `multicraft` system user if you created one, and finally offers to delete the checkout itself.
+---
 
-Deleting data requires typing `delete`. `install.sh` can't tell which packages were already on the machine before it ran, so package removal is opt-in and your package manager shows exactly what it'll remove before it does; git and curl are only ever removed if you explicitly say so.
+## 📝 Good to know
 
-Flags: `./uninstall.sh -y` runs non-interactively and keeps your data and packages (removes the service, processes and build output only). `./uninstall.sh -y --purge` removes everything, including data, packages and the checkout. Firewall rules you opened for individual game servers aren't tracked; remove those yourself.
+- 📜 Java servers require accepting Mojang's EULA at creation; MultiCraft writes `eula.txt` for you.
+- 👤 Op/kick/ban go through the live console, so the server must be running. Whitelist edits work either way.
+- ⬆️ Updating a server needs it stopped; tick *create a backup first* on its **Update** page for a safety snapshot.
 
-## Notes
+## 🗺️ Roadmap
 
-- Creating a Java server requires accepting Mojang's EULA in the creation wizard; MultiCraft writes `eula.txt` accordingly.
-- Operator tools and player op/kick/ban are applied via the live console, so the target server must be running. Whitelist/allowlist changes work either way.
-- Resource usage (RAM/CPU) is sampled per-process using platform-native tools (`Get-Process` on Windows, `/proc` on Linux) — no extra agents required.
-- Updating a *Minecraft* server (not the panel) requires it to be stopped first; checking "create a backup first" in its Update tab takes a safety backup before touching any files.
+- [x] 🎨 Material 3 redesign with list / grid / box views
+- [x] 🚀 Custom launch executables, jars and custom script servers
+- [x] 📸 Snapshots with per-file diff &amp; restore
+- [ ] 🧱 Mohist and SpongeForge instances
+- [ ] ⏪ Restore view for Minecraft's own auto-save states
 
-## Left to implement
-Implement a method to install and configure a Spigot/Mohist and SpongeForge server instance for Minecraft.
-Make the webUI more interesting, less boring.
-implement a customize launchable server jar file setting option so users can define what jar in the directory should launch.
-
-Restore tab that restores Minecraft auto save states
+<p align="center"><sub>Made with 💚 for people who'd rather play than SSH.</sub></p>

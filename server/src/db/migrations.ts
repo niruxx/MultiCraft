@@ -13,6 +13,14 @@ export function runMigrations(db: DatabaseSync): void {
   addSteamCmdColumns(db);
   addSuspensionColumns(db);
   addAccessPermissionsColumn(db);
+  addLaunchConfigColumn(db);
+}
+
+function addLaunchConfigColumn(db: DatabaseSync): void {
+  const hasColumn = db.prepare("SELECT 1 FROM pragma_table_info('servers') WHERE name = 'launch_config'").get();
+  if (hasColumn) return;
+  logger.info('Migrating database: adding servers.launch_config column');
+  db.exec('ALTER TABLE servers ADD COLUMN launch_config TEXT');
 }
 
 function addAccessPermissionsColumn(db: DatabaseSync): void {

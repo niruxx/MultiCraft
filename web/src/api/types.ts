@@ -10,7 +10,8 @@ export type ServerPermission =
   | 'plugins'
   | 'players'
   | 'settings'
-  | 'update';
+  | 'update'
+  | 'launch';
 
 export interface PublicUser {
   id: string;
@@ -22,10 +23,15 @@ export interface PublicUser {
   serverPermissions?: Record<string, ServerPermission[] | null>;
 }
 
-export type Platform = 'java' | 'bedrock' | 'steam';
-export type Loader = 'vanilla' | 'paper' | 'purpur' | 'spigot' | 'bedrock' | 'steam';
+export type Platform = 'java' | 'bedrock' | 'steam' | 'custom';
+export type Loader = 'vanilla' | 'paper' | 'purpur' | 'spigot' | 'bedrock' | 'steam' | 'custom';
 
 export const PLUGIN_CAPABLE_LOADERS: Loader[] = ['paper', 'purpur', 'spigot'];
+
+/** Java/Bedrock instances have Minecraft features (players, ops, whitelist, maps, server.properties). */
+export function isMinecraftPlatform(platform: Platform): boolean {
+  return platform === 'java' || platform === 'bedrock';
+}
 
 /** Steam-platform servers have no Minecraft-specific players/operator/whitelist/map concept. */
 export function isSteamPlatform(platform: Platform): boolean {
@@ -72,6 +78,8 @@ export interface ServerRecord {
   steam_app_id: string | null;
   steam_login: string;
   steam_extra_flags: string;
+  /** JSON-encoded LaunchConfig; null = platform defaults. */
+  launch_config: string | null;
   suspended: 0 | 1;
   suspended_reason: string | null;
   suspended_at: string | null;
@@ -177,6 +185,7 @@ export interface SystemInfo {
   nodeVersion: string;
   java: { available: boolean; version: string | null };
   primaryAddress: string | null;
+  osRelease?: string;
   addresses: HostAddress[];
   cpuCores: number;
   totalMemMb: number;
@@ -290,4 +299,66 @@ export interface MapMeta {
 export interface MapState {
   capable: boolean;
   meta: MapMeta | null;
+}
+
+export type StopSignal = 'SIGINT' | 'SIGTERM' | 'SIGQUIT' | 'SIGHUP';
+
+export type StopConfig =
+  | { kind: 'default' }
+  | { kind: 'stdin'; commands: string[]; delayMs?: number }
+  | { kind: 'signal'; signal: StopSignal }
+  | { kind: 'script'; command: string };
+
+export type RestartConfig = { kind: 'default' } | { kind: 'stdin'; commands: string[] } | { kind: 'script'; command: string };
+
+export interface LaunchConfig {
+  executable?: string;
+  javaPath?: string;
+  args?: string;
+  useShell?: boolean;
+  workingDir?: string;
+  env?: { key: string; value: string }[];
+  protocol?: 'tcp' | 'udp';
+  readyPattern?: string;
+  stop?: StopConfig;
+  restart?: RestartConfig;
+  stopTimeoutSec?: number;
+}
+
+export interface LaunchInfo {
+  config: LaunchConfig;
+  preview: string | null;
+  previewError: string | null;
+  variables: Record<string, string>;
+}
+
+/** Light per-instance metrics returned alongside the instance list. */
+export interface InstanceListMetrics {
+  runtime: RuntimeInfo | null;
+  playersOnline: number | null;
+}
+
+export interface HostMetrics {
+  sampledAt: string;
+  cpu: { percent: number | null; cores: number; model: string; loadAvg: [number, number, number] | null; perCore: number[] };
+  memory: { totalMb: number; usedMb: number; availableMb: number; swapTotalMb: number | null; swapUsedMb: number | null };
+  disk: { path: string; totalBytes: number | null; usedBytes: number | null; freeBytes: number | null; readRate: number | null; writeRate: number | null };
+  network: { rxRate: number | null; txRate: number | null; rxTotal: number | null; txTotal: number | null };
+  uptimeSec: number;
+  panelUptimeSec: number;
+}
+
+export interface SystemMetrics {
+  host: HostMetrics;
+  instances: {
+    total: number;
+    running: number;
+    starting: number;
+    stopped: number;
+    crashed: number;
+    installing: number;
+    suspended: number;
+    memoryMb: number;
+    cpuPercent: number;
+  };
 }

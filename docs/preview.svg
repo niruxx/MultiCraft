@@ -1,0 +1,131 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="640" viewBox="0 0 1200 640" role="img" aria-label="Illustration of the MultiCraft dashboard: navigation drawer, host metric gauges and instance cards">
+  <defs>
+    <linearGradient id="java" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1f3d1a"/><stop offset="1" stop-color="#14240f"/></linearGradient>
+    <linearGradient id="val" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#3a2d1a"/><stop offset="1" stop-color="#21190f"/></linearGradient>
+    <linearGradient id="pal" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#173a4a"/><stop offset="1" stop-color="#0f2330"/></linearGradient>
+    <linearGradient id="cus" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#20262b"/><stop offset="1" stop-color="#0f1316"/></linearGradient>
+    <clipPath id="win"><rect width="1200" height="640" rx="24"/></clipPath>
+  </defs>
+  <g clip-path="url(#win)" font-family="'Segoe UI', Roboto, Helvetica, Arial, sans-serif">
+    <rect width="1200" height="640" fill="#11140f"/>
+
+    <!-- window bar -->
+    <rect width="1200" height="40" fill="#0c0f0a"/>
+    <circle cx="24" cy="20" r="6" fill="#ffb4ab"/><circle cx="44" cy="20" r="6" fill="#ecc65c"/><circle cx="64" cy="20" r="6" fill="#78dc77"/>
+    <rect x="440" y="10" width="320" height="20" rx="10" fill="#1d211b"/>
+    <text x="600" y="24" text-anchor="middle" font-size="12" fill="#8c9387">localhost:8642</text>
+
+    <!-- navigation drawer -->
+    <rect x="0" y="40" width="250" height="600" fill="#191d17"/>
+    <g transform="translate(28 66)">
+      <rect width="30" height="30" rx="7" fill="#0c0f0a"/>
+      <rect x="6" y="8" width="7" height="7" fill="#4ade80"/><rect x="17" y="8" width="7" height="7" fill="#22c55e"/><rect x="11.5" y="16" width="7" height="7" fill="#4ade80"/>
+      <text x="42" y="21" font-size="18" fill="#f1f4ea">MultiCraft</text>
+    </g>
+    <rect x="14" y="120" width="222" height="44" rx="22" fill="#3a4b37"/>
+    <g font-size="14" font-weight="600">
+      <text x="62" y="147" fill="#d5e8ce">Instances</text>
+      <text x="62" y="195" fill="#c2c9bb">Configuration</text>
+      <text x="62" y="243" fill="#c2c9bb">File Management</text>
+      <text x="62" y="291" fill="#c2c9bb">Users</text>
+    </g>
+    <g fill="none" stroke-width="2" stroke-linecap="round">
+      <rect x="34" y="133" width="16" height="7" rx="2" stroke="#d5e8ce"/><rect x="34" y="144" width="16" height="7" rx="2" stroke="#d5e8ce"/>
+      <path d="M36 181v12M42 179v14M48 183v10" stroke="#c2c9bb"/>
+      <path d="M34 231h7l2 3h7v9H34z" stroke="#c2c9bb"/>
+      <circle cx="42" cy="280" r="4" stroke="#c2c9bb"/><path d="M35 293c1-5 13-5 14 0" stroke="#c2c9bb"/>
+    </g>
+    <rect x="14" y="566" width="222" height="56" rx="16" fill="#1d211b"/>
+    <circle cx="44" cy="594" r="15" fill="#005313"/><text x="44" y="599" text-anchor="middle" font-size="14" fill="#94f990">A</text>
+    <text x="68" y="590" font-size="13" fill="#e1e4da">admin</text><text x="68" y="606" font-size="11" fill="#8c9387">admin</text>
+
+    <!-- header -->
+    <text x="290" y="96" font-size="28" fill="#f1f4ea">Instances</text>
+    <text x="290" y="120" font-size="13" fill="#a3aa9d">Everything running on this host, at a glance.</text>
+    <rect x="1010" y="74" width="150" height="38" rx="19" fill="#78dc77"/>
+    <text x="1085" y="98" text-anchor="middle" font-size="14" font-weight="600" fill="#00390a">+ New instance</text>
+
+    <!-- gauges -->
+    <g font-size="12">
+      <g transform="translate(290 146)">
+        <rect width="276" height="112" rx="22" fill="#1d211b"/>
+        <circle cx="58" cy="56" r="34" fill="none" stroke="#32362f" stroke-width="8"/>
+        <circle cx="58" cy="56" r="34" fill="none" stroke="#78dc77" stroke-width="8" stroke-linecap="round" stroke-dasharray="214" stroke-dashoffset="139" transform="rotate(-90 58 56)"/>
+        <text x="58" y="61" text-anchor="middle" font-size="16" fill="#f1f4ea">35%</text>
+        <text x="110" y="44" fill="#c2c9bb" font-weight="600">CPU</text><text x="110" y="64" font-size="15" fill="#f1f4ea">12 threads</text><text x="110" y="82" fill="#a3aa9d">load 1.84</text>
+      </g>
+      <g transform="translate(582 146)">
+        <rect width="276" height="112" rx="22" fill="#1d211b"/>
+        <circle cx="58" cy="56" r="34" fill="none" stroke="#32362f" stroke-width="8"/>
+        <circle cx="58" cy="56" r="34" fill="none" stroke="#a1ced7" stroke-width="8" stroke-linecap="round" stroke-dasharray="214" stroke-dashoffset="64" transform="rotate(-90 58 56)"/>
+        <text x="58" y="61" text-anchor="middle" font-size="16" fill="#f1f4ea">70%</text>
+        <text x="110" y="44" fill="#c2c9bb" font-weight="600">Memory</text><text x="110" y="64" font-size="15" fill="#f1f4ea">22.4 of 32 GB</text><text x="110" y="82" fill="#a3aa9d">instances use 9.1 GB</text>
+      </g>
+      <g transform="translate(874 146)">
+        <rect width="286" height="112" rx="22" fill="#1d211b"/>
+        <text x="20" y="30" fill="#c2c9bb" font-weight="600">Network</text>
+        <text x="20" y="52" font-size="10" fill="#9ecaff" font-weight="600">INBOUND</text><text x="20" y="70" font-size="15" fill="#f1f4ea">1.42 MB/s</text>
+        <text x="150" y="52" font-size="10" fill="#ffb4ab" font-weight="600">OUTBOUND</text><text x="150" y="70" font-size="15" fill="#f1f4ea">3.87 MB/s</text>
+        <path d="M20 98 L38 90 L56 94 L74 82 L92 88 L110 78 L128 84" fill="none" stroke="#9ecaff" stroke-width="2.5" stroke-linecap="round"/>
+        <path d="M150 96 L168 86 L186 90 L204 74 L222 80 L240 70 L258 76" fill="none" stroke="#ffb4ab" stroke-width="2.5" stroke-linecap="round"/>
+      </g>
+    </g>
+
+    <!-- view switcher -->
+    <text x="290" y="300" font-size="15" fill="#e1e4da">4 instances</text>
+    <rect x="976" y="282" width="184" height="30" rx="15" fill="none" stroke="#6c7468"/>
+    <rect x="1038" y="285" width="60" height="24" rx="12" fill="#3a4b37"/>
+    <g font-size="11" font-weight="600" text-anchor="middle"><text x="1007" y="301" fill="#c2c9bb">List</text><text x="1068" y="301" fill="#d5e8ce">Grid</text><text x="1129" y="301" fill="#c2c9bb">Box</text></g>
+
+    <!-- instance cards -->
+    <g font-size="12">
+      <!-- Java -->
+      <g transform="translate(290 326)">
+        <rect width="427" height="134" rx="22" fill="#1d211b"/>
+        <rect x="18" y="18" width="48" height="48" rx="14" fill="url(#java)"/>
+        <path d="M42 28l12 6-12 6-12-6z" fill="#82d65a"/><path d="M30 34l12 6v14l-12-6z" fill="#8a5a36"/><path d="M54 34l-12 6v14l12-6z" fill="#6e4528"/>
+        <circle cx="64" cy="64" r="6" fill="#6cdeb0" stroke="#1d211b" stroke-width="2"/>
+        <text x="82" y="38" font-size="16" fill="#f1f4ea">Survival SMP</text>
+        <rect x="200" y="25" width="62" height="18" rx="5" fill="#6cdeb0" fill-opacity="0.15"/><text x="231" y="38" text-anchor="middle" font-size="11" fill="#6cdeb0">Running</text>
+        <text x="82" y="58" fill="#a3aa9d">Minecraft: Java · paper 26.3 · port 25565</text>
+        <line x1="18" y1="88" x2="409" y2="88" stroke="#32362f"/>
+        <text x="18" y="112" fill="#c2c9bb">⚙ 18.4%     ▤ 2.1 GB     👤 7 online     ⏱ 3h 12m</text>
+      </g>
+      <!-- Valheim -->
+      <g transform="translate(733 326)">
+        <rect width="427" height="134" rx="22" fill="#1d211b"/>
+        <rect x="18" y="18" width="48" height="48" rx="14" fill="url(#val)"/>
+        <path d="M30 50a12 12 0 0 1 24 0v5H30z" fill="#b8874a"/><path d="M29 34c-2 5 0 9 5 11l1-4c-3-1-5-3-6-7z" fill="#e8dcc0"/><path d="M55 34c2 5 0 9-5 11l-1-4c3-1 5-3 6-7z" fill="#e8dcc0"/>
+        <text x="82" y="38" font-size="16" fill="#f1f4ea">Valheim Vikings</text>
+        <rect x="222" y="25" width="62" height="18" rx="5" fill="#32362f"/><text x="253" y="38" text-anchor="middle" font-size="11" fill="#c2c9bb">Stopped</text>
+        <text x="82" y="58" fill="#a3aa9d">Valheim · port 2456</text>
+        <line x1="18" y1="88" x2="409" y2="88" stroke="#32362f"/>
+        <text x="18" y="112" fill="#6c7468">Not running</text>
+      </g>
+      <!-- Palworld -->
+      <g transform="translate(290 476)">
+        <rect width="427" height="134" rx="22" fill="#1d211b"/>
+        <rect x="18" y="18" width="48" height="48" rx="14" fill="url(#pal)"/>
+        <circle cx="42" cy="42" r="14" fill="#e8f1f5"/><path d="M28 42a14 14 0 0 1 28 0z" fill="#3ba3d0"/><rect x="28" y="41" width="28" height="2.5" fill="#163847"/><circle cx="42" cy="42" r="4" fill="#163847"/>
+        <circle cx="64" cy="64" r="6" fill="#6cdeb0" stroke="#1d211b" stroke-width="2"/>
+        <text x="82" y="38" font-size="16" fill="#f1f4ea">Palworld Co-op</text>
+        <rect x="210" y="25" width="62" height="18" rx="5" fill="#6cdeb0" fill-opacity="0.15"/><text x="241" y="38" text-anchor="middle" font-size="11" fill="#6cdeb0">Running</text>
+        <text x="82" y="58" fill="#a3aa9d">Palworld · port 8211</text>
+        <line x1="18" y1="88" x2="409" y2="88" stroke="#32362f"/>
+        <text x="18" y="112" fill="#c2c9bb">⚙ 41.0%     ▤ 6.8 GB     ⏱ 1d 4h</text>
+      </g>
+      <!-- Custom -->
+      <g transform="translate(733 476)">
+        <rect width="427" height="134" rx="22" fill="#1d211b"/>
+        <rect x="18" y="18" width="48" height="48" rx="14" fill="url(#cus)"/>
+        <rect x="27" y="29" width="30" height="24" rx="4" fill="#0b0f0c" stroke="#5f6b62" stroke-width="1.5"/>
+        <path d="M33 37l4 4-4 4M40 46h9" fill="none" stroke="#78dc77" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+        <text x="82" y="38" font-size="16" fill="#f1f4ea">Arena Relay</text>
+        <rect x="186" y="25" width="70" height="18" rx="5" fill="#ffb4ab" fill-opacity="0.15"/><text x="221" y="38" text-anchor="middle" font-size="11" fill="#ffb4ab">Suspended</text>
+        <text x="82" y="58" fill="#a3aa9d">Custom server · port 27960</text>
+        <line x1="18" y1="88" x2="409" y2="88" stroke="#32362f"/>
+        <text x="18" y="112" fill="#6c7468">Locked by an admin — Non-payment</text>
+      </g>
+    </g>
+  </g>
+</svg>

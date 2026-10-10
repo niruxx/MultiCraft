@@ -288,7 +288,7 @@ export function InstanceAdminCards() {
   const { isAdmin } = useServerDetail();
   if (!isAdmin) return null;
   return (
-    <div className="space-y-5">
+    <div className="stagger space-y-5">
       <h2 className="pt-2 text-sm font-medium text-ink-400">Administration</h2>
       <SuspensionCard />
       <TransferCard />

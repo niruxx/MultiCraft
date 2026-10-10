@@ -72,13 +72,14 @@ export const SERVER_PERMISSIONS = [
   'players', // op, kick, ban, whitelist
   'settings', // instance configuration & server.properties
   'update', // change version / update the server software
+  'launch', // change the launch command/executable — effectively running arbitrary code, so opt-in
 ] as const;
 
 export type ServerPermission = (typeof SERVER_PERMISSIONS)[number];
 
 export function roleDefaultPermissions(role: Role): ServerPermission[] {
   if (role === 'viewer') return ['files.read'];
-  return [...SERVER_PERMISSIONS];
+  return SERVER_PERMISSIONS.filter((p) => p !== 'launch');
 }
 
 function sanitizePermissions(value: unknown): ServerPermission[] | null {

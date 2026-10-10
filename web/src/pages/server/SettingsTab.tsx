@@ -4,6 +4,8 @@ import { api, ApiError } from '../../api/client.js';
 import type { PropertyEntry } from '../../api/types.js';
 import { Button, Card, ErrorText, Field, Input } from '../../components/ui.js';
 import { InstanceAdminCards } from './AdminCards.js';
+import { LaunchCard } from './LaunchCard.js';
+import { isMinecraftPlatform } from '../../api/types.js';
 
 export function SettingsTab() {
   const { server, can, refresh } = useServerDetail();
@@ -72,7 +74,7 @@ export function SettingsTab() {
   if (!server) return null;
 
   return (
-    <div className="space-y-6">
+    <div className="stagger space-y-6">
       <Card className="p-5">
         <h2 className="mb-4 text-base font-medium text-ink-100">General</h2>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -94,10 +96,10 @@ export function SettingsTab() {
           )}
           {server.platform !== 'steam' && (
             <>
-              <Field label="Min memory (MB)">
+              <Field label={server.platform === 'custom' ? 'Min memory (MB) — {{MIN_MEMORY}}' : 'Min memory (MB)'}>
                 <Input type="number" value={minMemoryMb} onChange={(e) => setMinMemoryMb(Number(e.target.value))} disabled={!canWrite} />
               </Field>
-              <Field label="Max memory (MB)">
+              <Field label={server.platform === 'custom' ? 'Max memory (MB) — {{MAX_MEMORY}}' : 'Max memory (MB)'}>
                 <Input type="number" value={maxMemoryMb} onChange={(e) => setMaxMemoryMb(Number(e.target.value))} disabled={!canWrite} />
               </Field>
             </>
@@ -107,7 +109,7 @@ export function SettingsTab() {
               <Input value={extraJavaArgs} onChange={(e) => setExtraJavaArgs(e.target.value)} disabled={!canWrite} placeholder="-XX:+UseG1GC" />
             </Field>
           )}
-          <Field label={server.platform === 'steam' ? 'Extra launch args' : 'Extra server args'}>
+          <Field label={server.platform === 'java' || server.platform === 'bedrock' ? 'Extra server args' : 'Extra launch args'}>
             <Input value={extraArgs} onChange={(e) => setExtraArgs(e.target.value)} disabled={!canWrite} />
           </Field>
           {server.platform === 'steam' && (
@@ -152,11 +154,13 @@ export function SettingsTab() {
         )}
       </Card>
 
-      {server.platform === 'steam' ? (
+      <LaunchCard />
+
+      {!isMinecraftPlatform(server.platform) ? (
         <Card className="p-5">
           <h2 className="mb-2 text-base font-medium text-ink-100">Config files</h2>
           <p className="text-sm text-ink-400">
-            This game's config files aren't edited here — open File Management to view or edit whatever config file
+            {server.platform === 'custom' ? 'Custom instances keep their config in their own files' : "This game's config files aren't edited here"} — open File Management to view or edit whatever config file
             it writes (INI, JSON, or otherwise).
           </p>
         </Card>

@@ -10,6 +10,7 @@ import {
   listServers,
   setServerJar,
   setServerStatus,
+  setLaunchConfig,
   setServerSuspension,
   setServerVersion,
   updateServerRecord,
@@ -26,6 +27,8 @@ import {
   sendCommand,
   startServer,
   stopServer,
+  restartServer,
+  buildLaunch,
 } from '../services/processManager.js';
 import { getPlayerRoster } from '../services/playerService.js';
 import { getServerPermissions, getUserServerAccess, logAudit } from '../services/userService.js';
@@ -35,7 +38,9 @@ import { findJava, getJavaVersion } from '../services/javaService.js';
 import { getDiskUsage } from '../services/diskUsageService.js';
 import { instanceDir, safeJoin } from '../utils/paths.js';
 import { STEAM_GAME_PRESETS, findPreset } from '../services/steamGames.js';
-import { isSteamPlatform, type Loader, type Platform, type Role, type ServerRecord } from '../types/index.js';
+import { isMinecraftPlatform, type Loader, type Platform, type ServerRecord } from '../types/index.js';
+import { sanitizeLaunchConfig, launchConfigOf, launchVariables, resolveExecutable, ensureExecutable } from '../services/launchConfig.js';
+import { getOnlinePlayers } from '../services/playerService.js';
 
 export const serversRouter = Router();
 serversRouter.use(requireAuth);
@@ -98,10 +103,18 @@ async function runServerInstall(server: ServerRecord): Promise<void> {
 serversRouter.get(
   '/',
   asyncHandler(async (req, res) => {
-    const all = listServers();
-    if (req.auth!.role === 'admin') return res.json({ servers: all });
-    const allowed = new Set(getUserServerAccess(req.auth!.sub));
-    res.json({ servers: all.filter((s) => allowed.has(s.id)) });
+    const allowed = req.auth!.role === 'admin' ? null : new Set(getUserServerAccess(req.auth!.sub));
+    const visible = listServers().filter((s) => !allowed || allowed.has(s.id));
+    // Light per-instance metrics for the instance list (suspended ones stay opaque to non-admins).
+    const metrics = Object.fromEntries(
+      visible
+        .filter((s) => req.auth!.role === 'admin' || !s.suspended)
+        .map((s) => [
+          s.id,
+          { runtime: getRuntimeInfo(s.id), playersOnline: isMinecraftPlatform(s.platform) ? getOnlinePlayers(s.id).length : null },
+        ])
+    );
+    res.json({ servers: visible, metrics });
   })
 );
 
@@ -164,13 +177,20 @@ serversRouter.post(
     } = req.body ?? {};
 
     if (typeof name !== 'string' || !name.trim()) throw new HttpError(400, 'Server name is required');
-    if (!['java', 'bedrock', 'steam'].includes(platform)) throw new HttpError(400, 'Invalid platform');
-    if (!['vanilla', 'paper', 'purpur', 'spigot', 'bedrock', 'steam'].includes(loader)) {
+    if (!['java', 'bedrock', 'steam', 'custom'].includes(platform)) throw new HttpError(400, 'Invalid platform');
+    if (!['vanilla', 'paper', 'purpur', 'spigot', 'bedrock', 'steam', 'custom'].includes(loader)) {
       throw new HttpError(400, 'Invalid loader');
     }
     if (typeof version !== 'string' || !version) throw new HttpError(400, 'Version is required');
     if (platform === 'java' && acceptEula !== true) {
       throw new HttpError(400, "You must accept Mojang's EULA to create a Java server");
+    }
+
+    // Custom instances run an arbitrary binary/script on this host, so only admins may create them.
+    let launchConfig: string | null = null;
+    if (platform === 'custom') {
+      if (req.auth!.role !== 'admin') throw new HttpError(403, 'Only admins can create custom instances');
+      launchConfig = JSON.stringify(sanitizeLaunchConfig(req.body?.launch ?? {}, { isAdmin: true, platform: 'custom' }));
     }
 
     let preset: ReturnType<typeof findPreset> | undefined;
@@ -207,6 +227,7 @@ serversRouter.post(
       steamAppId: platform === 'steam' ? steamAppId : null,
       steamLogin: platform === 'steam' && typeof steamLogin === 'string' && steamLogin.trim() ? steamLogin.trim() : 'anonymous',
       steamExtraFlags: platform === 'steam' && typeof steamExtraFlags === 'string' ? steamExtraFlags.trim() : '',
+      launchConfig,
     });
 
     if (platform === 'steam' && !preset && typeof customExecutable === 'string') {
@@ -224,8 +245,15 @@ serversRouter.post(
     }
 
     logAudit(req.auth!.sub, req.auth!.username, 'server.create', record.id, `${loader} ${version}`);
-    res.status(201).json({ server: record });
 
+    if (platform === 'custom') {
+      // Nothing to download: the user brings the files (File Management) or points at a host binary.
+      setServerStatus(record.id, 'stopped');
+      appendLine(record.id, '[MultiCraft] Custom instance created — upload your server files in File Management, then start it.');
+      return res.status(201).json({ server: getServer(record.id) });
+    }
+
+    res.status(201).json({ server: record });
     void runServerInstall(record);
   })
 );
@@ -240,6 +268,7 @@ serversRouter.post(
     if (server.status !== 'install_failed') {
       throw new HttpError(409, 'Retry is only available after a failed install');
     }
+    if (server.platform === 'custom') throw new HttpError(409, 'Custom instances have no install step');
 
     setServerStatus(server.id, 'installing');
     publish(consoleTopic(server.id), { type: 'status', status: 'installing' });
@@ -274,12 +303,18 @@ serversRouter.get(
   asyncHandler(async (req, res) => {
     const server = getServer(req.params.serverId);
     if (!server) throw new HttpError(404, 'Server not found');
-    const props = server.platform === 'steam' ? [] : readServerProperties(server.id, server.platform);
+    const props = isMinecraftPlatform(server.platform) ? readServerProperties(server.id, server.platform) : [];
     const bind = props.find((p) => p.key === 'server-ip')?.value.trim() ?? '';
     const wildcard = !bind || bind === '0.0.0.0' || bind === '::';
     const primary = await getPrimaryAddress();
     const protocol =
-      server.platform === 'java' ? 'tcp' : server.platform === 'bedrock' ? 'udp' : findPreset(server.steam_app_id)?.portProtocol ?? 'udp';
+      server.platform === 'java'
+        ? 'tcp'
+        : server.platform === 'bedrock'
+          ? 'udp'
+          : server.platform === 'custom'
+            ? launchConfigOf(server).protocol ?? 'tcp'
+            : findPreset(server.steam_app_id)?.portProtocol ?? 'udp';
     res.json({
       host: wildcard ? primary ?? '127.0.0.1' : bind,
       bindAddress: wildcard ? '0.0.0.0' : bind,
@@ -288,6 +323,48 @@ serversRouter.get(
       hostname: os.hostname(),
       addresses: listHostAddresses(),
     });
+  })
+);
+
+/** The instance's launch config plus a preview of the exact command it resolves to. */
+serversRouter.get(
+  '/:serverId/launch',
+  requireServerAccess(),
+  asyncHandler(async (req, res) => {
+    const server = getServer(req.params.serverId);
+    if (!server) throw new HttpError(404, 'Server not found');
+    let preview: string | null = null;
+    let previewError: string | null = null;
+    try {
+      preview = (await buildLaunch(server)).display;
+    } catch (err) {
+      previewError = err instanceof Error ? err.message : String(err);
+    }
+    res.json({ config: launchConfigOf(server), preview, previewError, variables: launchVariables(server) });
+  })
+);
+
+serversRouter.put(
+  '/:serverId/launch',
+  requireServerAccess(),
+  asyncHandler(async (req, res) => {
+    requirePermission(req, 'launch');
+    const server = getServer(req.params.serverId);
+    if (!server) throw new HttpError(404, 'Server not found');
+    const config = sanitizeLaunchConfig(req.body?.config ?? {}, { isAdmin: req.auth!.role === 'admin', platform: server.platform });
+    setLaunchConfig(server.id, Object.keys(config).length ? JSON.stringify(config) : null);
+    if (config.executable && !config.useShell) ensureExecutable(resolveExecutable(server, config.executable));
+    appendLine(server.id, `[MultiCraft] Launch settings changed by ${req.auth!.username} — they apply on the next start`, 'system');
+    logAudit(req.auth!.sub, req.auth!.username, 'server.launch.update', server.id, JSON.stringify(config).slice(0, 500));
+    const updated = getServer(server.id)!;
+    let preview: string | null = null;
+    let previewError: string | null = null;
+    try {
+      preview = (await buildLaunch(updated)).display;
+    } catch (err) {
+      previewError = err instanceof Error ? err.message : String(err);
+    }
+    res.json({ config, preview, previewError, server: updated });
   })
 );
 
@@ -408,18 +485,7 @@ serversRouter.post(
   asyncHandler(async (req, res) => {
     requirePermission(req, 'power');
     const serverId = req.params.serverId;
-    if (isRunning(serverId)) {
-      await new Promise<void>((resolve) => {
-        const check = setInterval(() => {
-          if (!isRunning(serverId)) {
-            clearInterval(check);
-            resolve();
-          }
-        }, 500);
-        stopServer(serverId);
-      });
-    }
-    await startServer(serverId);
+    await restartServer(serverId);
     logAudit(req.auth!.sub, req.auth!.username, 'server.restart', serverId);
     res.status(202).json({ ok: true });
   })
@@ -451,7 +517,7 @@ serversRouter.get(
   asyncHandler(async (req, res) => {
     const server = getServer(req.params.serverId);
     if (!server) throw new HttpError(404, 'Server not found');
-    if (isSteamPlatform(server.platform)) throw new HttpError(400, 'Steam-platform servers have no player roster');
+    if (!isMinecraftPlatform(server.platform)) throw new HttpError(400, 'Only Minecraft instances have a player roster');
     res.json({ players: getPlayerRoster(req.params.serverId) });
   })
 );
@@ -474,7 +540,7 @@ serversRouter.post(
     const { serverId, name, action } = req.params;
     const server = getServer(serverId);
     if (!server) throw new HttpError(404, 'Server not found');
-    if (isSteamPlatform(server.platform)) throw new HttpError(400, 'Steam-platform servers have no operator/player commands');
+    if (!isMinecraftPlatform(server.platform)) throw new HttpError(400, 'Only Minecraft instances have operator/player commands');
     const builder = PLAYER_ACTIONS[action];
     if (!builder) throw new HttpError(400, `Unknown player action: ${action}`);
     if (!isRunning(serverId)) {

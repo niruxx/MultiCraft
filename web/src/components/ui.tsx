@@ -21,7 +21,7 @@ export function Button({
   ...props
 }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'default' | 'primary' | 'danger' | 'ghost' | 'outlined' }) {
   const base =
-    'state-layer inline-flex items-center justify-center gap-2 rounded-full px-4 py-2 text-sm font-medium tracking-[0.01em] transition-[background-color,box-shadow] duration-150 disabled:cursor-not-allowed disabled:opacity-[0.38] select-none';
+    'state-layer inline-flex items-center justify-center gap-2 rounded-full px-4 py-2 text-sm font-medium tracking-[0.01em] transition-[background-color,box-shadow,transform] duration-150 enabled:active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-[0.38] select-none';
   const variants: Record<string, string> = {
     default: 'bg-secondary-container text-secondary-on-container',
     primary: 'bg-accent-400 text-accent-on hover:shadow-flat',
@@ -55,7 +55,7 @@ export function Card({
   hover = false,
   glass = true,
 }: {
-  children: ReactNode;
+  children?: ReactNode;
   className?: string;
   hover?: boolean;
   glass?: boolean;
@@ -63,7 +63,7 @@ export function Card({
   return (
     <div
       className={`rounded-3xl ${glass ? 'bg-surface-850' : 'bg-surface-900'} ${
-        hover ? 'transition-colors duration-150 hover:bg-surface-800' : ''
+        hover ? 'transition-[background-color,transform,box-shadow] duration-200 ease-out hover:-translate-y-0.5 hover:bg-surface-800 hover:shadow-card' : ''
       } ${className}`}
     >
       {children}
@@ -108,7 +108,7 @@ export function Badge({
     blue: 'bg-sky-400',
   };
   return (
-    <span className={`inline-flex items-center gap-1.5 rounded-lg px-2 py-0.5 text-xs font-medium ${BADGE_TONES[tone]}`}>
+    <span className={`inline-flex items-center gap-1.5 rounded-lg px-2 py-0.5 text-xs font-medium transition-colors duration-300 ${BADGE_TONES[tone]}`}>
       {pulse && (
         <span className="relative flex h-1.5 w-1.5">
           <span className={`absolute inline-flex h-full w-full animate-ping-slow rounded-full ${dotColor[tone]}`} />

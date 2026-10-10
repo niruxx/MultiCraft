@@ -22,10 +22,10 @@ import { BackupsTab } from './server/BackupsTab.js';
 import { UpdateTab } from './server/UpdateTab.js';
 import { useEndpoint } from '../hooks/useEndpoint.js';
 import { api, ApiError } from '../api/client.js';
-import { isSteamPlatform, type ServerRecord } from '../api/types.js';
+import { isMinecraftPlatform, type ServerRecord } from '../api/types.js';
 
 function InstanceNav({ server, onNavigate }: { server: ServerRecord; onNavigate: () => void }) {
-  const steam = isSteamPlatform(server.platform);
+  const steam = !isMinecraftPlatform(server.platform);
   const kind = gameKindOf(server);
   return (
     <nav className="space-y-1">
@@ -70,7 +70,7 @@ function CopyChip({ icon, label, value, copyValue }: { icon: 'globe' | 'port'; l
           .catch(() => toast.error('Clipboard unavailable'));
       }}
       title={`Copy ${label.toLowerCase()}`}
-      className="state-layer flex items-center gap-2 rounded-lg border border-surface-600 px-3 py-1.5 text-left"
+      className="state-layer flex items-center gap-2 rounded-lg border border-surface-600 px-3 py-1.5 text-left transition-transform active:scale-[0.97]"
     >
       <Icon name={icon} className="h-4 w-4 text-accent-400" />
       <span className="text-[11px] font-medium uppercase tracking-wide text-ink-400">{label}</span>
@@ -143,7 +143,14 @@ function InstanceTopBar({ server }: { server: ServerRecord }) {
       animate={{ opacity: 1, y: 0 }}
       className="relative overflow-hidden rounded-3xl bg-surface-850 px-5 py-5 sm:px-6"
     >
-      <GameWatermark kind={kind} className="absolute -right-6 -top-10 h-56 w-56 rotate-12 opacity-[0.09]" />
+      <motion.div
+        className="pointer-events-none absolute -right-6 -top-10"
+        initial={{ opacity: 0, rotate: 0, scale: 0.9 }}
+        animate={{ opacity: 0.09, rotate: [12, 16, 12], y: [0, -6, 0], scale: 1 }}
+        transition={{ opacity: { duration: 0.6 }, scale: { duration: 0.6 }, rotate: { duration: 9, repeat: Infinity, ease: 'easeInOut' }, y: { duration: 9, repeat: Infinity, ease: 'easeInOut' } }}
+      >
+        <GameWatermark kind={kind} className="h-56 w-56" />
+      </motion.div>
       <div className="relative flex flex-wrap items-start gap-4">
         <GameTile kind={kind} className="h-14 w-14" running={server.status === 'running'} />
         <div className="min-w-0 flex-1">
@@ -153,7 +160,7 @@ function InstanceTopBar({ server }: { server: ServerRecord }) {
           </div>
           <p className="mt-0.5 text-sm text-ink-400">
             {gameLabel(kind)}
-            {server.platform !== 'steam' && ` · ${server.loader} ${server.version}`}
+            {isMinecraftPlatform(server.platform) && ` · ${server.loader} ${server.version}`}
           </p>
         </div>
         <LifecycleActions />
@@ -224,7 +231,7 @@ function InstancePageInner() {
     );
   }
 
-  const steam = isSteamPlatform(server.platform);
+  const steam = !isMinecraftPlatform(server.platform);
   const onConsole = location.pathname.endsWith('/console');
 
   return (
