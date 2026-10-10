@@ -14,6 +14,12 @@ import {
   setUserServerAccess,
   updateUserPassword,
   updateUserRole,
+  countOwned,
+  getEffectiveCreation,
+  roleDefaultCreation,
+  sanitizeCreationPolicy,
+  setCreationPolicy,
+  CREATABLE_PLATFORMS,
 } from '../services/userService.js';
 import type { Role } from '../types/index.js';
 
@@ -27,6 +33,9 @@ usersRouter.get(
       ...u,
       serverAccess: getUserServerAccess(u.id),
       serverPermissions: Object.fromEntries(getUserServerAccessDetailed(u.id).map((a) => [a.serverId, a.permissions])),
+      creationPolicy: u.creation ? sanitizeCreationPolicy(JSON.parse(u.creation)) : null,
+      effectiveCreation: getEffectiveCreation(u.id, u.role),
+      owned: countOwned(u.id),
     }));
     res.json({ users });
   })
@@ -73,6 +82,10 @@ usersRouter.patch(
       }
       updateUserPassword(target.id, password);
     }
+    if (req.body && 'creation' in req.body) {
+      // null = follow the role's default; an object = this user's own creation policy.
+      setCreationPolicy(target.id, req.body.creation === null ? null : sanitizeCreationPolicy(req.body.creation));
+    }
     if (Array.isArray(serverAccess)) {
       // Plain ids get the role's default permissions; objects carry a per-instance permission set.
       setUserServerAccess(
@@ -95,6 +108,8 @@ usersRouter.get(
     res.json({
       permissions: SERVER_PERMISSIONS,
       defaults: { moderator: roleDefaultPermissions('moderator'), viewer: roleDefaultPermissions('viewer') },
+      creatablePlatforms: CREATABLE_PLATFORMS,
+      creationDefaults: { moderator: roleDefaultCreation('moderator'), viewer: roleDefaultCreation('viewer') },
     });
   })
 );

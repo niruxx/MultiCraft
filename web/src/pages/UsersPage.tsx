@@ -4,7 +4,7 @@ import { Badge, Button, Card, ErrorText, Field, Input, Modal, Select } from '../
 import { useToast } from '../components/Toast.js';
 import { useConfirm } from '../components/ConfirmDialog.js';
 import { api, ApiError } from '../api/client.js';
-import type { PublicUser, Role, ServerPermission, ServerRecord } from '../api/types.js';
+import type { CreatablePlatform, CreationPolicy, PublicUser, Role, ServerPermission, ServerRecord } from '../api/types.js';
 import { GameTile, gameKindOf } from '../components/GameArt.js';
 import { useAuth } from '../state/AuthContext.js';
 
@@ -86,6 +86,10 @@ export function UsersPage() {
                       {u.serverAccess && u.serverAccess.length > 0
                         ? `Access to ${u.serverAccess.length} instance(s)`
                         : 'No instance access granted'}
+                      {' · '}
+                      {u.effectiveCreation?.canCreate
+                        ? `can create${u.effectiveCreation.maxInstances ? ` (owns ${u.owned ?? 0}/${u.effectiveCreation.maxInstances})` : u.owned ? ` (owns ${u.owned})` : ''}`
+                        : 'cannot create instances'}
                     </p>
                   )}
                 </div>
@@ -195,6 +199,8 @@ function EditUserModal({
   const [password, setPassword] = useState('');
   // Assigned instances → explicit permission set, or null for the role's defaults.
   const [access, setAccess] = useState<Record<string, ServerPermission[] | null>>({});
+  // null = follow the role's default creation policy
+  const [creation, setCreation] = useState<CreationPolicy | null>(null);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -204,6 +210,7 @@ function EditUserModal({
     setRole(user.role);
     setPassword('');
     setAccess(Object.fromEntries((user.serverAccess ?? []).map((id) => [id, user.serverPermissions?.[id] ?? null])));
+    setCreation(user.creationPolicy ?? null);
     setError('');
   }, [user]);
 
@@ -216,6 +223,7 @@ function EditUserModal({
         role,
         password: password || undefined,
         serverAccess: Object.entries(access).map(([serverId, permissions]) => ({ serverId, permissions })),
+        ...(role === 'admin' ? {} : { creation }),
       });
       toast.success(`Updated "${user.username}"`);
       onSaved();
@@ -240,6 +248,7 @@ function EditUserModal({
         <Field label="New password (leave blank to keep current)">
           <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} minLength={8} />
         </Field>
+        {role !== 'admin' && <CreationEditor role={role} value={creation} onChange={setCreation} owned={user?.owned ?? 0} />}
         {role !== 'admin' && <AccessEditor role={role} servers={servers} access={access} onChange={setAccess} />}
         <ErrorText>{error}</ErrorText>
         <div className="flex justify-end gap-2">
@@ -384,6 +393,94 @@ function AccessEditor({
       </div>
       <p className="mt-2 text-xs text-ink-500">
         Every assigned user can see the instance's status, console output and player list. Everything else needs the permission.
+      </p>
+    </div>
+  );
+}
+
+const PLATFORM_LABEL: Record<CreatablePlatform, string> = { java: '⛏️ Minecraft Java', bedrock: '🪨 Bedrock', steam: '🎮 Steam games' };
+const ALL_CREATABLE: CreatablePlatform[] = ['java', 'bedrock', 'steam'];
+
+function roleCreation(role: Role): CreationPolicy {
+  return role === 'viewer'
+    ? { canCreate: false, platforms: [], maxInstances: 0, maxMemoryMb: 0 }
+    : { canCreate: true, platforms: ALL_CREATABLE, maxInstances: 0, maxMemoryMb: 0 };
+}
+
+/** May this user create instances — which kinds, how many, how big. New instances are owned by them. */
+function CreationEditor({
+  role,
+  value,
+  onChange,
+  owned,
+}: {
+  role: Role;
+  value: CreationPolicy | null;
+  onChange: (v: CreationPolicy | null) => void;
+  owned: number;
+}) {
+  const custom = value !== null;
+  const effective = value ?? roleCreation(role);
+  const set = (patch: Partial<CreationPolicy>) => onChange({ ...effective, ...patch });
+  const summary = effective.canCreate
+    ? `${effective.platforms.map((p) => PLATFORM_LABEL[p].split(' ').slice(1).join(' ')).join(', ') || 'nothing'}${effective.maxInstances ? ` · up to ${effective.maxInstances}` : ' · no limit'}`
+    : 'cannot create instances';
+
+  return (
+    <div className="rounded-2xl bg-surface-850 p-4">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <span className="text-xs font-medium text-ink-300">Instance creation</span>
+        <span className="text-xs text-ink-500">Owns {owned} instance{owned === 1 ? '' : 's'}</span>
+      </div>
+      <div className="mb-3 flex flex-wrap gap-2 text-sm">
+        <label className="flex items-center gap-2 text-ink-200">
+          <input type="radio" checked={!custom} onChange={() => onChange(null)} />
+          {role === 'viewer' ? 'Viewer' : 'Moderator'} default <span className="text-xs text-ink-500">({summary})</span>
+        </label>
+        <label className="flex items-center gap-2 text-ink-200">
+          <input type="radio" checked={custom} onChange={() => onChange({ ...effective })} />
+          Custom for this user
+        </label>
+      </div>
+      {custom && (
+        <div className="space-y-3">
+          <label className="flex items-center gap-2 text-sm text-ink-200">
+            <input type="checkbox" checked={effective.canCreate} onChange={(e) => set({ canCreate: e.target.checked, platforms: e.target.checked && !effective.platforms.length ? ALL_CREATABLE : effective.platforms })} />
+            Can create new instances (they'll own them)
+          </label>
+          {effective.canCreate && (
+            <>
+              <div className="flex flex-wrap gap-1.5">
+                {ALL_CREATABLE.map((p) => {
+                  const on = effective.platforms.includes(p);
+                  return (
+                    <button
+                      key={p}
+                      type="button"
+                      onClick={() => set({ platforms: on ? effective.platforms.filter((x) => x !== p) : [...effective.platforms, p] })}
+                      className={`state-layer rounded-lg border px-2.5 py-1 text-xs font-medium ${on ? 'border-transparent bg-secondary-container text-secondary-on-container' : 'border-surface-500 text-ink-400'}`}
+                    >
+                      {on ? '✓ ' : ''}
+                      {PLATFORM_LABEL[p]}
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Max instances (0 = no limit)">
+                  <Input type="number" min={0} value={effective.maxInstances} onChange={(e) => set({ maxInstances: Math.max(0, Number(e.target.value)) })} />
+                </Field>
+                <Field label="Max memory per instance, MB (0 = no limit)">
+                  <Input type="number" min={0} step={256} value={effective.maxMemoryMb} onChange={(e) => set({ maxMemoryMb: Math.max(0, Number(e.target.value)) })} />
+                </Field>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+      <p className="mt-3 text-xs text-ink-500">
+        Owners get full control of their own instances except editing the launch command and UPnP (grant those per instance below). Custom
+        and Docker instances can only be created by admins.
       </p>
     </div>
   );

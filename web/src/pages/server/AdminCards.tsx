@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useServerDetail } from './ServerContext.js';
 import { api, ApiError } from '../../api/client.js';
-import type { PanelNode, TransferState } from '../../api/types.js';
+import type { PanelNode, PublicUser, TransferState } from '../../api/types.js';
 import { Button, Card, CardTitle, ErrorText, Field, Input, Notice, Select, Spinner } from '../../components/ui.js';
 import { Icon } from '../../components/icons.js';
 import { useToast } from '../../components/Toast.js';
@@ -246,6 +246,57 @@ function TransferCard() {
   );
 }
 
+function OwnerCard() {
+  const { server, owner, refresh } = useServerDetail();
+  const toast = useToast();
+  const [users, setUsers] = useState<PublicUser[] | null>(null);
+  const [choice, setChoice] = useState('');
+
+  useEffect(() => {
+    api.get<{ users: PublicUser[] }>('/users').then((r) => setUsers(r.users)).catch(() => setUsers([]));
+  }, []);
+  useEffect(() => setChoice(owner?.id ?? ''), [owner?.id]);
+
+  if (!server) return null;
+
+  async function save() {
+    try {
+      await api.patch(`/servers/${server!.id}/owner`, { userId: choice || null });
+      toast.success(choice ? 'Ownership transferred' : 'Owner removed');
+      refresh();
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : 'Failed to change the owner');
+    }
+  }
+
+  return (
+    <Card className="p-5">
+      <CardTitle>Owner</CardTitle>
+      <p className="mb-4 text-sm text-ink-400">
+        The owner can manage and delete this instance and it counts toward their instance limit. A new non-admin owner automatically gets
+        owner access.
+      </p>
+      <div className="flex flex-wrap items-end gap-3">
+        <div className="min-w-[220px] flex-1">
+          <Field label="Owned by">
+            <Select value={choice} onChange={(e) => setChoice(e.target.value)} disabled={!users}>
+              <option value="">No owner (admins only)</option>
+              {users?.map((u) => (
+                <option key={u.id} value={u.id}>
+                  {u.username} ({u.role})
+                </option>
+              ))}
+            </Select>
+          </Field>
+        </div>
+        <Button variant="primary" onClick={save} disabled={choice === (owner?.id ?? '')}>
+          Save owner
+        </Button>
+      </div>
+    </Card>
+  );
+}
+
 function DangerZone() {
   const { server, running } = useServerDetail();
   const toast = useToast();
@@ -285,13 +336,14 @@ function DangerZone() {
 
 /** Admin-only section at the bottom of an instance's Configuration page. */
 export function InstanceAdminCards() {
-  const { isAdmin } = useServerDetail();
-  if (!isAdmin) return null;
+  const { isAdmin, isOwner } = useServerDetail();
+  if (!isAdmin && !isOwner) return null;
   return (
     <div className="stagger space-y-5">
-      <h2 className="pt-2 text-sm font-medium text-ink-400">Administration</h2>
-      <SuspensionCard />
-      <TransferCard />
+      <h2 className="pt-2 text-sm font-medium text-ink-400">{isAdmin ? 'Administration' : 'Ownership'}</h2>
+      {isAdmin && <OwnerCard />}
+      {isAdmin && <SuspensionCard />}
+      {isAdmin && <TransferCard />}
       <DangerZone />
     </div>
   );

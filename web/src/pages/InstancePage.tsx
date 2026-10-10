@@ -175,6 +175,17 @@ function LifecycleActions() {
   );
 }
 
+function OwnerChip() {
+  const { owner, isOwner } = useServerDetail();
+  if (!owner) return null;
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-lg bg-surface-900 px-2.5 py-1 text-xs text-ink-300" title="Instance owner">
+      <Icon name="player" className="h-3.5 w-3.5" />
+      {isOwner ? 'You own this' : `Owner: ${owner.username}`}
+    </span>
+  );
+}
+
 function InstanceTopBar({ server }: { server: ServerRecord }) {
   const kind = gameKindOf(server);
   const endpoint = useEndpoint(server.id, server.server_port);
@@ -216,6 +227,7 @@ function InstanceTopBar({ server }: { server: ServerRecord }) {
           copyValue={endpoint ? `${endpoint.host}:${endpoint.port}` : undefined}
         />
         <CopyChip icon="port" label="Port" value={`${server.server_port}/${(endpoint?.protocol ?? 'tcp').toUpperCase()}`} copyValue={String(server.server_port)} />
+        <OwnerChip />
         {endpoint && endpoint.bindAddress !== '0.0.0.0' && (
           <span className="text-xs text-ink-500">bound to {endpoint.bindAddress}</span>
         )}

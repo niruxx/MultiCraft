@@ -255,6 +255,22 @@ Roles set the defaults; each user can be assigned **any number of instances**, e
 
 Admins can do everything. Every assigned user can see status, console output and the player list.
 
+#### ➕ Creating instances &amp; ownership
+
+Each user also has an **Instance creation** policy (Users → Edit), either the role's default or their own:
+
+| | Moderator default | Viewer default | Custom per user |
+|---|:-:|:-:|---|
+| ➕ Can create instances | ✅ | — | on / off |
+| 🎮 Allowed types | Java · Bedrock · Steam | — | any of Java · Bedrock · Steam |
+| 🔢 Max instances owned | no limit | — | e.g. 3 |
+| 🧠 Max memory per instance | no limit | — | e.g. 4096 MB |
+
+- 👤 **Every new instance is owned by its creator**, who automatically gets full control of it (everything except *Edit launch command* and *UPnP*, which stay opt-in) and can delete it. Its header shows *You own this* / *Owner: …*.
+- 🔁 **Admins can hand an instance to someone else** under its **Configuration → Owner**; the new owner gets owner access and it counts toward *their* limit.
+- 🧾 Deleting a user keeps their instances (ownership simply clears).
+- 🔒 Custom and Docker instances can only ever be created by admins.
+
 </details>
 
 <details>

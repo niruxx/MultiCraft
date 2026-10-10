@@ -5,7 +5,8 @@ CREATE TABLE IF NOT EXISTS users (
   password_hash TEXT NOT NULL,
   password_salt TEXT NOT NULL,
   role TEXT NOT NULL CHECK (role IN ('admin', 'moderator', 'viewer')),
-  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  creation TEXT -- JSON CreationPolicy: may this user create instances, which kinds, how many; NULL = role default
 );
 
 -- Non-admin users can be restricted to specific servers. Admins always see everything.

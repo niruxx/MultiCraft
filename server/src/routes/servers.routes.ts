@@ -36,7 +36,16 @@ import {
   launchSandboxed,
 } from '../services/processManager.js';
 import { getPlayerRoster } from '../services/playerService.js';
-import { getServerPermissions, getUserServerAccess, logAudit } from '../services/userService.js';
+import {
+  getEffectiveCreation,
+  getServerPermissions,
+  getUserById,
+  getUserServerAccess,
+  grantOwnerAccess,
+  logAudit,
+  setServerOwner,
+  usernamesFor,
+} from '../services/userService.js';
 import { publish, consoleTopic } from '../services/wsHub.js';
 import { appendLine } from '../services/consoleLogService.js';
 import { findJava, getJavaVersion } from '../services/javaService.js';
@@ -136,7 +145,8 @@ serversRouter.get(
           { runtime: getRuntimeInfo(s.id), playersOnline: isMinecraftPlatform(s.platform) ? getOnlinePlayers(s.id).length : null },
         ])
     );
-    res.json({ servers: visible, metrics });
+    const owners = usernamesFor(visible.map((s) => s.created_by).filter((id): id is string => !!id));
+    res.json({ servers: visible, metrics, owners });
   })
 );
 
@@ -179,7 +189,6 @@ serversRouter.get(
 
 serversRouter.post(
   '/',
-  requireRole('admin', 'moderator'),
   asyncHandler(async (req, res) => {
     const {
       name,
@@ -199,6 +208,24 @@ serversRouter.post(
     } = req.body ?? {};
 
     if (typeof name !== 'string' || !name.trim()) throw new HttpError(400, 'Server name is required');
+
+    // Account-level creation policy: may this user create instances, of this kind, this big, this many?
+    const creation = getEffectiveCreation(req.auth!.sub, req.auth!.role);
+    if (!creation.canCreate) throw new HttpError(403, "Your account can't create instances — ask an admin");
+    if (typeof platform === 'string' && !creation.allowedPlatforms.includes(platform)) {
+      throw new HttpError(
+        403,
+        platform === 'custom' || platform === 'docker'
+          ? `Only admins can create ${platform === 'docker' ? 'Docker' : 'custom'} instances`
+          : `Your account can't create ${platform} instances`
+      );
+    }
+    if (creation.maxInstances && creation.owned >= creation.maxInstances) {
+      throw new HttpError(403, `You already own ${creation.owned} of your ${creation.maxInstances} allowed instances`);
+    }
+    if (creation.maxMemoryMb && (Number(maxMemoryMb) || 2048) > creation.maxMemoryMb) {
+      throw new HttpError(400, `Max memory is limited to ${creation.maxMemoryMb} MB per instance for your account`);
+    }
     if (!['java', 'bedrock', 'steam', 'custom', 'docker'].includes(platform)) throw new HttpError(400, 'Invalid platform');
     if (!['vanilla', 'paper', 'purpur', 'spigot', 'bedrock', 'steam', 'custom', 'docker'].includes(loader)) {
       throw new HttpError(400, 'Invalid loader');
@@ -280,6 +307,8 @@ serversRouter.post(
       appendLine(record.id, "[MultiCraft] Wrote eula.txt (eula=true, accepted by user at creation)");
     }
 
+    // Tie the instance to its creator: non-admins can only see instances they're assigned to.
+    if (req.auth!.role !== 'admin') grantOwnerAccess(req.auth!.sub, record.id);
     logAudit(req.auth!.sub, req.auth!.username, 'server.create', record.id, `${loader} ${version}`);
 
     if (platform === 'custom') {
@@ -328,6 +357,7 @@ serversRouter.get(
       running: isRunning(server.id),
       permissions: getServerPermissions(req.auth!.sub, req.auth!.role, server.id) ?? [],
       autoRestart: getAutoRestartState(server.id),
+      owner: server.created_by ? { id: server.created_by, username: getUserById(server.created_by)?.username ?? 'unknown' } : null,
     });
   })
 );
@@ -432,6 +462,24 @@ serversRouter.put(
     appendLine(server.id, `[MultiCraft] Container settings changed by ${req.auth!.username} — they apply on the next start`, 'system');
     logAudit(req.auth!.sub, req.auth!.username, 'server.docker.update', server.id, config.image);
     res.json({ config, server: getServer(server.id) });
+  })
+);
+
+/** Hands an instance to another user (or back to "no owner"); the new owner gets owner access. */
+serversRouter.patch(
+  '/:serverId/owner',
+  requireRole('admin'),
+  asyncHandler(async (req, res) => {
+    const server = getServer(req.params.serverId);
+    if (!server) throw new HttpError(404, 'Server not found');
+    const { userId } = req.body ?? {};
+    if (userId !== null && typeof userId !== 'string') throw new HttpError(400, 'userId must be a user id or null');
+    const user = userId ? getUserById(userId) : null;
+    if (userId && !user) throw new HttpError(404, 'User not found');
+    setServerOwner(server.id, user?.id ?? null);
+    if (user && user.role !== 'admin') grantOwnerAccess(user.id, server.id);
+    logAudit(req.auth!.sub, req.auth!.username, 'server.owner', server.id, user?.username ?? 'none');
+    res.json({ owner: user ? { id: user.id, username: user.username } : null });
   })
 );
 
@@ -541,7 +589,15 @@ serversRouter.patch(
 
 serversRouter.delete(
   '/:serverId',
-  requireRole('admin'),
+  requireServerAccess(),
+  asyncHandler(async (req, res, next) => {
+    // Admins and the instance's owner may delete it.
+    const target = getServer(req.params.serverId);
+    if (req.auth!.role !== 'admin' && target?.created_by !== req.auth!.sub) {
+      throw new HttpError(403, 'Only admins and the instance’s owner can delete it');
+    }
+    next();
+  }),
   asyncHandler(async (req, res) => {
     const server = getServer(req.params.serverId);
     if (!server) throw new HttpError(404, 'Server not found');

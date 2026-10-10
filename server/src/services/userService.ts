@@ -54,6 +54,9 @@ export function updateUserPassword(id: string, password: string) {
 }
 
 export function deleteUser(id: string) {
+  // servers.created_by references users without ON DELETE — release ownership first (the
+  // instances stay; admins can hand them to someone else) or the delete hits the foreign key.
+  prep('UPDATE servers SET created_by = NULL WHERE created_by = ?').run(id);
   prep('DELETE FROM users WHERE id = ?').run(id);
 }
 
@@ -146,4 +149,107 @@ export function logAudit(userId: string | null, username: string | null, action:
   prep(
     'INSERT INTO audit_log (user_id, username, action, target, detail) VALUES (?, ?, ?, ?, ?)'
   ).run(userId, username, action, target ?? null, detail ?? null);
+}
+
+// ---------------------------------------------------------------------------
+// Instance creation policy (account-level) and ownership
+// ---------------------------------------------------------------------------
+
+/** Instance types a non-admin can be allowed to create. Custom and Docker instances run arbitrary
+ *  code / containers on the host, so they stay admin-only no matter what. */
+export const CREATABLE_PLATFORMS = ['java', 'bedrock', 'steam'] as const;
+export type CreatablePlatform = (typeof CREATABLE_PLATFORMS)[number];
+
+export interface CreationPolicy {
+  canCreate: boolean;
+  platforms: CreatablePlatform[];
+  /** Instances this user may own at once (0 = no limit). */
+  maxInstances: number;
+  /** Highest "max memory" per instance in MB (0 = no limit). */
+  maxMemoryMb: number;
+}
+
+export interface EffectiveCreation extends CreationPolicy {
+  /** Every platform this user can create, including admin-only ones for admins. */
+  allowedPlatforms: string[];
+  owned: number;
+  /** True when this comes from the role rather than a per-user setting. */
+  fromRole: boolean;
+}
+
+export function roleDefaultCreation(role: Role): CreationPolicy {
+  if (role === 'viewer') return { canCreate: false, platforms: [], maxInstances: 0, maxMemoryMb: 0 };
+  return { canCreate: true, platforms: [...CREATABLE_PLATFORMS], maxInstances: 0, maxMemoryMb: 0 };
+}
+
+export function sanitizeCreationPolicy(input: unknown): CreationPolicy {
+  const raw = (input ?? {}) as Record<string, unknown>;
+  const int = (v: unknown, max: number) => Math.min(Math.max(Math.round(Number(v)) || 0, 0), max);
+  return {
+    canCreate: raw.canCreate === true,
+    platforms: CREATABLE_PLATFORMS.filter((p) => Array.isArray(raw.platforms) && raw.platforms.includes(p)),
+    maxInstances: int(raw.maxInstances, 10_000),
+    maxMemoryMb: int(raw.maxMemoryMb, 4_194_304),
+  };
+}
+
+export function countOwned(userId: string): number {
+  return (prep('SELECT COUNT(*) AS c FROM servers WHERE created_by = ?').get(userId) as { c: number }).c;
+}
+
+export function getEffectiveCreation(userId: string, role: Role): EffectiveCreation {
+  const owned = countOwned(userId);
+  if (role === 'admin') {
+    return { canCreate: true, platforms: [...CREATABLE_PLATFORMS], maxInstances: 0, maxMemoryMb: 0, allowedPlatforms: [...CREATABLE_PLATFORMS, 'custom', 'docker'], owned, fromRole: true };
+  }
+  const user = getUserById(userId);
+  let policy: CreationPolicy | null = null;
+  if (user?.creation) {
+    try {
+      policy = sanitizeCreationPolicy(JSON.parse(user.creation));
+    } catch {
+      policy = null;
+    }
+  }
+  const effective = policy ?? roleDefaultCreation(role);
+  return { ...effective, allowedPlatforms: effective.canCreate ? effective.platforms : [], owned, fromRole: !policy };
+}
+
+export function setCreationPolicy(userId: string, policy: CreationPolicy | null) {
+  prep('UPDATE users SET creation = ? WHERE id = ?').run(policy ? JSON.stringify(policy) : null, userId);
+}
+
+/** What an instance's owner can do in it by default: everything except the two opt-in powers
+ *  (changing what runs on the host, opening router ports), which an admin grants separately. */
+export const OWNER_PERMISSIONS: ServerPermission[] = SERVER_PERMISSIONS.filter((p) => p !== 'launch' && p !== 'network');
+
+/** Gives a user owner-level access to an instance (keeps any extra permissions they already had). */
+export function grantOwnerAccess(userId: string, serverId: string) {
+  const existing = prep('SELECT permissions FROM user_server_access WHERE user_id = ? AND server_id = ?').get(userId, serverId) as
+    | { permissions: string | null }
+    | undefined;
+  let merged: ServerPermission[] = [...OWNER_PERMISSIONS];
+  if (existing?.permissions) {
+    try {
+      merged = SERVER_PERMISSIONS.filter((p) => merged.includes(p) || (JSON.parse(existing.permissions!) as string[]).includes(p));
+    } catch {
+      // keep owner defaults
+    }
+  }
+  prep(
+    'INSERT INTO user_server_access (user_id, server_id, permissions) VALUES (?, ?, ?) ON CONFLICT(user_id, server_id) DO UPDATE SET permissions = excluded.permissions'
+  ).run(userId, serverId, JSON.stringify(merged));
+}
+
+export function setServerOwner(serverId: string, userId: string | null) {
+  prep('UPDATE servers SET created_by = ? WHERE id = ?').run(userId, serverId);
+}
+
+export function usernamesFor(ids: string[]): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const id of new Set(ids)) {
+    const u = getUserById(id);
+    if (u) out[id] = u.username;
+  }
+  return out;
 }

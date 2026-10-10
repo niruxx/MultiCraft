@@ -21,8 +21,10 @@ const LOADERS_BY_PLATFORM: Record<Platform, { value: Loader; label: string }[]> 
 const CUSTOM_STEAM_GAME = '__custom__';
 
 export function CreateServerModal({ open, onClose, onCreated }: { open: boolean; onClose: () => void; onCreated: (s: ServerRecord) => void }) {
-  const { user } = useAuth();
+  const { user, creation } = useAuth();
   const isAdmin = user?.role === 'admin';
+  const allowed = new Set(creation?.allowedPlatforms ?? []);
+  const memoryCap = creation?.maxMemoryMb || 0;
   const [launch, setLaunch] = useState<LaunchConfig>({ executable: 'start.sh', stop: { kind: 'signal', signal: 'SIGTERM' } });
   const [name, setName] = useState('');
   const [platform, setPlatform] = useState<Platform>('java');
@@ -74,6 +76,14 @@ export function CreateServerModal({ open, onClose, onCreated }: { open: boolean;
   }, [platform, open]);
 
   useEffect(() => {
+    if (open && creation && !creation.allowedPlatforms.includes(platform)) {
+      const first = creation.allowedPlatforms.find((p) => p !== 'docker') as Platform | undefined;
+      if (first) setPlatform(first);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, creation]);
+
+  useEffect(() => {
     setServerPort(platform === 'bedrock' ? 19132 : platform === 'custom' ? 27015 : 25565);
     setLoader(LOADERS_BY_PLATFORM[platform][0].value);
   }, [platform]);
@@ -92,6 +102,7 @@ export function CreateServerModal({ open, onClose, onCreated }: { open: boolean;
     if (platform === 'custom' && !launch.executable?.trim()) return setError('Enter the executable, script or command to launch');
     if (platform !== 'custom' && !version) return setError('Choose a version');
     if (platform === 'java' && !acceptEula) return setError("You must accept Mojang's EULA");
+    if (memoryCap && maxMemoryMb > memoryCap) return setError(`Max memory is limited to ${memoryCap} MB per instance for your account`);
     if (platform === 'steam' && steamGameChoice === CUSTOM_STEAM_GAME) {
       if (!/^\d+$/.test(customAppId.trim())) return setError('Enter a numeric Steam App ID');
       if (!customExecutable.trim()) return setError('Enter the relative path to the server executable');
@@ -134,9 +145,9 @@ export function CreateServerModal({ open, onClose, onCreated }: { open: boolean;
         <div className="grid grid-cols-2 gap-3">
           <Field label="Platform">
             <Select value={platform} onChange={(e) => setPlatform(e.target.value as Platform)}>
-              <option value="java">Minecraft: Java Edition</option>
-              <option value="bedrock">Minecraft: Bedrock Edition</option>
-              <option value="steam">Steam Dedicated Server</option>
+              {allowed.has('java') && <option value="java">Minecraft: Java Edition</option>}
+              {allowed.has('bedrock') && <option value="bedrock">Minecraft: Bedrock Edition</option>}
+              {allowed.has('steam') && <option value="steam">Steam Dedicated Server</option>}
               {isAdmin && <option value="custom">Custom server (binary or shell script)</option>}
             </Select>
           </Field>
@@ -275,7 +286,7 @@ export function CreateServerModal({ open, onClose, onCreated }: { open: boolean;
                 <Input type="number" value={minMemoryMb} min={512} step={256} onChange={(e) => setMinMemoryMb(Number(e.target.value))} />
               </Field>
               <Field label="Max memory (MB)">
-                <Input type="number" value={maxMemoryMb} min={512} step={256} onChange={(e) => setMaxMemoryMb(Number(e.target.value))} />
+                <Input type="number" value={maxMemoryMb} min={512} max={memoryCap || undefined} step={256} onChange={(e) => setMaxMemoryMb(Number(e.target.value))} />
               </Field>
             </>
           )}

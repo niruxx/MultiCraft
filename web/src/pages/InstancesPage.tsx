@@ -276,7 +276,7 @@ const CONTAINER: Record<ViewMode, string> = {
 };
 
 export function InstancesPage() {
-  const { user } = useAuth();
+  const { user, creation, refreshCreation } = useAuth();
   const toast = useToast();
   const [servers, setServers] = useState<ServerRecord[] | null>(null);
   const [metrics, setMetrics] = useState<Record<string, InstanceListMetrics>>({});
@@ -312,7 +312,9 @@ export function InstancesPage() {
     }
   }
 
-  const canCreate = user?.role === 'admin' || user?.role === 'moderator';
+  const canAct = user?.role === 'admin' || user?.role === 'moderator';
+  const canCreate = !!creation?.canCreate;
+  const atQuota = !!creation?.maxInstances && creation.owned >= creation.maxInstances;
 
   async function act(id: string, action: 'start' | 'stop' | 'restart' | 'retry-install') {
     setBusyId(id);
@@ -336,10 +338,17 @@ export function InstancesPage() {
           subtitle="Everything running on this host, at a glance."
           action={
             canCreate && (
-              <Button variant="primary" onClick={() => setCreateOpen(true)}>
-                <Icon name="plus" className="h-4 w-4" />
-                New instance
-              </Button>
+              <div className="flex items-center gap-3">
+                {creation?.maxInstances ? (
+                  <span className={`text-xs ${atQuota ? 'text-yellow-400' : 'text-ink-400'}`}>
+                    {creation.owned} of {creation.maxInstances} instances used
+                  </span>
+                ) : null}
+                <Button variant="primary" onClick={() => setCreateOpen(true)} disabled={atQuota} title={atQuota ? 'You’ve reached your instance limit' : undefined}>
+                  <Icon name="plus" className="h-4 w-4" />
+                  New instance
+                </Button>
+              </div>
             )
           }
         />
@@ -376,7 +385,7 @@ export function InstancesPage() {
             </div>
             <p className="mb-1 text-base font-medium text-ink-100">No instances yet</p>
             <p className="mb-5 text-sm text-ink-400">Spin up a Minecraft, Steam or custom game server in a couple of clicks.</p>
-            {canCreate && (
+            {canCreate && !atQuota && (
               <Button variant="primary" onClick={() => setCreateOpen(true)}>
                 Create your first instance
               </Button>
@@ -399,7 +408,7 @@ export function InstancesPage() {
                       server={server}
                       metrics={metrics[server.id]}
                       hostMemMb={hostMemMb}
-                      canAct={canCreate}
+                      canAct={canAct || server.created_by === user?.id}
                       busy={busyId === server.id}
                       act={act}
                     />
@@ -411,7 +420,14 @@ export function InstancesPage() {
         )}
       </div>
 
-      <CreateServerModal open={createOpen} onClose={() => setCreateOpen(false)} onCreated={() => load()} />
+      <CreateServerModal
+        open={createOpen}
+        onClose={() => setCreateOpen(false)}
+        onCreated={() => {
+          load();
+          refreshCreation();
+        }}
+      />
     </Layout>
   );
 }

@@ -7,6 +7,8 @@ export interface User {
   password_salt: string;
   role: Role;
   created_at: string;
+  /** JSON CreationPolicy (services/userService.ts); NULL = the role's default. */
+  creation: string | null;
 }
 
 export type PublicUser = Omit<User, 'password_hash' | 'password_salt'>;

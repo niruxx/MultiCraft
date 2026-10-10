@@ -22,6 +22,28 @@ export interface PublicUser {
   serverAccess?: string[];
   /** serverId → explicit permission set, or null for the role's defaults */
   serverPermissions?: Record<string, ServerPermission[] | null>;
+  /** This user's own creation policy, or null when it follows the role's default. */
+  creationPolicy?: CreationPolicy | null;
+  effectiveCreation?: EffectiveCreation;
+  owned?: number;
+}
+
+export type CreatablePlatform = 'java' | 'bedrock' | 'steam';
+
+export interface CreationPolicy {
+  canCreate: boolean;
+  platforms: CreatablePlatform[];
+  /** 0 = no limit */
+  maxInstances: number;
+  /** 0 = no limit */
+  maxMemoryMb: number;
+}
+
+export interface EffectiveCreation extends CreationPolicy {
+  /** Every platform this user can create (admins also get custom + docker). */
+  allowedPlatforms: string[];
+  owned: number;
+  fromRole: boolean;
 }
 
 export type Platform = 'java' | 'bedrock' | 'steam' | 'custom' | 'docker';

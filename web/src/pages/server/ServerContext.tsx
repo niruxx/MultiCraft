@@ -16,6 +16,9 @@ interface ServerDetailState {
   permissions: ServerPermission[];
   /** A scheduled automatic restart after the process exited on its own. */
   autoRestart: AutoRestartState | null;
+  /** Who the instance belongs to (its creator, or whoever an admin handed it to). */
+  owner: { id: string; username: string } | null;
+  isOwner: boolean;
   isAdmin: boolean;
   /** Set when the API refuses access because the instance is suspended (non-admins only). */
   suspendedMessage: string | null;
@@ -35,6 +38,7 @@ export function ServerDetailProvider({ children, serverId: explicitId }: { child
   const [running, setRunning] = useState(false);
   const [permissions, setPermissions] = useState<ServerPermission[]>([]);
   const [autoRestart, setAutoRestart] = useState<AutoRestartState | null>(null);
+  const [owner, setOwner] = useState<{ id: string; username: string } | null>(null);
   const [suspendedMessage, setSuspendedMessage] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -47,12 +51,14 @@ export function ServerDetailProvider({ children, serverId: explicitId }: { child
         running: boolean;
         permissions: ServerPermission[];
         autoRestart?: AutoRestartState;
+        owner?: { id: string; username: string } | null;
       }>(
         `/servers/${serverId}`
       );
       setServer(res.server);
       setPermissions(res.permissions ?? []);
       setAutoRestart(res.autoRestart ?? null);
+      setOwner(res.owner ?? null);
       setRuntime(res.runtime);
       setRunning(res.running);
       setSuspendedMessage(null);
@@ -85,7 +91,7 @@ export function ServerDetailProvider({ children, serverId: explicitId }: { child
 
   return (
     <ServerDetailContext.Provider
-      value={{ serverId: serverId!, server, runtime, running, canWrite, can, permissions, autoRestart, isAdmin, suspendedMessage, loadError, refresh }}
+      value={{ serverId: serverId!, server, runtime, running, canWrite, can, permissions, autoRestart, owner, isOwner: !!owner && owner.id === user?.id, isAdmin, suspendedMessage, loadError, refresh }}
     >
       {children}
     </ServerDetailContext.Provider>

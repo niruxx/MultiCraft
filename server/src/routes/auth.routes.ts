@@ -3,6 +3,7 @@ import { asyncHandler, HttpError } from '../utils/asyncHandler.js';
 import { requireAuth } from '../auth/middleware.js';
 import { createToken } from '../auth/tokens.js';
 import { authenticate, countUsers, createUser, getUserById, logAudit } from '../services/userService.js';
+import { getEffectiveCreation } from '../services/userService.js';
 
 export const authRouter = Router();
 
@@ -54,6 +55,6 @@ authRouter.get(
     const user = getUserById(req.auth!.sub);
     if (!user) throw new HttpError(401, 'Session no longer valid');
     const { password_hash, password_salt, ...publicUser } = user;
-    res.json({ user: publicUser });
+    res.json({ user: publicUser, creation: getEffectiveCreation(user.id, user.role) });
   })
 );

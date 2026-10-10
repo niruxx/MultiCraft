@@ -16,6 +16,35 @@ export function runMigrations(db: DatabaseSync): void {
   addLaunchConfigColumn(db);
   addRestartAndUpnpColumns(db);
   addIsolationColumn(db);
+  addCreationPolicyColumn(db);
+  grantCreatorsOwnerAccess(db);
+}
+
+/**
+ * One-time: instances created by non-admins before ownership existed never gave their creator
+ * access (they couldn't even see them). Give each creator owner access once; flagged so an admin
+ * removing that access later isn't undone on the next start.
+ */
+function grantCreatorsOwnerAccess(db: DatabaseSync): void {
+  const flag = 'migration_owner_access_v1';
+  if (db.prepare('SELECT 1 FROM system_settings WHERE key = ?').get(flag)) return;
+  const ownerPermissions = JSON.stringify([
+    'power', 'console', 'files.read', 'files.write', 'backups.create', 'backups.restore', 'plugins', 'players', 'settings', 'update',
+  ]);
+  const result = db
+    .prepare(
+      `INSERT OR IGNORE INTO user_server_access (user_id, server_id, permissions)
+       SELECT s.created_by, s.id, ? FROM servers s JOIN users u ON u.id = s.created_by WHERE u.role != 'admin'`
+    )
+    .run(ownerPermissions);
+  if (Number(result.changes) > 0) logger.info(`Migrating database: gave ${result.changes} instance creator(s) owner access`);
+  db.prepare('INSERT INTO system_settings (key, value) VALUES (?, ?)').run(flag, new Date().toISOString());
+}
+
+function addCreationPolicyColumn(db: DatabaseSync): void {
+  if (db.prepare("SELECT 1 FROM pragma_table_info('users') WHERE name = 'creation'").get()) return;
+  logger.info('Migrating database: adding users.creation column');
+  db.exec('ALTER TABLE users ADD COLUMN creation TEXT');
 }
 
 function addIsolationColumn(db: DatabaseSync): void {
