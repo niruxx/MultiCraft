@@ -108,7 +108,17 @@ let lastNavKey: string | null = null;
  * App shell: MD3 navigation drawer + content. Pages can replace the drawer's navigation with
  * their own (`sidebar`) — the instance view does, swapping in Status/Console/Backups/….
  */
-export function Layout({ children, sidebar }: { children: ReactNode; sidebar?: (close: () => void) => ReactNode }) {
+export function Layout({
+  children,
+  sidebar,
+  fill = false,
+}: {
+  children: ReactNode;
+  sidebar?: (close: () => void) => ReactNode;
+  /** Pin the page to the viewport height (instead of growing with its content) so an inner
+   *  panel — the console — can scroll on its own. */
+  fill?: boolean;
+}) {
   const [system, setSystem] = useState<SystemInfo | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
   const location = useLocation();
@@ -185,7 +195,7 @@ export function Layout({ children, sidebar }: { children: ReactNode; sidebar?: (
         <main className="min-h-0 flex-1 overflow-y-auto">
           <motion.div
             key={pageKey}
-            className="min-h-full"
+            className={fill ? 'h-full' : 'min-h-full'}
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4, ease: [0.2, 0, 0, 1] }}

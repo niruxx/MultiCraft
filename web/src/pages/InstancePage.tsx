@@ -235,7 +235,7 @@ function InstancePageInner() {
   const onConsole = location.pathname.endsWith('/console');
 
   return (
-    <Layout sidebar={(close) => <InstanceNav server={server} onNavigate={close} />}>
+    <Layout fill={onConsole} sidebar={(close) => <InstanceNav server={server} onNavigate={close} />}>
       <div className={`mx-auto flex max-w-6xl flex-col gap-5 px-4 py-6 sm:px-8 ${onConsole ? 'h-full' : ''}`}>
         <InstanceTopBar server={server} />
         {server.suspended === 1 && isAdmin && (
