@@ -37,6 +37,10 @@ export interface CreationPolicy {
   maxInstances: number;
   /** 0 = no limit */
   maxMemoryMb: number;
+  /** Container instances: none, catalog apps only, or any image. */
+  containers: 'none' | 'catalog' | 'any';
+  /** May mount the container engine socket (Portainer). */
+  engineSocket: boolean;
 }
 
 export interface EffectiveCreation extends CreationPolicy {
@@ -153,6 +157,8 @@ export interface HostAddress {
 }
 
 export interface EndpointInfo {
+  /** Link to the instance's web interface, for apps that have one. */
+  webUrl: string | null;
   host: string;
   bindAddress: string;
   port: number;
@@ -359,6 +365,7 @@ export interface LaunchConfig {
   stop?: StopConfig;
   restart?: RestartConfig;
   stopTimeoutSec?: number;
+  webUi?: WebUi;
 }
 
 export interface LaunchInfo {
@@ -455,6 +462,18 @@ export interface DockerConfig {
   cpus: number | null;
   command: string;
   runAsPanelUser: boolean;
+  volumes: { subdir: string; containerPath: string }[];
+  webUi: WebUi | null;
+  mountEngineSocket: boolean;
+  category: 'game' | 'app' | 'container';
+  icon: string | null;
+  template: string | null;
+}
+
+export interface WebUi {
+  port: number;
+  scheme: 'http' | 'https';
+  path: string;
 }
 
 export interface EngineStatus {
@@ -470,6 +489,7 @@ export interface DockerOverview {
   engine: EngineStatus;
   counts: { containers: number; running: number; images: number } | null;
   containers: { name: string; status: string; image: string; instanceId: string }[];
+  socket: { path: string | null; hint: string | null } | null;
 }
 
 export interface SandboxStatus {

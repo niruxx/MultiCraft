@@ -1,8 +1,8 @@
 {
-  "name": "multicraft",
+  "name": "outpost",
   "private": true,
   "version": "1.0.1",
-  "description": "MultiCraft - a self-hosted web panel for creating and managing Minecraft Java & Bedrock servers.",
+  "description": "Outpost - a self-hosted web panel for creating and managing Minecraft Java & Bedrock servers.",
   "workspaces": [
     "server",
     "web"

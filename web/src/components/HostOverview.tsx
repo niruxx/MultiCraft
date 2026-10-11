@@ -96,7 +96,7 @@ export function HostOverview() {
   const [system, setSystem] = useState<SystemInfo | null>(null);
   const [showDetails, setShowDetails] = useState(() => {
     try {
-      return localStorage.getItem('multicraft_host_details') === '1';
+      return localStorage.getItem('outpost_host_details') === '1';
     } catch {
       return false;
     }
@@ -132,7 +132,7 @@ export function HostOverview() {
   function toggleDetails() {
     setShowDetails((v) => {
       try {
-        localStorage.setItem('multicraft_host_details', v ? '0' : '1');
+        localStorage.setItem('outpost_host_details', v ? '0' : '1');
       } catch {
         // per-viewer preference only
       }

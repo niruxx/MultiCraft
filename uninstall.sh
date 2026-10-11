@@ -1,23 +1,24 @@
 #!/usr/bin/env bash
 #
-# MultiCraft uninstaller for Linux. Reverses what install.sh (and the README's systemd/pm2
+# Outpost uninstaller for Linux. Reverses what install.sh (and the README's systemd/pm2
 # setup) may have changed on this machine:
 #
-#   - stops MultiCraft and any game servers it launched
-#   - removes the multicraft systemd service (unit, drop-ins, enablement) or pm2 entry
+#   - stops Outpost and any game servers it launched
+#   - removes the outpost (or pre-rename multicraft) systemd service, or its pm2 entry
+#   - removes Outpost's containers and, optionally, the container engine and sandbox it installed
 #   - removes the firewall rule for the panel port, if one was added
-#   - deletes MultiCraft's data (database, every server's files, backups, steamcmd)
+#   - deletes Outpost's data (database, every server's files, backups, steamcmd)
 #     and update.sh's pre-update archives                                           [asks first]
 #   - deletes build output and node_modules from the checkout
 #   - removes packages install.sh may have installed: Node.js (+ NodeSource repo), Java,
 #     steamcmd's 32-bit libraries, and optionally git/curl                          [asks first]
-#   - removes the dedicated 'multicraft' system user from the README setup, if present
+#   - removes the dedicated 'outpost' (or 'multicraft') system user from the README setup, if present
 #   - optionally deletes the checkout itself
 #
 # install.sh doesn't record which packages were already on the machine before it ran, so every
 # package removal is opt-in and your package manager shows exactly what it will remove.
 #
-# Usage: run from inside the MultiCraft checkout:
+# Usage: run from inside the Outpost checkout:
 #   ./uninstall.sh            interactive; asks before every step
 #   ./uninstall.sh -y         non-interactive; removes the service/processes/build output, keeps data + packages
 #   ./uninstall.sh -y --purge non-interactive; removes everything above, data, packages and the checkout
@@ -55,7 +56,7 @@ for arg in "$@"; do
       echo "  -y, --yes   Non-interactive: accept every default."
       echo "              Removes the service, running processes and build output; keeps data and packages."
       echo "  --purge     Make 'remove' the default for everything: data, Node.js, Java, steamcmd libraries,"
-      echo "              the multicraft system user and the checkout itself. git and curl are still only"
+      echo "              the container engine, the outpost system user and the checkout. git and curl are still only"
       echo "              removed if you say so interactively."
       exit 0
       ;;
@@ -93,7 +94,7 @@ confirm_typed() {
 # ---------------------------------------------------------------------------
 # Sanity checks
 # ---------------------------------------------------------------------------
-heading "MultiCraft uninstaller"
+heading "Outpost uninstaller"
 
 [[ "$(uname -s)" == "Linux" ]] || die "This script is for Linux. Detected: $(uname -s)."
 
@@ -105,10 +106,10 @@ else
 fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-if [[ -f "$SCRIPT_DIR/package.json" ]] && grep -q '"name": *"multicraft"' "$SCRIPT_DIR/package.json" 2>/dev/null; then
+if [[ -f "$SCRIPT_DIR/package.json" ]] && grep -qE '"name": *"(outpost|multicraft)"' "$SCRIPT_DIR/package.json" 2>/dev/null; then
   PROJECT_DIR="$SCRIPT_DIR"
 else
-  die "Run this from inside the MultiCraft checkout it should uninstall."
+  die "Run this from inside the Outpost checkout it should uninstall."
 fi
 ok "Project directory: $PROJECT_DIR"
 
@@ -127,7 +128,7 @@ safe_rm() {
 }
 
 # ---------------------------------------------------------------------------
-# Detect how MultiCraft was set up
+# Detect how Outpost was set up
 # ---------------------------------------------------------------------------
 DISTRO_FAMILY="unknown"
 DISTRO_NAME="Linux"
@@ -146,12 +147,18 @@ ok "Detected: $DISTRO_NAME ($DISTRO_FAMILY)"
 HAS_SYSTEMD=0
 command -v systemctl >/dev/null 2>&1 && HAS_SYSTEMD=1
 
-SERVICE_FILE="/etc/systemd/system/multicraft.service"
-SERVICE_DROPIN_DIR="/etc/systemd/system/multicraft.service.d"
+# outpost.service — or multicraft.service on installs from before the rename.
+SERVICE_NAME=outpost
 SERVICE_PRESENT=0
-if [[ "$HAS_SYSTEMD" == "1" ]] && { [[ -f "$SERVICE_FILE" ]] || systemctl list-unit-files multicraft.service 2>/dev/null | grep -q '^multicraft\.service'; }; then
-  SERVICE_PRESENT=1
-fi
+for name in outpost multicraft; do
+  if [[ "$HAS_SYSTEMD" == "1" ]] && { [[ -f "/etc/systemd/system/$name.service" ]] || systemctl list-unit-files "$name.service" 2>/dev/null | grep -q "^$name\.service"; }; then
+    SERVICE_NAME="$name"
+    SERVICE_PRESENT=1
+    break
+  fi
+done
+SERVICE_FILE="/etc/systemd/system/$SERVICE_NAME.service"
+SERVICE_DROPIN_DIR="/etc/systemd/system/$SERVICE_NAME.service.d"
 
 # Reads `Environment=NAME=value` (optionally quoted) out of the service file.
 service_env() {
@@ -167,8 +174,9 @@ PANEL_PORT="$(service_env PORT)"; PANEL_PORT="${PANEL_PORT:-${PORT:-8642}}"
 SERVICE_USER="$(service_key User)"
 SERVICE_WORKDIR="$(service_key WorkingDirectory)"
 
-DATA_DIR="$(service_env MULTICRAFT_DATA_DIR)"
-DATA_DIR="${DATA_DIR:-${MULTICRAFT_DATA_DIR:-$PROJECT_DIR/server/data}}"
+DATA_DIR="$(service_env OUTPOST_DATA_DIR)"
+[[ -n "$DATA_DIR" ]] || DATA_DIR="$(service_env MULTICRAFT_DATA_DIR)"
+DATA_DIR="${DATA_DIR:-${OUTPOST_DATA_DIR:-${MULTICRAFT_DATA_DIR:-$PROJECT_DIR/server/data}}}"
 # Mirror the server's path.resolve() for relative values.
 [[ "$DATA_DIR" == /* ]] || DATA_DIR="$PROJECT_DIR/server/$DATA_DIR"
 DATA_DIR="${DATA_DIR%/}"
@@ -177,42 +185,44 @@ if [[ "$SERVICE_PRESENT" == "1" ]]; then
   ok "systemd service: $SERVICE_FILE (user: ${SERVICE_USER:-?}, port: $PANEL_PORT)"
   if [[ -n "$SERVICE_WORKDIR" && "${SERVICE_WORKDIR%/}" != "$PROJECT_DIR" ]]; then
     warn "The service runs from $SERVICE_WORKDIR, not this checkout. It'll still be removed — it's the only"
-    warn "multicraft.service on this machine — but build output/checkout cleanup below only covers $PROJECT_DIR."
+    warn "$SERVICE_NAME.service on this machine — but build output/checkout cleanup below only covers $PROJECT_DIR."
   fi
 else
-  info "No multicraft systemd service found."
+  info "No outpost (or multicraft) systemd service found."
 fi
 ok "Data directory: $DATA_DIR$([[ -d "$DATA_DIR" ]] || echo ' (not present)')"
 
 # ---------------------------------------------------------------------------
 # Step 1 — stop everything and remove the service
 # ---------------------------------------------------------------------------
-heading "Step 1/6 — Stopping MultiCraft and removing the service"
+heading "Step 1/6 — Stopping Outpost and removing the service"
 
 if [[ "$SERVICE_PRESENT" == "1" ]]; then
-  if confirm "Stop, disable and remove multicraft.service?" y; then
+  if confirm "Stop, disable and remove $SERVICE_NAME.service?" y; then
     # Stopping the unit also stops every game server the panel spawned (same cgroup).
-    $SUDO systemctl disable --now multicraft.service >/dev/null 2>&1 || $SUDO systemctl stop multicraft.service 2>/dev/null || true
+    $SUDO systemctl disable --now "$SERVICE_NAME.service" >/dev/null 2>&1 || $SUDO systemctl stop "$SERVICE_NAME.service" 2>/dev/null || true
     safe_rm "$SERVICE_FILE"
     safe_rm "$SERVICE_DROPIN_DIR"
     # A leftover enablement symlink if the unit was enabled under another target.
-    for link in /etc/systemd/system/*.wants/multicraft.service; do
+    for link in /etc/systemd/system/*.wants/"$SERVICE_NAME".service; do
       [[ -L "$link" ]] && safe_rm "$link"
     done
     $SUDO systemctl daemon-reload
-    $SUDO systemctl reset-failed multicraft.service >/dev/null 2>&1 || true
-    ok "multicraft.service removed"
+    $SUDO systemctl reset-failed "$SERVICE_NAME.service" >/dev/null 2>&1 || true
+    ok "$SERVICE_NAME.service removed"
   else
-    warn "Leaving multicraft.service in place."
+    warn "Leaving $SERVICE_NAME.service in place."
   fi
 fi
 
-if command -v pm2 >/dev/null 2>&1 && pm2 describe multicraft >/dev/null 2>&1; then
-  if confirm "Found a pm2 process named 'multicraft' — delete it from pm2?" y; then
-    pm2 delete multicraft >/dev/null && pm2 save --force >/dev/null 2>&1 || true
-    ok "Removed multicraft from pm2 (pm2 itself is left installed — 'npm uninstall -g pm2' removes it)."
+for pm2name in outpost multicraft; do
+  if command -v pm2 >/dev/null 2>&1 && pm2 describe "$pm2name" >/dev/null 2>&1; then
+    if confirm "Found a pm2 process named '$pm2name' — delete it from pm2?" y; then
+      pm2 delete "$pm2name" >/dev/null && pm2 save --force >/dev/null 2>&1 || true
+      ok "Removed $pm2name from pm2 (pm2 itself is left installed — 'npm uninstall -g pm2' removes it)."
+    fi
   fi
-fi
+done
 
 # Anything still running that the service didn't cover: game servers / steamcmd working inside
 # the data dir, or a manually started panel (npm start, node dist/index.js, npm run dev) in the
@@ -243,7 +253,7 @@ while IFS=' ' read -r proc cwd; do
 done < <($SUDO find /proc -mindepth 2 -maxdepth 2 -name cwd -printf '%h %l\n' 2>/dev/null)
 
 if [[ ${#STRAY_PIDS[@]} -gt 0 ]]; then
-  warn "These processes are still running from the MultiCraft checkout or data directory:"
+  warn "These processes are still running from the Outpost checkout or data directory:"
   ps -o pid=,user=,args= -p "$(IFS=,; echo "${STRAY_PIDS[*]}")" | sed 's/^/    /' | cut -c1-160
   if confirm "Stop them?" y; then
     $SUDO kill -TERM "${STRAY_PIDS[@]}" 2>/dev/null || true
@@ -262,7 +272,7 @@ if [[ ${#STRAY_PIDS[@]} -gt 0 ]]; then
     warn "Leaving them running — deleting files out from under them may fail or corrupt worlds."
   fi
 else
-  ok "No MultiCraft processes running"
+  ok "No Outpost processes running"
 fi
 
 # ---------------------------------------------------------------------------
@@ -302,7 +312,7 @@ if [[ -d "$DATA_DIR" || ${#DATA_SIBLINGS[@]} -gt 0 ]]; then
   for d in "${DATA_SIBLINGS[@]}"; do info "$d — $($SUDO du -sh "$d" 2>/dev/null | cut -f1) (previous environment snapshot)"; done
   warn "This holds every server's worlds and backups, user accounts and the database. Deleting it can't be undone."
   warn "Want a copy first? Export one from the panel's environment backup page before continuing."
-  if confirm_typed "Permanently delete MultiCraft's data?" "delete" "$PURGE_DEFAULT"; then
+  if confirm_typed "Permanently delete Outpost's data?" "delete" "$PURGE_DEFAULT"; then
     safe_rm "$DATA_DIR"
     for d in "${DATA_SIBLINGS[@]}"; do safe_rm "$d"; done
     ok "Data deleted"
@@ -314,7 +324,9 @@ else
 fi
 
 # update.sh archives the data dir here (next to the checkout) before every update.
-UPDATE_BACKUPS="$(dirname "$PROJECT_DIR")/multicraft-update-backups"
+UPDATE_BACKUPS="$(dirname "$PROJECT_DIR")/outpost-update-backups"
+# Installs from before the rename keep their update backups here.
+[[ -d "$(dirname "$PROJECT_DIR")/multicraft-update-backups" && ! -d "$UPDATE_BACKUPS" ]] && UPDATE_BACKUPS="$(dirname "$PROJECT_DIR")/multicraft-update-backups"
 if [[ -d "$UPDATE_BACKUPS" ]]; then
   info "$UPDATE_BACKUPS — $(du -sh "$UPDATE_BACKUPS" 2>/dev/null | cut -f1) (update.sh's pre-update data archives)"
   if confirm_typed "Permanently delete update.sh's data backups too?" "delete" "$PURGE_DEFAULT"; then
@@ -338,8 +350,9 @@ if confirm "Delete node_modules and build output (server/dist, web/dist) from th
   ok "Build output and dependencies removed"
 fi
 
-safe_rm /tmp/multicraft-install-check.log
-safe_rm /tmp/multicraft-update-check.log
+for log in outpost-install-check outpost-update-check multicraft-install-check multicraft-update-check; do
+  safe_rm "/tmp/$log.log"
+done
 ok "Removed installer/updater temp logs"
 
 # ---------------------------------------------------------------------------
@@ -455,6 +468,56 @@ else
     fi
   fi
 
+  # --- Containers: Outpost's leftovers first, then (opt-in) the engine install.sh set up ---
+  for engine in docker podman; do
+    command -v "$engine" >/dev/null 2>&1 || continue
+    # Containers are --rm and stop with their instance; anything left was orphaned by a panel restart.
+    leftovers="$( { $engine ps -aq --filter label=outpost.instance; $engine ps -aq --filter label=multicraft.instance; } 2>/dev/null | sort -u | tr '\n' ' ')"
+    if [[ -n "${leftovers// /}" ]] && confirm "Remove containers Outpost started with $engine ($leftovers)?" y; then
+      # shellcheck disable=SC2086
+      $engine rm -f $leftovers >/dev/null 2>&1 && ok "Removed Outpost's containers"
+    fi
+    if $engine image inspect docker.io/portainer/portainer-ce:lts >/dev/null 2>&1 && confirm "Remove the Portainer image install.sh pre-downloaded?" "$PURGE_DEFAULT"; then
+      $engine rmi docker.io/portainer/portainer-ce:lts >/dev/null 2>&1 && ok "Removed the Portainer image" || warn "Couldn't remove the Portainer image (still in use?)"
+    fi
+  done
+
+  case "$DISTRO_FAMILY" in
+    debian)   DOCKER_PKGS=(docker.io) ;;
+    fedora)   DOCKER_PKGS=(moby-engine) ;;
+    *)        DOCKER_PKGS=(docker) ;;
+  esac
+  if [[ -n "$(installed_of "${DOCKER_PKGS[@]}")" ]] && confirm "Remove Docker (and stop docker.service/docker.socket)? Other containers on this machine stop working." "$PURGE_DEFAULT"; then
+    $SUDO systemctl disable --now docker.socket docker.service >/dev/null 2>&1 || true
+    if pkg_remove "${DOCKER_PKGS[@]}"; then
+      ok "Docker removed"
+      PKG_CHANGED=1
+      if [[ "$EUID" -ne 0 ]] && id -nG "$(id -un)" | tr ' ' '\n' | grep -qx docker; then
+        $SUDO gpasswd -d "$(id -un)" docker >/dev/null 2>&1 && ok "Removed $(id -un) from the docker group"
+      fi
+    else
+      warn "Docker wasn't removed."
+    fi
+  fi
+  if [[ -n "$(installed_of podman)" ]] && confirm "Remove Podman (and its user API socket)? Other containers on this machine stop working." "$PURGE_DEFAULT"; then
+    systemctl --user disable --now podman.socket >/dev/null 2>&1 || true
+    $SUDO systemctl disable --now podman.socket >/dev/null 2>&1 || true
+    pkg_remove podman && { ok "Podman removed"; PKG_CHANGED=1; } || warn "Podman wasn't removed."
+    if [[ "$EUID" -ne 0 ]] && loginctl show-user "$(id -un)" -p Linger 2>/dev/null | grep -q yes \
+       && confirm "Turn off lingering for $(id -un)? (install.sh enabled it for podman.socket; other user services may rely on it)" n; then
+      $SUDO loginctl disable-linger "$(id -un)" && ok "Lingering disabled"
+    fi
+  fi
+
+  # --- bubblewrap: the instance sandbox. Flatpak depends on it, so never by default. ---
+  if [[ -n "$(installed_of bubblewrap)" ]]; then
+    if command -v flatpak >/dev/null 2>&1; then
+      info "Keeping bubblewrap — Flatpak on this machine depends on it."
+    else
+      remove_group "bubblewrap (the instance sandbox)" n bubblewrap && PKG_CHANGED=1 || true
+    fi
+  fi
+
   # --- git / curl: general-purpose tools, never removed by default ---
   remove_group "git (widely used — only if nothing else needs it)" n git && PKG_CHANGED=1 || true
   remove_group "curl (widely used — only if nothing else needs it)" n curl && PKG_CHANGED=1 || true
@@ -470,28 +533,31 @@ fi
 # ---------------------------------------------------------------------------
 heading "Step 6/6 — Leftovers"
 
-# The README's systemd guide creates a system user 'multicraft' with home /opt/multicraft.
-if id multicraft >/dev/null 2>&1; then
-  MC_HOME="$(getent passwd multicraft | cut -d: -f6)"
-  MC_UID="$(id -u multicraft)"
-  if [[ "$MC_UID" -lt 1000 ]]; then
-    [[ "$PROJECT_DIR" == "$MC_HOME"/* || "$DATA_DIR" == "$MC_HOME"/* ]] \
-      && warn "Its home $MC_HOME contains the checkout and/or data — removing the user deletes them too."
-    if confirm "Remove the 'multicraft' system user and its home directory ($MC_HOME)?" "$PURGE_DEFAULT"; then
-      $SUDO userdel multicraft && ok "User 'multicraft' removed" || warn "Couldn't remove user 'multicraft'."
-      [[ -n "$MC_HOME" && -d "$MC_HOME" ]] && safe_rm "$MC_HOME"
+# The README's systemd guide creates a dedicated system user ('outpost', or 'multicraft' before the rename).
+for SYS_USER in outpost multicraft; do
+  if id $SYS_USER >/dev/null 2>&1; then
+    MC_HOME="$(getent passwd $SYS_USER | cut -d: -f6)"
+    MC_UID="$(id -u $SYS_USER)"
+    if [[ "$MC_UID" -lt 1000 ]]; then
+      [[ "$PROJECT_DIR" == "$MC_HOME"/* || "$DATA_DIR" == "$MC_HOME"/* ]] \
+        && warn "Its home $MC_HOME contains the checkout and/or data — removing the user deletes them too."
+      if confirm "Remove the '$SYS_USER' system user and its home directory ($MC_HOME)?" "$PURGE_DEFAULT"; then
+        $SUDO userdel $SYS_USER && ok "User '$SYS_USER' removed" || warn "Couldn't remove user '$SYS_USER'."
+        [[ -n "$MC_HOME" && -d "$MC_HOME" ]] && safe_rm "$MC_HOME"
+      fi
+    else
+      info "A regular (uid $MC_UID) user named '$SYS_USER' exists — not touching it."
     fi
-  else
-    info "A regular (uid $MC_UID) user named 'multicraft' exists — not touching it."
   fi
-fi
+
+done
 
 if [[ -d "$PROJECT_DIR" ]]; then
   if [[ -d "$PROJECT_DIR/.git" ]] && command -v git >/dev/null 2>&1 \
      && [[ -n "$(git -C "$PROJECT_DIR" status --porcelain 2>/dev/null)" ]]; then
     warn "The checkout has uncommitted changes."
   fi
-  if confirm "Delete the MultiCraft checkout itself ($PROJECT_DIR)?" "$PURGE_DEFAULT"; then
+  if confirm "Delete the Outpost checkout itself ($PROJECT_DIR)?" "$PURGE_DEFAULT"; then
     cd /
     safe_rm "$PROJECT_DIR"
     ok "Checkout deleted"
@@ -504,11 +570,11 @@ fi
 # Summary
 # ---------------------------------------------------------------------------
 heading "Done"
-echo "MultiCraft has been uninstalled per your answers above."
+echo "Outpost has been uninstalled per your answers above."
 [[ -d "$DATA_DIR" ]] && echo "  - Data kept at: $DATA_DIR"
 [[ -d "$UPDATE_BACKUPS" ]] && echo "  - Update backups kept at: $UPDATE_BACKUPS"
 [[ -d "$PROJECT_DIR" ]] && echo "  - Checkout kept at: $PROJECT_DIR"
-[[ "$SERVICE_PRESENT" == "1" ]] && echo "  - Old service logs remain in the journal until it rotates ('journalctl -u multicraft')."
+[[ "$SERVICE_PRESENT" == "1" ]] && echo "  - Old service logs remain in the journal until it rotates ('journalctl -u $SERVICE_NAME')."
 exit 0
 }
 

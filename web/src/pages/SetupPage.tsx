@@ -116,9 +116,9 @@ export function SetupPage() {
               <div className="mb-6 text-center">
                 <Logo className="mx-auto mb-4 h-12 w-12 rounded-2xl" />
                 <h1 className="text-2xl font-bold text-ink-50">
-                  Welcome to <span className="text-accent-400">MultiCraft</span>
+                  Welcome to <span className="text-accent-400">Outpost</span>
                 </h1>
-                <p className="mt-1.5 text-sm text-ink-400">Your self-hosted Minecraft server control panel.</p>
+                <p className="mt-1.5 text-sm text-ink-400">Your self-hosted control panel for servers, apps and game servers.</p>
               </div>
               <div className="mb-6 grid grid-cols-2 gap-3">
                 {FEATURES.map((f, i) => (

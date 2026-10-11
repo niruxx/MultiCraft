@@ -51,7 +51,9 @@ function InstanceNav({ server, onNavigate }: { server: ServerRecord; onNavigate:
       <NavItem to="upnp" icon="router" label="UPnP" onClick={onNavigate} />
 
       <NavSectionLabel>Manage</NavSectionLabel>
-      <NavItem to="plugins" icon="plugin" label={addonNavLabel(server)} onClick={onNavigate} />
+      {(server.platform === 'java' || server.platform === 'bedrock' || server.platform === 'steam') && (
+        <NavItem to="plugins" icon="plugin" label={addonNavLabel(server)} onClick={onNavigate} />
+      )}
       {!steam && <NavItem to="players" icon="player" label="Players" onClick={onNavigate} />}
       {!steam && <NavItem to="operator" icon="shield" label="Operators" onClick={onNavigate} />}
       {!steam && <NavItem to="whitelist" icon="checklist" label="Whitelist" onClick={onNavigate} />}
@@ -227,6 +229,20 @@ function InstanceTopBar({ server }: { server: ServerRecord }) {
           copyValue={endpoint ? `${endpoint.host}:${endpoint.port}` : undefined}
         />
         <CopyChip icon="port" label="Port" value={`${server.server_port}/${(endpoint?.protocol ?? 'tcp').toUpperCase()}`} copyValue={String(server.server_port)} />
+        {endpoint?.webUrl && (
+          <motion.a
+            href={endpoint.webUrl}
+            target="_blank"
+            rel="noreferrer"
+            whileTap={{ scale: 0.97 }}
+            className={`state-layer inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-sm font-medium ${
+              live ? 'bg-accent-400 text-accent-on' : 'bg-secondary-container text-secondary-on-container'
+            }`}
+            title={live ? endpoint.webUrl : 'Start the instance to use its web interface'}
+          >
+            <Icon name="globe" className="h-4 w-4" /> Open web UI
+          </motion.a>
+        )}
         <OwnerChip />
         {endpoint && endpoint.bindAddress !== '0.0.0.0' && (
           <span className="text-xs text-ink-500">bound to {endpoint.bindAddress}</span>

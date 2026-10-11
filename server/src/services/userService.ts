@@ -167,6 +167,11 @@ export interface CreationPolicy {
   maxInstances: number;
   /** Highest "max memory" per instance in MB (0 = no limit). */
   maxMemoryMb: number;
+  /** Container instances: none, only templates from the app catalog, or any image. */
+  containers: 'none' | 'catalog' | 'any';
+  /** May mount the container engine's socket (Portainer & other container managers). This means
+   *  control over every container on the host — with rootful Docker, effectively the host. */
+  engineSocket: boolean;
 }
 
 export interface EffectiveCreation extends CreationPolicy {
@@ -178,8 +183,9 @@ export interface EffectiveCreation extends CreationPolicy {
 }
 
 export function roleDefaultCreation(role: Role): CreationPolicy {
-  if (role === 'viewer') return { canCreate: false, platforms: [], maxInstances: 0, maxMemoryMb: 0 };
-  return { canCreate: true, platforms: [...CREATABLE_PLATFORMS], maxInstances: 0, maxMemoryMb: 0 };
+  if (role === 'viewer') return { canCreate: false, platforms: [], maxInstances: 0, maxMemoryMb: 0, containers: 'none', engineSocket: false };
+  // Containers stay opt-in: an admin grants catalog or any-image access per user.
+  return { canCreate: true, platforms: [...CREATABLE_PLATFORMS], maxInstances: 0, maxMemoryMb: 0, containers: 'none', engineSocket: false };
 }
 
 export function sanitizeCreationPolicy(input: unknown): CreationPolicy {
@@ -190,6 +196,8 @@ export function sanitizeCreationPolicy(input: unknown): CreationPolicy {
     platforms: CREATABLE_PLATFORMS.filter((p) => Array.isArray(raw.platforms) && raw.platforms.includes(p)),
     maxInstances: int(raw.maxInstances, 10_000),
     maxMemoryMb: int(raw.maxMemoryMb, 4_194_304),
+    containers: raw.containers === 'catalog' || raw.containers === 'any' ? raw.containers : 'none',
+    engineSocket: raw.engineSocket === true && (raw.containers === 'catalog' || raw.containers === 'any'),
   };
 }
 
@@ -200,7 +208,17 @@ export function countOwned(userId: string): number {
 export function getEffectiveCreation(userId: string, role: Role): EffectiveCreation {
   const owned = countOwned(userId);
   if (role === 'admin') {
-    return { canCreate: true, platforms: [...CREATABLE_PLATFORMS], maxInstances: 0, maxMemoryMb: 0, allowedPlatforms: [...CREATABLE_PLATFORMS, 'custom', 'docker'], owned, fromRole: true };
+    return {
+      canCreate: true,
+      platforms: [...CREATABLE_PLATFORMS],
+      maxInstances: 0,
+      maxMemoryMb: 0,
+      containers: 'any',
+      engineSocket: true,
+      allowedPlatforms: [...CREATABLE_PLATFORMS, 'custom', 'docker'],
+      owned,
+      fromRole: true,
+    };
   }
   const user = getUserById(userId);
   let policy: CreationPolicy | null = null;
@@ -212,7 +230,9 @@ export function getEffectiveCreation(userId: string, role: Role): EffectiveCreat
     }
   }
   const effective = policy ?? roleDefaultCreation(role);
-  return { ...effective, allowedPlatforms: effective.canCreate ? effective.platforms : [], owned, fromRole: !policy };
+  const allowedPlatforms: string[] = effective.canCreate ? [...effective.platforms] : [];
+  if (effective.canCreate && effective.containers !== 'none') allowedPlatforms.push('docker');
+  return { ...effective, allowedPlatforms, owned, fromRole: !policy };
 }
 
 export function setCreationPolicy(userId: string, policy: CreationPolicy | null) {

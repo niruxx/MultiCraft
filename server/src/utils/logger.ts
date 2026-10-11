@@ -1,3 +1,4 @@
+import { envVar } from './env.js';
 type Level = 'info' | 'warn' | 'error' | 'debug';
 
 function ts() {
@@ -20,6 +21,6 @@ export const logger = {
   warn: (msg: string, meta?: unknown) => line('warn', msg, meta),
   error: (msg: string, meta?: unknown) => line('error', msg, meta),
   debug: (msg: string, meta?: unknown) => {
-    if (process.env.MULTICRAFT_DEBUG) line('debug', msg, meta);
+    if (envVar('DEBUG')) line('debug', msg, meta);
   },
 };

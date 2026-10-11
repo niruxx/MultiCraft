@@ -1,11 +1,20 @@
 import fs from 'node:fs';
 import { DatabaseSync, type StatementSync } from 'node:sqlite';
-import { DATA_DIR, DB_PATH } from '../utils/paths.js';
+import { DATA_DIR, DB_PATH, LEGACY_DB_PATH } from '../utils/paths.js';
 import { SCHEMA_SQL } from './schema.js';
 import { runMigrations } from './migrations.js';
 import { logger } from '../utils/logger.js';
 
 fs.mkdirSync(DATA_DIR, { recursive: true });
+
+// Installs from before the rename to Outpost have multicraft.db — move it (and its WAL/SHM
+// journal files) to the new name before opening, so nothing is lost or duplicated.
+if (!fs.existsSync(DB_PATH) && fs.existsSync(LEGACY_DB_PATH)) {
+  for (const suffix of ['', '-wal', '-shm']) {
+    if (fs.existsSync(LEGACY_DB_PATH + suffix)) fs.renameSync(LEGACY_DB_PATH + suffix, DB_PATH + suffix);
+  }
+  logger.info(`Renamed ${LEGACY_DB_PATH} to ${DB_PATH}`);
+}
 
 export const db = new DatabaseSync(DB_PATH);
 db.exec('PRAGMA journal_mode = WAL;');

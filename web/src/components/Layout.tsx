@@ -148,7 +148,7 @@ export function Layout({
         <motion.div whileHover={{ rotate: -8, scale: 1.06 }} transition={{ type: 'spring', stiffness: 400, damping: 15 }}>
           <Logo className="h-8 w-8 shrink-0 rounded-lg" />
         </motion.div>
-        <span className="text-lg font-medium tracking-tight text-ink-50">MultiCraft</span>
+        <span className="text-lg font-medium tracking-tight text-ink-50">Outpost</span>
       </div>
       <motion.div
         className="min-h-0 flex-1 overflow-y-auto"
@@ -191,7 +191,7 @@ export function Layout({
             </svg>
           </button>
           <Logo className="h-6 w-6 rounded-md" />
-          <span className="font-medium text-ink-50">MultiCraft</span>
+          <span className="font-medium text-ink-50">Outpost</span>
         </div>
         <main className="min-h-0 flex-1 overflow-y-auto">
           <motion.div

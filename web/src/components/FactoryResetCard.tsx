@@ -38,7 +38,7 @@ export function FactoryResetCard() {
       if (err instanceof ApiError) {
         setError(err.message);
       } else {
-        toast.show('Lost the connection — if the reset actually started, MultiCraft is restarting now. Wait a few seconds and reload.');
+        toast.show('Lost the connection — if the reset actually started, Outpost is restarting now. Wait a few seconds and reload.');
         setRestarting(true);
       }
     } finally {
@@ -52,7 +52,7 @@ export function FactoryResetCard() {
         <div className="flex items-center gap-3">
           <Spinner className="h-5 w-5 text-accent-400" />
           <div>
-            <p className="text-sm font-semibold text-ink-100">MultiCraft is restarting…</p>
+            <p className="text-sm font-semibold text-ink-100">Outpost is restarting…</p>
             <p className="text-xs text-ink-400">
               This page will stop responding for a few seconds. Reload once it's back — you'll land on the first-run
               setup wizard.
@@ -91,7 +91,7 @@ export function FactoryResetCard() {
               </div>
               <p className="text-xs text-ink-500">
                 Your current data isn't deleted immediately — it's kept on disk as a timestamped backup folder,
-                but MultiCraft itself won't offer any way to restore it. Recovering it means stopping the panel and
+                but Outpost itself won't offer any way to restore it. Recovering it means stopping the panel and
                 renaming the folder back by hand.
               </p>
               <div className="flex justify-end gap-2">

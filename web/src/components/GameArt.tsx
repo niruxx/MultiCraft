@@ -43,8 +43,21 @@ const MARKED_GAMES: Record<string, MarkedGame> = {
 
 const QUAKE_APP_IDS = new Set(['349090']); // Quake Live dedicated server
 
-/** A drawn emblem kind, or `steam:<appId>` for a marked Steam game. */
-export type GameKind = DrawnKind | `steam:${string}`;
+/** A drawn emblem kind, `steam:<appId>` for a marked Steam game, or `app:<icon>` for software. */
+export type GameKind = DrawnKind | `steam:${string}` | `app:${string}`;
+
+/** Emblems for general software (container apps). Simple original glyphs — not product logos. */
+export const APP_ICONS: Record<string, { label: string; tile: string; color: string; path: string }> = {
+  manager: { label: 'Container manager', tile: 'from-[#13365a] to-[#0b1f33]', color: '#8ec5ff', path: 'M6 9h8v6H6zM18 9h8v6h-8zM6 18h8v6H6zM18 18h8v6h-8z' },
+  web: { label: 'Web server', tile: 'from-[#14402b] to-[#0b2418]', color: '#7fe0a8', path: 'M16 5a11 11 0 1 0 0 22 11 11 0 0 0 0-22zM5 16h22M16 5c3.5 3.5 3.5 18.5 0 22M16 5c-3.5 3.5-3.5 18.5 0 22' },
+  database: { label: 'Database', tile: 'from-[#2b2350] to-[#17132d]', color: '#b8a7ff', path: 'M7 9c0-2 4-3.5 9-3.5s9 1.5 9 3.5-4 3.5-9 3.5S7 11 7 9zM7 9v14c0 2 4 3.5 9 3.5s9-1.5 9-3.5V9M7 16c0 2 4 3.5 9 3.5s9-1.5 9-3.5' },
+  cache: { label: 'Cache', tile: 'from-[#4a1f1f] to-[#2a1111]', color: '#ff9e8f', path: 'M18 4L8 18h7l-1 10 10-14h-7z' },
+  media: { label: 'Media server', tile: 'from-[#3e1d4a] to-[#22102a]', color: '#e3a3ff', path: 'M6 7h20v18H6zM13 11v10l8-5z' },
+  monitor: { label: 'Monitoring', tile: 'from-[#173f3a] to-[#0c2420]', color: '#7ee0cf', path: 'M4 17h6l3-8 5 15 3-7h7' },
+  vault: { label: 'Password manager', tile: 'from-[#3a3214] to-[#211c0b]', color: '#f2d16b', path: 'M16 4l9 4v7c0 6-4 10.5-9 13-5-2.5-9-7-9-13V8zM16 13a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5zM16 18v4' },
+  cloud: { label: 'Cloud & files', tile: 'from-[#163a52] to-[#0c2130]', color: '#9fd6ff', path: 'M10 24a6 6 0 0 1-.5-12A8 8 0 0 1 25 13a5.5 5.5 0 0 1 0 11z' },
+  app: { label: 'App', tile: 'from-[#2a2f36] to-[#16191d]', color: '#c2c9bb', path: 'M6 6h8v8H6zM18 6h8v8h-8zM6 18h8v8H6zM18 18h8v8h-8z' },
+};
 
 const DRAWN_APP: Record<string, DrawnKind> = {
   '2394010': 'palworld',
@@ -61,7 +74,7 @@ const DRAWN_LABEL: Record<DrawnKind, string> = {
   zomboid: 'Project Zomboid',
   terraria: 'Terraria',
   quake: 'Quake Live',
-  custom: 'Custom server',
+  custom: 'Custom process',
   docker: 'Docker container',
   steam: 'Steam dedicated server',
 };
@@ -77,8 +90,18 @@ const IMAGE_GAME: [RegExp, GameKind][] = [
   [/(^|\/)cs2|counter-?strike/i, 'steam:730'],
 ];
 
-export function gameKindOf(server: Pick<ServerRecord, 'platform' | 'steam_app_id'> & { version?: string }): GameKind {
-  if (server.platform === 'docker') return IMAGE_GAME.find(([re]) => re.test(server.version ?? ''))?.[1] ?? 'docker';
+export function gameKindOf(server: Pick<ServerRecord, 'platform' | 'steam_app_id'> & { version?: string; docker_config?: string | null }): GameKind {
+  if (server.platform === 'docker') {
+    let icon: string | null = null;
+    try {
+      icon = server.docker_config ? (JSON.parse(server.docker_config).icon ?? null) : null;
+    } catch {
+      icon = null;
+    }
+    if (icon && APP_ICONS[icon]) return `app:${icon}`;
+    if (icon && icon in DRAWN_LABEL) return icon as DrawnKind;
+    return IMAGE_GAME.find(([re]) => re.test(server.version ?? ''))?.[1] ?? 'docker';
+  }
   if (server.platform === 'java') return 'minecraft-java';
   if (server.platform === 'bedrock') return 'minecraft-bedrock';
   if (server.platform === 'custom') return 'custom';
@@ -89,13 +112,22 @@ export function gameKindOf(server: Pick<ServerRecord, 'platform' | 'steam_app_id
   return 'steam';
 }
 
+function appIcon(kind: GameKind) {
+  return kind.startsWith('app:') ? APP_ICONS[kind.slice(4)] ?? APP_ICONS.app : null;
+}
+
+/** Whether an emblem kind is a game (vs. general software). */
+export function isGameKind(kind: GameKind): boolean {
+  return !kind.startsWith('app:') && kind !== 'docker' && kind !== 'custom';
+}
+
 function marked(kind: GameKind): MarkedGame | null {
   return kind.startsWith('steam:') ? MARKED_GAMES[kind.slice(6)] ?? null : null;
 }
 
 /** Human-readable game name for an emblem kind. */
 export function gameLabel(kind: GameKind): string {
-  return marked(kind)?.label ?? DRAWN_LABEL[kind as DrawnKind] ?? DRAWN_LABEL.steam;
+  return appIcon(kind)?.label ?? marked(kind)?.label ?? DRAWN_LABEL[kind as DrawnKind] ?? DRAWN_LABEL.steam;
 }
 
 /** Tile background per game — tonal, so the emblems read on the dark MD3 surfaces. */
@@ -113,10 +145,14 @@ const TILE: Record<DrawnKind, string> = {
 };
 
 function tileOf(kind: GameKind): string {
-  return marked(kind)?.tile ?? TILE[kind as DrawnKind] ?? TILE.steam;
+  return appIcon(kind)?.tile ?? marked(kind)?.tile ?? TILE[kind as DrawnKind] ?? TILE.steam;
 }
 
 function Emblem({ kind }: { kind: GameKind }) {
+  const app = appIcon(kind);
+  if (app) {
+    return <path d={app.path} fill="none" stroke={app.color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />;
+  }
   const m = marked(kind);
   if (m?.mark.type === 'crosshair') {
     const c = m.mark.color;
@@ -275,4 +311,18 @@ export function GameWatermark({ kind, className = '' }: { kind: GameKind; classN
       <Emblem kind={kind} />
     </svg>
   );
+}
+
+export type InstanceCategory = 'game' | 'app' | 'container' | 'custom';
+
+/** What an instance is, for grouping: games, apps/services, plain containers, custom processes. */
+export function instanceCategory(server: Pick<ServerRecord, 'platform' | 'docker_config'>): InstanceCategory {
+  if (server.platform === 'custom') return 'custom';
+  if (server.platform !== 'docker') return 'game';
+  try {
+    const c = server.docker_config ? JSON.parse(server.docker_config).category : null;
+    return c === 'game' || c === 'app' ? c : 'container';
+  } catch {
+    return 'container';
+  }
 }

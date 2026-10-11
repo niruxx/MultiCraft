@@ -6,10 +6,16 @@ import { Button, Card, CardTitle, ErrorText, Notice, Spinner } from '../../compo
 import { Icon } from '../../components/icons.js';
 import { DockerEditor, cleanDockerConfig } from '../../components/DockerEditor.js';
 import { useToast } from '../../components/Toast.js';
+import { useAuth } from '../../state/AuthContext.js';
 
-/** Container settings for a Docker instance. Admin-only to change: they decide what runs on the host. */
+/** Container settings for a Docker instance — editable by admins, or by users with Configuration
+ *  permission on it, within their account's container access. */
 export function DockerCard() {
-  const { server, isAdmin, running, refresh } = useServerDetail();
+  const { server, isAdmin, can, running, refresh } = useServerDetail();
+  const { creation } = useAuth();
+  const containers = isAdmin ? 'any' : creation?.containers ?? 'none';
+  // Owners / Configuration-permission holders may edit within their container access.
+  const editable = isAdmin || (can('settings') && containers !== 'none');
   const toast = useToast();
   const [config, setConfig] = useState<DockerConfig | null>(null);
   const [saved, setSaved] = useState('');
@@ -58,14 +64,19 @@ export function DockerCard() {
         error ? <ErrorText>{error}</ErrorText> : <Spinner />
       ) : (
         <>
-          {!isAdmin && (
+          {!editable && (
             <div className="mb-4">
-              <Notice tone="info">Only admins can change container settings.</Notice>
+              <Notice tone="info">Changing container settings needs Configuration permission on this instance and container access on your account.</Notice>
             </div>
           )}
-          <DockerEditor value={config} onChange={setConfig} disabled={!isAdmin} />
+          {editable && containers === 'catalog' && (
+            <div className="mb-4">
+              <Notice tone="info">Your account runs catalog apps only, so the image stays as the catalog defines it.</Notice>
+            </div>
+          )}
+          <DockerEditor value={config} onChange={setConfig} disabled={!editable} lockImage={containers === 'catalog'} allowEngineSocket={isAdmin || !!creation?.engineSocket} />
           <ErrorText>{error}</ErrorText>
-          {isAdmin && (
+          {editable && (
             <div className="mt-5 flex items-center gap-3">
               <Button variant="primary" onClick={save} disabled={busy || JSON.stringify(config) === saved}>
                 {busy ? 'Saving…' : 'Save container settings'}

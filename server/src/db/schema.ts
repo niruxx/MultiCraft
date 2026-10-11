@@ -50,7 +50,7 @@ CREATE TABLE IF NOT EXISTS servers (
   suspended_by TEXT
 );
 
--- Other MultiCraft panels this one can transfer instances to. api_key is the remote panel's
+-- Other Outpost panels this one can transfer instances to. api_key is the remote panel's
 -- node key (shown on its Configuration page) and has to be stored as-is to call that panel.
 CREATE TABLE IF NOT EXISTS nodes (
   id TEXT PRIMARY KEY,

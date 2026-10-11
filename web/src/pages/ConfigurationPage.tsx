@@ -95,7 +95,7 @@ function SecurityCard() {
       <div className="space-y-3 text-sm text-ink-300">
         <p>Every instance is kept to its own folder:</p>
         <ul className="space-y-1.5">
-          <li>🛡️ <b className="text-ink-100">Process sandbox</b> — game servers run under bubblewrap: their folder is the only writable place, system folders are read-only, and home folders, other instances and the panel’s data are hidden.</li>
+          <li>🛡️ <b className="text-ink-100">Process sandbox</b> — instance processes run under bubblewrap: their folder is the only writable place, system folders are read-only, and home folders, other instances and the panel’s data are hidden.</li>
           <li>🔗 <b className="text-ink-100">Symlink-proof file access</b> — the panel never follows a link out of an instance folder (files, uploads, plugins, snapshots).</li>
           <li>🧹 <b className="text-ink-100">Clean environment</b> — instances never inherit the panel’s environment variables or secrets.</li>
           <li>🐳 <b className="text-ink-100">Docker instances</b> — containers only see their mounted folder, with memory/process limits and no-new-privileges.</li>
@@ -104,7 +104,7 @@ function SecurityCard() {
         {sandbox?.available && (
           <label className="flex items-center gap-2">
             <input type="checkbox" checked={sandbox.enabled} onChange={(e) => toggle(e.target.checked)} />
-            Sandbox game server processes ({sandbox.version})
+            Sandbox instance processes ({sandbox.version})
           </label>
         )}
       </div>
@@ -234,7 +234,7 @@ function NodesCard() {
         Nodes
       </CardTitle>
       <p className="mb-4 text-sm text-ink-400">
-        Link other hosts running MultiCraft so instances can be transferred between them — from an instance's Configuration page.
+        Link other hosts running Outpost so instances can be transferred between them — from an instance's Configuration page.
       </p>
 
       <div className="mb-4 rounded-2xl bg-surface-900 p-4">
@@ -320,7 +320,7 @@ function AddNodeModal({ open, onClose, onAdded }: { open: boolean; onClose: () =
           <Input value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder="mcn_…" className="font-mono" />
         </Field>
         <p className="text-xs text-ink-500">
-          Find the key on the other panel under Configuration → Nodes. MultiCraft checks the connection before saving. Use HTTPS
+          Find the key on the other panel under Configuration → Nodes. Outpost checks the connection before saving. Use HTTPS
           (or a private network/VPN) between nodes — instance files are sent over this connection.
         </p>
         <ErrorText>{error}</ErrorText>
@@ -343,7 +343,7 @@ export function ConfigurationPage() {
   return (
     <Layout>
       <div className="stagger mx-auto max-w-5xl space-y-5 px-4 py-8 sm:px-8">
-        <PageHeader title="Configuration" subtitle="Panel-wide settings for this MultiCraft host." />
+        <PageHeader title="Configuration" subtitle="Panel-wide settings for this Outpost host." />
         <HostCard />
         {isAdmin ? (
           <>

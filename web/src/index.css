@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 /*
- * Theme tokens — a dark-only Material Design 3 scheme generated from MultiCraft's green seed.
+ * Theme tokens — a dark-only Material Design 3 scheme generated from Outpost's green seed.
  * Every color Tailwind class in the app (surface-*, ink-*, accent-*, …) resolves through these
  * CSS variables. Values are "R G B" triplets (no commas) so Tailwind's rgb(var(--x) / alpha)
  * trick works.

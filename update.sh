@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# MultiCraft updater: pulls the latest commits from GitHub, rebuilds, and restarts —
+# Outpost updater: pulls the latest commits from GitHub, rebuilds, and restarts —
 # without ever touching server/data/ (the database, every server's files, and backups).
 #
 # Safety, in order:
@@ -67,16 +67,16 @@ confirm() {
   [[ "$reply" =~ ^[Yy] ]]
 }
 
-heading "MultiCraft updater"
+heading "Outpost updater"
 
 command -v git >/dev/null 2>&1 || die "git is required."
 command -v npm >/dev/null 2>&1 || die "npm is required."
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-if [[ -f "$SCRIPT_DIR/package.json" ]] && grep -q '"name": *"multicraft"' "$SCRIPT_DIR/package.json" 2>/dev/null; then
+if [[ -f "$SCRIPT_DIR/package.json" ]] && grep -qE '"name": *"(outpost|multicraft)"' "$SCRIPT_DIR/package.json" 2>/dev/null; then
   PROJECT_DIR="$SCRIPT_DIR"
 else
-  die "Run this from inside your MultiCraft checkout."
+  die "Run this from inside your Outpost checkout."
 fi
 cd "$PROJECT_DIR"
 
@@ -87,7 +87,9 @@ BRANCH="$(git rev-parse --abbrev-ref HEAD)"
 [[ "$BRANCH" == "HEAD" ]] && die "You're in a detached HEAD state — check out a branch first (e.g. 'git checkout main')."
 
 DATA_DIR="${MULTICRAFT_DATA_DIR:-$PROJECT_DIR/server/data}"
-BACKUP_ROOT="$PROJECT_DIR/../multicraft-update-backups"
+BACKUP_ROOT="$PROJECT_DIR/../outpost-update-backups"
+# Keep using the pre-rename folder if it exists, so earlier rollback points stay available.
+[[ -d "$PROJECT_DIR/../multicraft-update-backups" && ! -d "$BACKUP_ROOT" ]] && BACKUP_ROOT="$PROJECT_DIR/../multicraft-update-backups"
 STATE_FILE="$BACKUP_ROOT/last-update.json"
 
 # ---------------------------------------------------------------------------
@@ -165,15 +167,20 @@ ok "Recorded rollback point ($STATE_FILE) — this update never runs without one
 heading "Step 3/6 — Stopping the running instance"
 
 SYSTEMD_ACTIVE=0
-if command -v systemctl >/dev/null 2>&1 && systemctl is-active --quiet multicraft 2>/dev/null; then
-  info "Stopping multicraft.service…"
-  sudo systemctl stop multicraft
+# The unit is outpost.service; installs from before the rename still have multicraft.service.
+SERVICE=outpost
+if command -v systemctl >/dev/null 2>&1 && ! systemctl is-active --quiet outpost 2>/dev/null && systemctl is-active --quiet multicraft 2>/dev/null; then
+  SERVICE=multicraft
+fi
+if command -v systemctl >/dev/null 2>&1 && systemctl is-active --quiet "$SERVICE" 2>/dev/null; then
+  info "Stopping ${SERVICE}.service…"
+  sudo systemctl stop "$SERVICE"
   SYSTEMD_ACTIVE=1
   ok "Service stopped."
 else
-  warn "No active multicraft.service found. If you're running MultiCraft another way (pm2, a plain"
+  warn "No active ${SERVICE}.service found. If you're running Outpost another way (pm2, a plain"
   warn "'npm start' terminal), stop it yourself now so the update doesn't fight a live process."
-  confirm "Continue?" y || die "Cancelled — stop MultiCraft and re-run this script."
+  confirm "Continue?" y || die "Cancelled — stop Outpost and re-run this script."
 fi
 
 # ---------------------------------------------------------------------------
@@ -238,7 +245,7 @@ rollback() {
 
 TEST_PORT="${PORT:-8642}"
 if confirm "Start the updated build once to verify it actually comes up before restarting your live service?" y; then
-  ( cd "$PROJECT_DIR/server" && exec env PORT="$TEST_PORT" node dist/index.js ) >/tmp/multicraft-update-check.log 2>&1 &
+  ( cd "$PROJECT_DIR/server" && exec env PORT="$TEST_PORT" node dist/index.js ) >/tmp/outpost-update-check.log 2>&1 &
   TEST_PID=$!
   trap 'kill "$TEST_PID" >/dev/null 2>&1 || true' EXIT
   sleep 3
@@ -250,41 +257,41 @@ if confirm "Start the updated build once to verify it actually comes up before r
     trap - EXIT
 
     if [[ "$SYSTEMD_ACTIVE" == "1" ]]; then
-      if confirm "Restart multicraft.service now with the updated build?" y; then
-        sudo systemctl start multicraft
+      if confirm "Restart ${SERVICE}.service now with the updated build?" y; then
+        sudo systemctl start "$SERVICE"
         sleep 2
-        if systemctl is-active --quiet multicraft; then
-          ok "multicraft.service is running the update."
+        if systemctl is-active --quiet "$SERVICE"; then
+          ok "${SERVICE}.service is running the update."
         else
-          err "Service failed to start after the update. Check: journalctl -u multicraft -e"
+          err "Service failed to start after the update. Check: journalctl -u $SERVICE -e"
           confirm "Roll back to $PREV_LABEL?" y && rollback
         fi
       else
-        ok "Not restarting automatically — run 'sudo systemctl start multicraft' when ready."
+        ok "Not restarting automatically — run 'sudo systemctl start "$SERVICE"' when ready."
       fi
     else
-      ok "Verified working. Start it however you normally do (npm start / pm2 restart multicraft / etc)."
+      ok "Verified working. Start it however you normally do (npm start / pm2 restart outpost / etc)."
     fi
   else
     err "The updated build didn't respond on port $TEST_PORT. Recent log output:"
-    tail -n 30 /tmp/multicraft-update-check.log || true
+    tail -n 30 /tmp/outpost-update-check.log || true
     kill "$TEST_PID" >/dev/null 2>&1 || true
     wait "$TEST_PID" 2>/dev/null || true
     trap - EXIT
 
     if confirm "Roll back to the previous version ($PREV_LABEL)?" y; then
       rollback
-      [[ "$SYSTEMD_ACTIVE" == "1" ]] && { sudo systemctl start multicraft; ok "multicraft.service restarted on the rolled-back version."; }
+      [[ "$SYSTEMD_ACTIVE" == "1" ]] && { sudo systemctl start "$SERVICE"; ok "${SERVICE}.service restarted on the rolled-back version."; }
     else
       warn "Update left in place but UNVERIFIED. Roll back any time with: ./update.sh --rollback"
-      [[ "$SYSTEMD_ACTIVE" == "1" ]] && warn "multicraft.service is still stopped — start it manually once you've sorted this out."
+      [[ "$SYSTEMD_ACTIVE" == "1" ]] && warn "${SERVICE}.service is still stopped — start it manually once you've sorted this out."
     fi
   fi
 else
   ok "Skipping the test."
-  if [[ "$SYSTEMD_ACTIVE" == "1" ]] && confirm "Restart multicraft.service now anyway?" n; then
-    sudo systemctl start multicraft
-    ok "multicraft.service restarted."
+  if [[ "$SYSTEMD_ACTIVE" == "1" ]] && confirm "Restart ${SERVICE}.service now anyway?" n; then
+    sudo systemctl start "$SERVICE"
+    ok "${SERVICE}.service restarted."
   else
     ok "Start it whenever you're ready. Roll back any time with: ./update.sh --rollback"
   fi

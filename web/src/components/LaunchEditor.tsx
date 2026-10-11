@@ -100,7 +100,30 @@ export function LaunchEditor({
             <Input value={value.workingDir ?? ''} onChange={(e) => set({ workingDir: e.target.value })} placeholder="Default: the instance folder" className="font-mono" />
           </Field>
           {custom && (
-            <Field label="Players connect over">
+            <Field label="Web interface on port (optional)">
+              <div className="flex gap-2">
+                <Select
+                  value={value.webUi?.scheme ?? 'http'}
+                  onChange={(e) => value.webUi && set({ webUi: { ...value.webUi, scheme: e.target.value as 'http' | 'https' } })}
+                  className="!w-24"
+                  disabled={!value.webUi}
+                >
+                  <option value="http">http</option>
+                  <option value="https">https</option>
+                </Select>
+                <Input
+                  type="number"
+                  min={1}
+                  max={65535}
+                  value={value.webUi?.port ?? ''}
+                  onChange={(e) => set({ webUi: e.target.value ? { port: Number(e.target.value), scheme: value.webUi?.scheme ?? 'http', path: value.webUi?.path ?? '/' } : undefined })}
+                  placeholder="none — e.g. 3000"
+                />
+              </div>
+            </Field>
+          )}
+          {custom && (
+            <Field label="Clients connect over">
               <Select value={value.protocol ?? 'tcp'} onChange={(e) => set({ protocol: e.target.value as 'tcp' | 'udp' })}>
                 <option value="tcp">TCP</option>
                 <option value="udp">UDP</option>
@@ -305,5 +328,6 @@ export function cleanLaunchConfig(c: LaunchConfig): LaunchConfig {
     out.restart = c.restart.kind === 'stdin' ? { ...c.restart, commands: c.restart.commands.map((x) => x.trim()).filter(Boolean) } : c.restart;
   }
   if (c.stopTimeoutSec) out.stopTimeoutSec = c.stopTimeoutSec;
+  if (c.webUi?.port) out.webUi = c.webUi;
   return out;
 }

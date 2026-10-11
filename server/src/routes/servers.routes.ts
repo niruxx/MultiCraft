@@ -55,7 +55,8 @@ import { STEAM_GAME_PRESETS, findPreset } from '../services/steamGames.js';
 import { isMinecraftPlatform, type Loader, type Platform, type ServerRecord } from '../types/index.js';
 import { sanitizeLaunchConfig, launchConfigOf, launchVariables, resolveExecutable, ensureExecutable } from '../services/launchConfig.js';
 import { getOnlinePlayers } from '../services/playerService.js';
-import { dockerConfigOf, getEngineStatus, pullImage, sanitizeDockerConfig } from '../services/containerService.js';
+import { dockerConfigOf, enforceContainerPolicy, getEngineStatus, pullImage, sanitizeDockerConfig } from '../services/containerService.js';
+import { findTemplate } from '../services/catalogService.js';
 
 export const serversRouter = Router();
 serversRouter.use(requireAuth);
@@ -76,12 +77,12 @@ async function runServerInstall(server: ServerRecord): Promise<void> {
     try {
       publish(consoleTopic(server.id), { type: 'install_progress', pct: 5, message: `Pulling ${server.version}` });
       await pullImage(server.version, (line) => appendLine(server.id, line));
-      appendLine(server.id, '[MultiCraft] Image ready — the instance can start');
+      appendLine(server.id, '[Outpost] Image ready — the instance can start');
       setServerStatus(server.id, 'stopped');
       publish(consoleTopic(server.id), { type: 'status', status: 'stopped' });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      appendLine(server.id, `[MultiCraft] Image pull failed: ${message}`, 'stderr');
+      appendLine(server.id, `[Outpost] Image pull failed: ${message}`, 'stderr');
       setServerStatus(server.id, 'install_failed');
       publish(consoleTopic(server.id), { type: 'status', status: 'install_failed', error: message });
     }
@@ -120,12 +121,12 @@ async function runServerInstall(server: ServerRecord): Promise<void> {
       setServerJar(server.id, result.executable, result.build);
     }
 
-    appendLine(server.id, '[MultiCraft] Installation finished — server is ready to start');
+    appendLine(server.id, '[Outpost] Installation finished — server is ready to start');
     setServerStatus(server.id, 'stopped');
     publish(consoleTopic(server.id), { type: 'status', status: 'stopped' });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    appendLine(server.id, `[MultiCraft] Installation failed: ${message}`, 'stderr');
+    appendLine(server.id, `[Outpost] Installation failed: ${message}`, 'stderr');
     setServerStatus(server.id, 'install_failed');
     publish(consoleTopic(server.id), { type: 'status', status: 'install_failed', error: message });
   }
@@ -215,9 +216,11 @@ serversRouter.post(
     if (typeof platform === 'string' && !creation.allowedPlatforms.includes(platform)) {
       throw new HttpError(
         403,
-        platform === 'custom' || platform === 'docker'
-          ? `Only admins can create ${platform === 'docker' ? 'Docker' : 'custom'} instances`
-          : `Your account can't create ${platform} instances`
+        platform === 'custom'
+          ? 'Only admins can create custom instances'
+          : platform === 'docker'
+            ? "Your account can't create container instances — an admin can allow catalog apps or any image under Users"
+            : `Your account can't create ${platform} instances`
       );
     }
     if (creation.maxInstances && creation.owned >= creation.maxInstances) {
@@ -242,14 +245,14 @@ serversRouter.post(
       launchConfig = JSON.stringify(sanitizeLaunchConfig(req.body?.launch ?? {}, { isAdmin: true, platform: 'custom' }));
     }
 
-    // Docker access is root-equivalent on most hosts, so only admins create container instances.
+    // Container instances follow the user's container permission (none / catalog apps / any image,
+    // plus engine-socket access for Portainer); admins can do anything.
     let dockerConfig: string | null = null;
     let dockerImage: string | null = null;
     if (platform === 'docker') {
-      if (req.auth!.role !== 'admin') throw new HttpError(403, 'Only admins can create Docker instances');
       const engine = getEngineStatus(true);
       if (!engine.available) throw new HttpError(400, `${engine.error}${engine.hint ? ` — ${engine.hint}` : ''}`);
-      const cfg = sanitizeDockerConfig(req.body?.docker);
+      const cfg = enforceContainerPolicy(sanitizeDockerConfig(req.body?.docker), creation, req.auth!.role === 'admin', findTemplate);
       dockerConfig = JSON.stringify(cfg);
       dockerImage = cfg.image;
     }
@@ -301,10 +304,10 @@ serversRouter.post(
       record.jar_file = customExecutable.trim();
     }
 
-    appendLine(record.id, `[MultiCraft] Creating server "${record.name}" (${loader} ${version}, ${platform})`);
+    appendLine(record.id, `[Outpost] Creating server "${record.name}" (${loader} ${version}, ${platform})`);
     if (platform === 'java') {
       writeEula(record.id, true);
-      appendLine(record.id, "[MultiCraft] Wrote eula.txt (eula=true, accepted by user at creation)");
+      appendLine(record.id, "[Outpost] Wrote eula.txt (eula=true, accepted by user at creation)");
     }
 
     // Tie the instance to its creator: non-admins can only see instances they're assigned to.
@@ -314,7 +317,7 @@ serversRouter.post(
     if (platform === 'custom') {
       // Nothing to download: the user brings the files (File Management) or points at a host binary.
       setServerStatus(record.id, 'stopped');
-      appendLine(record.id, '[MultiCraft] Custom instance created — upload your server files in File Management, then start it.');
+      appendLine(record.id, '[Outpost] Custom instance created — upload your server files in File Management, then start it.');
       return res.status(201).json({ server: getServer(record.id) });
     }
 
@@ -337,7 +340,7 @@ serversRouter.post(
 
     setServerStatus(server.id, 'installing');
     publish(consoleTopic(server.id), { type: 'status', status: 'installing' });
-    appendLine(server.id, `[MultiCraft] Retrying installation (requested by ${req.auth!.username})`);
+    appendLine(server.id, `[Outpost] Retrying installation (requested by ${req.auth!.username})`);
     logAudit(req.auth!.sub, req.auth!.username, 'server.retry_install', server.id);
     res.status(202).json({ ok: true });
 
@@ -384,7 +387,10 @@ serversRouter.get(
             : server.platform === 'docker'
               ? dockerConfigOf(server)?.ports[0]?.protocol ?? 'tcp'
               : findPreset(server.steam_app_id)?.portProtocol ?? 'udp';
+    const host = wildcard ? primary ?? '127.0.0.1' : bind;
+    const web = server.platform === 'docker' ? dockerConfigOf(server)?.webUi : server.platform === 'custom' ? launchConfigOf(server).webUi : undefined;
     res.json({
+      webUrl: web ? `${web.scheme}://${host}:${web.port}${web.path}` : null,
       host: wildcard ? primary ?? '127.0.0.1' : bind,
       bindAddress: wildcard ? '0.0.0.0' : bind,
       port: server.server_port,
@@ -423,7 +429,7 @@ serversRouter.put(
     const config = sanitizeLaunchConfig(req.body?.config ?? {}, { isAdmin: req.auth!.role === 'admin', platform: server.platform });
     setLaunchConfig(server.id, Object.keys(config).length ? JSON.stringify(config) : null);
     if (config.executable && !config.useShell) ensureExecutable(resolveExecutable(server, config.executable));
-    appendLine(server.id, `[MultiCraft] Launch settings changed by ${req.auth!.username} — they apply on the next start`, 'system');
+    appendLine(server.id, `[Outpost] Launch settings changed by ${req.auth!.username} — they apply on the next start`, 'system');
     logAudit(req.auth!.sub, req.auth!.username, 'server.launch.update', server.id, JSON.stringify(config).slice(0, 500));
     const updated = getServer(server.id)!;
     let preview: string | null = null;
@@ -451,15 +457,18 @@ serversRouter.get(
 
 serversRouter.put(
   '/:serverId/docker',
-  requireRole('admin'),
+  requireServerAccess(),
   asyncHandler(async (req, res) => {
     const server = getServer(req.params.serverId);
     if (!server) throw new HttpError(404, 'Server not found');
     if (server.platform !== 'docker') throw new HttpError(400, 'Not a Docker instance');
-    const config = sanitizeDockerConfig(req.body?.config);
+    // Owners / users with Configuration rights may edit, within their container permission.
+    if (req.auth!.role !== 'admin') requirePermission(req, 'settings');
+    const policy = getEffectiveCreation(req.auth!.sub, req.auth!.role);
+    const config = enforceContainerPolicy(sanitizeDockerConfig(req.body?.config), policy, req.auth!.role === 'admin', findTemplate);
     setDockerConfig(server.id, JSON.stringify(config), config.image);
     updateServerRecord(server.id, { serverPort: config.ports[0].host });
-    appendLine(server.id, `[MultiCraft] Container settings changed by ${req.auth!.username} — they apply on the next start`, 'system');
+    appendLine(server.id, `[Outpost] Container settings changed by ${req.auth!.username} — they apply on the next start`, 'system');
     logAudit(req.auth!.sub, req.auth!.username, 'server.docker.update', server.id, config.image);
     res.json({ config, server: getServer(server.id) });
   })
@@ -494,7 +503,7 @@ serversRouter.post(
     setServerSuspension(server.id, true, reason || null, req.auth!.username);
     cancelAutoRestart(server.id, 'instance suspended');
     if (isRunning(server.id)) {
-      appendLine(server.id, `[MultiCraft] Instance suspended by ${req.auth!.username} — stopping`, 'system');
+      appendLine(server.id, `[Outpost] Instance suspended by ${req.auth!.username} — stopping`, 'system');
       stopServer(server.id, { force: req.body?.force === true });
     }
     logAudit(req.auth!.sub, req.auth!.username, 'server.suspend', server.id, reason);
@@ -509,7 +518,7 @@ serversRouter.post(
     const server = getServer(req.params.serverId);
     if (!server) throw new HttpError(404, 'Server not found');
     setServerSuspension(server.id, false, null, null);
-    appendLine(server.id, `[MultiCraft] Suspension lifted by ${req.auth!.username}`, 'system');
+    appendLine(server.id, `[Outpost] Suspension lifted by ${req.auth!.username}`, 'system');
     logAudit(req.auth!.sub, req.auth!.username, 'server.unsuspend', server.id);
     res.json({ server: getServer(server.id) });
   })
@@ -780,7 +789,7 @@ serversRouter.post(
     const targetVersion = typeof req.body?.targetVersion === 'string' ? req.body.targetVersion : undefined;
     setServerStatus(server.id, 'updating');
     publish(consoleTopic(server.id), { type: 'status', status: 'updating' });
-    appendLine(server.id, `[MultiCraft] Update requested by ${req.auth!.username}`);
+    appendLine(server.id, `[Outpost] Update requested by ${req.auth!.username}`);
     logAudit(req.auth!.sub, req.auth!.username, 'server.update', server.id, targetVersion ?? server.version);
     res.status(202).json({ ok: true });
 
@@ -793,12 +802,12 @@ serversRouter.post(
           (line) => appendLine(server.id, line)
         );
         setServerVersion(server.id, result.version, result.jarFile, result.build);
-        appendLine(server.id, '[MultiCraft] Update finished — server is ready to start');
+        appendLine(server.id, '[Outpost] Update finished — server is ready to start');
         setServerStatus(server.id, 'stopped');
         publish(consoleTopic(server.id), { type: 'status', status: 'stopped' });
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
-        appendLine(server.id, `[MultiCraft] Update failed: ${message}`, 'stderr');
+        appendLine(server.id, `[Outpost] Update failed: ${message}`, 'stderr');
         setServerStatus(server.id, 'stopped');
         publish(consoleTopic(server.id), { type: 'status', status: 'stopped', error: message });
       }

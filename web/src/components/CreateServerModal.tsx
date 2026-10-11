@@ -20,7 +20,18 @@ const LOADERS_BY_PLATFORM: Record<Platform, { value: Loader; label: string }[]> 
 
 const CUSTOM_STEAM_GAME = '__custom__';
 
-export function CreateServerModal({ open, onClose, onCreated }: { open: boolean; onClose: () => void; onCreated: (s: ServerRecord) => void }) {
+/** Creates a game server (`mode="game"`) or a custom process (`mode="custom"`, admin-only). */
+export function CreateServerModal({
+  open,
+  onClose,
+  onCreated,
+  mode = 'game',
+}: {
+  open: boolean;
+  onClose: () => void;
+  onCreated: (s: ServerRecord) => void;
+  mode?: 'game' | 'custom';
+}) {
   const { user, creation } = useAuth();
   const isAdmin = user?.role === 'admin';
   const allowed = new Set(creation?.allowedPlatforms ?? []);
@@ -76,12 +87,17 @@ export function CreateServerModal({ open, onClose, onCreated }: { open: boolean;
   }, [platform, open]);
 
   useEffect(() => {
-    if (open && creation && !creation.allowedPlatforms.includes(platform)) {
-      const first = creation.allowedPlatforms.find((p) => p !== 'docker') as Platform | undefined;
+    if (!open) return;
+    if (mode === 'custom') {
+      setPlatform('custom');
+      return;
+    }
+    if (platform === 'custom' || (creation && !creation.allowedPlatforms.includes(platform))) {
+      const first = creation?.allowedPlatforms.find((p) => p === 'java' || p === 'bedrock' || p === 'steam') as Platform | undefined;
       if (first) setPlatform(first);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, creation]);
+  }, [open, creation, mode]);
 
   useEffect(() => {
     setServerPort(platform === 'bedrock' ? 19132 : platform === 'custom' ? 27015 : 25565);
@@ -136,19 +152,18 @@ export function CreateServerModal({ open, onClose, onCreated }: { open: boolean;
   }
 
   return (
-    <Modal open={open} onClose={onClose} title="Create a new instance" size={platform === 'custom' ? 'lg' : 'md'}>
+    <Modal open={open} onClose={onClose} title={mode === 'custom' ? 'New custom process' : 'New game server'} size={platform === 'custom' ? 'lg' : 'md'}>
       <div className="space-y-4">
         <Field label="Instance name">
-          <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="My Survival Server" autoFocus />
+          <Input value={name} onChange={(e) => setName(e.target.value)} placeholder={mode === 'custom' ? 'My app' : 'My Survival Server'} autoFocus />
         </Field>
 
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Platform">
+        <div className={`grid grid-cols-2 gap-3 ${mode === 'custom' ? 'hidden' : ''}`}>
+          <Field label="Game">
             <Select value={platform} onChange={(e) => setPlatform(e.target.value as Platform)}>
               {allowed.has('java') && <option value="java">Minecraft: Java Edition</option>}
               {allowed.has('bedrock') && <option value="bedrock">Minecraft: Bedrock Edition</option>}
               {allowed.has('steam') && <option value="steam">Steam Dedicated Server</option>}
-              {isAdmin && <option value="custom">Custom server (binary or shell script)</option>}
             </Select>
           </Field>
           {(platform === 'java' || platform === 'bedrock') && (
@@ -199,7 +214,7 @@ export function CreateServerModal({ open, onClose, onCreated }: { open: boolean;
 
         {platform === 'steam' && steamGameChoice === CUSTOM_STEAM_GAME && (
           <p className="rounded-lg border border-yellow-500/30 bg-yellow-500/10 px-3 py-2 text-xs text-yellow-400">
-            Custom App IDs are best-effort: MultiCraft doesn't know this game's launch behavior, so it will send
+            Custom App IDs are best-effort: Outpost doesn't know this game's launch behavior, so it will send
             SIGTERM to stop it (falling back to a forced stop after 60s) and mark it "running" as soon as the
             process starts. Config files are edited via the Files tab.
           </p>
@@ -273,7 +288,7 @@ export function CreateServerModal({ open, onClose, onCreated }: { open: boolean;
 
         {loader === 'spigot' && (
           <p className="rounded-lg border border-yellow-500/30 bg-yellow-500/10 px-3 py-2 text-xs text-yellow-400">
-            Spigot isn't pre-built — MultiCraft compiles it from source with BuildTools on this machine. That
+            Spigot isn't pre-built — Outpost compiles it from source with BuildTools on this machine. That
             requires a full JDK (not just a JRE) and git, and can take several minutes. Watch the Console tab for
             live build output.
           </p>

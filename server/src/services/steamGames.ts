@@ -41,7 +41,7 @@ export const STEAM_GAME_PRESETS: SteamGamePreset[] = [
     stopStrategy: { kind: 'signal', signal: 'SIGTERM' },
     needsExecuteBit: true,
     notes:
-      "Palworld's dedicated server does not reliably shut down cleanly on a stop signal — MultiCraft will " +
+      "Palworld's dedicated server does not reliably shut down cleanly on a stop signal — Outpost will " +
       'force-stop it after a short grace period if it does not exit on its own. Its own periodic autosave is ' +
       'what gets preserved, not a save-on-exit. Use in-game admin commands or an RCON tool if you need a ' +
       'guaranteed save immediately before stopping.',

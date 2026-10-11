@@ -34,6 +34,8 @@ export interface LaunchConfig {
   restart?: RestartConfig;
   /** Seconds to wait for a graceful stop before force-killing (default 60). */
   stopTimeoutSec?: number;
+  /** Apps with a web interface: the port (usually the instance port) to link to. */
+  webUi?: { port: number; scheme: 'http' | 'https'; path: string };
 }
 
 export const STOP_SIGNALS = ['SIGINT', 'SIGTERM', 'SIGQUIT', 'SIGHUP'] as const;
@@ -119,6 +121,16 @@ export function sanitizeLaunchConfig(input: unknown, opts: { isAdmin: boolean; p
       throw new HttpError(400, 'readyPattern is not a valid regular expression');
     }
     out.readyPattern = readyPattern;
+  }
+  const web = raw.webUi as Record<string, unknown> | undefined;
+  if (web && typeof web === 'object') {
+    const port = Number(web.port);
+    if (!Number.isInteger(port) || port < 1 || port > 65535) throw new HttpError(400, 'Web UI port must be 1–65535');
+    out.webUi = {
+      port,
+      scheme: web.scheme === 'https' ? 'https' : 'http',
+      path: typeof web.path === 'string' && web.path.startsWith('/') ? web.path.slice(0, 200) : '/',
+    };
   }
   const timeout = Number(raw.stopTimeoutSec);
   if (Number.isFinite(timeout) && timeout > 0) out.stopTimeoutSec = Math.min(Math.max(Math.round(timeout), 5), 900);

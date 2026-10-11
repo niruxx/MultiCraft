@@ -4,8 +4,8 @@ import { AnimatePresence, LayoutGroup, motion } from 'framer-motion';
 import { Layout, PageHeader } from '../components/Layout.js';
 import { StatusBadge, SuspendedBadge } from '../components/StatusBadge.js';
 import { Button, Card, Skeleton } from '../components/ui.js';
-import { CreateServerModal } from '../components/CreateServerModal.js';
-import { GameTile, gameKindOf, gameLabel } from '../components/GameArt.js';
+import { NewInstanceModal } from '../components/NewInstanceModal.js';
+import { GameTile, gameKindOf, gameLabel, instanceCategory, type InstanceCategory } from '../components/GameArt.js';
 import { HostOverview, formatBytes, formatDuration } from '../components/HostOverview.js';
 import { MiniBar } from '../components/charts.js';
 import { EMPHASIZED } from '../components/motion.js';
@@ -16,12 +16,30 @@ import type { InstanceListMetrics, ServerRecord } from '../api/types.js';
 import { useAuth } from '../state/AuthContext.js';
 
 type ViewMode = 'list' | 'grid' | 'box';
-const VIEW_KEY = 'multicraft_instances_view';
+const VIEW_KEY = 'outpost_instances_view';
 const VIEWS: { mode: ViewMode; icon: IconName; label: string }[] = [
   { mode: 'list', icon: 'list', label: 'List' },
   { mode: 'grid', icon: 'grid', label: 'Grid' },
   { mode: 'box', icon: 'box', label: 'Box' },
 ];
+
+const FILTERS: { id: 'all' | InstanceCategory; label: string }[] = [
+  { id: 'all', label: 'All' },
+  { id: 'game', label: '🎮 Games' },
+  { id: 'app', label: '📦 Apps' },
+  { id: 'container', label: '🐳 Containers' },
+  { id: 'custom', label: '⌨️ Custom' },
+];
+const FILTER_KEY = 'outpost_instances_filter';
+
+function readFilter(): 'all' | InstanceCategory {
+  try {
+    const v = localStorage.getItem(FILTER_KEY);
+    return FILTERS.some((f) => f.id === v) ? (v as 'all' | InstanceCategory) : 'all';
+  } catch {
+    return 'all';
+  }
+}
 
 function readView(): ViewMode {
   try {
@@ -144,6 +162,7 @@ function Badge({ server }: { server: ServerRecord }) {
 
 function subtitle(server: ServerRecord) {
   const kind = gameKindOf(server);
+  if (server.platform === 'docker') return `${gameLabel(kind)} · ${server.version.replace(/^docker\.io\/(library\/)?/, '')} · port ${server.server_port}`;
   const version = server.platform === 'java' || server.platform === 'bedrock' ? ` · ${server.loader} ${server.version}` : '';
   return `${gameLabel(kind)}${version} · port ${server.server_port}`;
 }
@@ -284,6 +303,16 @@ export function InstancesPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [view, setView] = useState<ViewMode>(readView);
+  const [filter, setFilter] = useState<'all' | InstanceCategory>(readFilter);
+
+  function changeFilter(next: 'all' | InstanceCategory) {
+    setFilter(next);
+    try {
+      localStorage.setItem(FILTER_KEY, next);
+    } catch {
+      // per-viewer preference only
+    }
+  }
 
   const load = useCallback(async () => {
     try {
@@ -329,13 +358,21 @@ export function InstancesPage() {
   }
 
   const Row = view === 'list' ? ListRow : view === 'grid' ? GridCard : BoxCard;
+  const counts = (servers ?? []).reduce<Partial<Record<InstanceCategory, number>>>((acc, s) => {
+    const c = instanceCategory(s);
+    acc[c] = (acc[c] ?? 0) + 1;
+    return acc;
+  }, {});
+  // If the remembered filter no longer matches anything, fall back to everything.
+  const activeFilter = filter !== 'all' && !counts[filter] ? 'all' : filter;
+  const visible = (servers ?? []).filter((s) => activeFilter === 'all' || instanceCategory(s) === activeFilter);
 
   return (
     <Layout>
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-8">
         <PageHeader
           title="Instances"
-          subtitle="Everything running on this host, at a glance."
+          subtitle="Games, apps, containers and services on this host — at a glance."
           action={
             canCreate && (
               <div className="flex items-center gap-3">
@@ -355,10 +392,27 @@ export function InstancesPage() {
 
         <HostOverview />
 
-        <div className="mb-3 flex items-center justify-between gap-3">
-          <h2 className="text-base font-medium text-ink-100">
-            {servers ? `${servers.length} instance${servers.length === 1 ? '' : 's'}` : 'Instances'}
-          </h2>
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap gap-1.5" role="tablist" aria-label="Filter instances">
+            {FILTERS.filter((f) => f.id === 'all' || counts[f.id]).map((f) => (
+              <button
+                key={f.id}
+                role="tab"
+                aria-selected={activeFilter === f.id}
+                onClick={() => changeFilter(f.id)}
+                className={`state-layer relative rounded-lg border px-3 py-1.5 text-xs font-medium ${
+                  activeFilter === f.id ? 'border-transparent text-secondary-on-container' : 'border-surface-500 text-ink-300'
+                }`}
+              >
+                {activeFilter === f.id && (
+                  <motion.span layoutId="instance-filter" className="absolute inset-0 rounded-lg bg-secondary-container" transition={{ type: 'spring', stiffness: 500, damping: 38 }} />
+                )}
+                <span className="relative z-10">
+                  {f.label} <span className="opacity-70">{f.id === 'all' ? servers?.length ?? 0 : counts[f.id]}</span>
+                </span>
+              </button>
+            ))}
+          </div>
           <ViewSwitcher mode={view} onChange={changeView} />
         </div>
 
@@ -377,14 +431,14 @@ export function InstancesPage() {
         ) : servers.length === 0 ? (
           <Card className="p-12 text-center">
             <div className="mx-auto mb-4 flex w-fit gap-2">
-              {(['minecraft-java', 'valheim', 'palworld', 'custom'] as const).map((k, i) => (
+              {(['app:web', 'app:database', 'minecraft-java', 'app:manager', 'custom'] as const).map((k, i) => (
                 <motion.div key={k} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.08, ease: EMPHASIZED }}>
                   <GameTile kind={k} className="h-12 w-12" />
                 </motion.div>
               ))}
             </div>
             <p className="mb-1 text-base font-medium text-ink-100">No instances yet</p>
-            <p className="mb-5 text-sm text-ink-400">Spin up a Minecraft, Steam or custom game server in a couple of clicks.</p>
+            <p className="mb-5 text-sm text-ink-400">Run a game server, a web app, a database, Portainer or any container — in a couple of clicks.</p>
             {canCreate && !atQuota && (
               <Button variant="primary" onClick={() => setCreateOpen(true)}>
                 Create your first instance
@@ -395,7 +449,7 @@ export function InstancesPage() {
           <LayoutGroup>
             <motion.div layout className={CONTAINER[view]} transition={{ duration: 0.35, ease: EMPHASIZED }}>
               <AnimatePresence mode="popLayout">
-                {servers.map((server, i) => (
+                {visible.map((server, i) => (
                   <motion.div
                     key={`${view}-${server.id}`}
                     layout
@@ -420,7 +474,7 @@ export function InstancesPage() {
         )}
       </div>
 
-      <CreateServerModal
+      <NewInstanceModal
         open={createOpen}
         onClose={() => setCreateOpen(false)}
         onCreated={() => {

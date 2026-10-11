@@ -12,7 +12,7 @@ import {
 } from '../services/nodeService.js';
 import { logAudit } from '../services/userService.js';
 
-/** Admin management of the other MultiCraft panels this one can transfer instances to. */
+/** Admin management of the other Outpost panels this one can transfer instances to. */
 export const nodesRouter = Router();
 nodesRouter.use(requireAuth, requireRole('admin'));
 

@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/banner.svg" alt="MultiCraft — self-hosted control panel for Minecraft, Steam and custom game servers" width="100%">
+  <img src="docs/banner.svg" alt="Outpost — self-hosted control panel for Minecraft, Steam and custom game servers" width="100%">
 </p>
 
 <p align="center">
@@ -11,16 +11,16 @@
   <img alt="Linux · Windows · macOS" src="https://img.shields.io/badge/Linux%20·%20Windows%20·%20macOS-ecc65c?style=flat-square&labelColor=1d211b">
 </p>
 
-<h3 align="center">🎮 Create, run and monitor game servers from your browser.</h3>
+<h3 align="center">🧭 One self-hosted panel for your servers, apps, containers and games.</h3>
 
 <p align="center">
-  ⛏️ Minecraft Java &amp; Bedrock &nbsp;·&nbsp; 🐾 Palworld &nbsp;·&nbsp; 🪖 Valheim &nbsp;·&nbsp; 🧟 Project Zomboid &nbsp;·&nbsp; 🌳 Terraria &nbsp;·&nbsp; 🎯 any Steam App ID &nbsp;·&nbsp; ⌨️ your own scripts
+  📦 Web apps &amp; databases &nbsp;·&nbsp; 🧭 Portainer &nbsp;·&nbsp; 🐳 any Docker / Podman image &nbsp;·&nbsp; 🎮 Minecraft &amp; Steam game servers &nbsp;·&nbsp; ⌨️ your own scripts
 </p>
 
 <p align="center">
   <a href="#-quick-start"><b>🚀 Quick start</b></a> &nbsp;•&nbsp;
   <a href="#-features"><b>✨ Features</b></a> &nbsp;•&nbsp;
-  <a href="#-supported-games"><b>🎮 Games</b></a> &nbsp;•&nbsp;
+  <a href="#-what-you-can-run"><b>🧰 What you can run</b></a> &nbsp;•&nbsp;
   <a href="#-guides"><b>📚 Guides</b></a> &nbsp;•&nbsp;
   <a href="#%EF%B8%8F-operations"><b>🛠️ Operations</b></a> &nbsp;•&nbsp;
   <a href="#%EF%B8%8F-roadmap"><b>🗺️ Roadmap</b></a>
@@ -29,7 +29,7 @@
 <br>
 
 <p align="center">
-  <img src="docs/preview.svg" alt="Illustration of the MultiCraft dashboard" width="92%">
+  <img src="docs/preview.svg" alt="Illustration of the Outpost dashboard" width="92%">
   <br>
   <sub><i>Illustration of the dashboard — navigation drawer, live host gauges, and instances with per-instance metrics.</i></sub>
 </p>
@@ -39,10 +39,19 @@
 ## 🚀 Quick start
 
 > [!TIP]
-> On **Debian/Ubuntu, Arch or Fedora**, `./install.sh` does all of this for you — Node.js, Java, build, a health check, and an optional systemd service.
+> On **Debian/Ubuntu, Arch or Fedora**, `./install.sh` does all of this for you — Node.js, Java, the **bubblewrap** sandbox, a **container engine** for Docker/Portainer/app instances (enabled with systemd), the build, a health check, and an optional `outpost.service`.
+>
+> ```bash
+> ./install.sh                    # asks as it goes (container engine: Docker by default)
+> ./install.sh --engine=podman    # rootless Podman instead — no root daemon, no docker group
+> ./install.sh -y                 # accept every default
+> ./install.sh --no-containers    # skip the container engine
+> ```
+>
+> With **Docker** it installs `docker.io` / `moby-engine` / `docker`, enables `docker.service` + `docker.socket` and adds you to the `docker` group (root-equivalent — log out and back in afterwards). With **Podman** it installs `podman`, enables your user's `podman.socket` (what Portainer talks to) and turns on lingering so it runs without a login. Either way it can pre-download the Portainer image.
 
 ```bash
-git clone <this-repo-url> MultiCraft && cd MultiCraft
+git clone <this-repo-url> Outpost && cd Outpost
 npm run setup        # 📦 install dependencies
 npm run build        # 🏗️ build API + UI
 npm start            # ▶️ http://localhost:8642
@@ -65,7 +74,7 @@ Open **http://localhost:8642** — the first visit walks you through creating th
   <tr>
     <td width="33%" valign="top">
       <h4>🏗️ One-click installs</h4>
-      Pick a platform and version from the live catalog — MultiCraft downloads and installs it. Spigot builds from source via BuildTools.
+      Pick a platform and version from the live catalog — Outpost downloads and installs it. Spigot builds from source via BuildTools.
     </td>
     <td width="33%" valign="top">
       <h4>🚀 Launch control</h4>
@@ -107,7 +116,7 @@ Open **http://localhost:8642** — the first visit walks you through creating th
   <tr>
     <td valign="top">
       <h4>🌐 Multi-node</h4>
-      Link other MultiCraft hosts and transfer an instance's files and settings between them.
+      Link other Outpost hosts and transfer an instance's files and settings between them.
     </td>
     <td valign="top">
       <h4>🔌 UPnP port forwarding</h4>
@@ -152,7 +161,33 @@ Open **http://localhost:8642** — the first visit walks you through creating th
 
 ---
 
-## 🎮 Supported games
+## 🧰 What you can run
+
+Click **New instance** and pick what to create:
+
+| | Option | What you get | Who |
+|:-:|---|---|---|
+| 📦 | **App from the catalog** | One-click web apps, databases, media servers and tools (below) — pre-wired ports, folders and a web UI link | admins · users with container access |
+| 🧭 | **Portainer** | A full container-management UI for this host, set up in one click | admins · users with Portainer access |
+| 🐳 | **Docker container** | Any image from Docker Hub, GHCR or your own registry | admins · users with *any image* access |
+| 🎮 | **Game server** | Minecraft Java/Bedrock or Steam dedicated servers — installed, updated and modded for you | anyone allowed to create |
+| ⌨️ | **Custom process** | Any Linux binary or shell script with your own start/stop/restart commands | admins |
+
+The Instances page groups everything with **🎮 Games · 📦 Apps · 🐳 Containers · ⌨️ Custom** filters, and anything with a web interface gets an **Open web UI** button.
+
+### 📦 App catalog
+
+| Section | Apps |
+|---|---|
+| 🧭 Platform tools | **Portainer** (container management) · **Uptime Kuma** (uptime monitoring & status pages) |
+| 🌐 Web & apps | **Nginx** (static sites from the instance's `html` folder) · **Vaultwarden** (Bitwarden-compatible passwords) |
+| 🗄️ Databases | **PostgreSQL** · **MariaDB** · **Redis** |
+| 🎞️ Media & files | **Jellyfin** (media streaming) · **File Browser** (share files) |
+| 🎮 Games | Minecraft Java & Bedrock, Valheim, Palworld, Counter-Strike 2 (as containers) |
+
+Every template is just a starting point — change the image, ports, environment, folders and limits before creating, or later under **Configuration → Container**.
+
+### 🎮 Game servers
 
 | | Game | Plugins / mods | Default port |
 |:-:|---|---|---|
@@ -164,10 +199,8 @@ Open **http://localhost:8642** — the first visit walks you through creating th
 | 🧟 | **Project Zomboid** | — *(Workshop IDs live in its own `.ini`)* | `16261/udp` |
 | 🌳 | **Terraria** | — *(the vanilla server has no mod loader)* | `7777/tcp` |
 | 🎯 | **Any Steam App ID** — CS2, TF2, Rust, ARK, Quake Live… | — | your choice |
-| ⌨️ | **Custom** — any binary or shell script | — | your choice |
-| 🐳 | **Docker / Podman** — any container image (Minecraft, Valheim, Palworld, CS2 presets) | via the image | your choice |
 
-Known titles get their own emblem in the UI, and running instances wear a live 🟢 dot.
+Known titles and app types get their own emblem, and running instances wear a live 🟢 dot.
 
 ---
 
@@ -216,7 +249,7 @@ The **Manage → Plugins** page (called *Data Packs*, *Add-ons* or *Mods* where 
 - **⛏️ Paper / Purpur / Spigot** — search Modrinth and install in one click (falling back to the newest build if your exact version isn't listed), or upload `.jar`s. Disabling renames to `.jar.disabled`.
 - **⛏️ Vanilla** — data packs from Modrinth or uploaded `.zip`s into `<world>/datapacks`; they load on restart or with `/reload`.
 - **🪨 Bedrock** — upload `.mcpack`, `.mcaddon` (nested packs included) or `.zip`. Packs are unpacked into `behavior_packs`/`resource_packs` and **activated for the world**; toggling adds/removes them.
-- **🪖 Valheim** — BepInEx plugins (`.dll`, or a Thunderstore-style `.zip` unpacked into its own folder). Upload *BepInExPack_Valheim* to the instance root once and MultiCraft loads it automatically on Linux.
+- **🪖 Valheim** — BepInEx plugins (`.dll`, or a Thunderstore-style `.zip` unpacked into its own folder). Upload *BepInExPack_Valheim* to the instance root once and Outpost loads it automatically on Linux.
 - **🐾 Palworld** — `.pak` mods into `Pal/Content/Paks/~mods`.
 
 </details>
@@ -265,11 +298,15 @@ Each user also has an **Instance creation** policy (Users → Edit), either the 
 | 🎮 Allowed types | Java · Bedrock · Steam | — | any of Java · Bedrock · Steam |
 | 🔢 Max instances owned | no limit | — | e.g. 3 |
 | 🧠 Max memory per instance | no limit | — | e.g. 4096 MB |
+| 🐳 Containers | — | — | none · 📦 catalog apps only · any image |
+| 🧭 Portainer &amp; engine access | — | — | on / off |
 
 - 👤 **Every new instance is owned by its creator**, who automatically gets full control of it (everything except *Edit launch command* and *UPnP*, which stay opt-in) and can delete it. Its header shows *You own this* / *Owner: …*.
 - 🔁 **Admins can hand an instance to someone else** under its **Configuration → Owner**; the new owner gets owner access and it counts toward *their* limit.
 - 🧾 Deleting a user keeps their instances (ownership simply clears).
-- 🔒 Custom and Docker instances can only ever be created by admins.
+- 🐳 **Container access is granted per user.** *Catalog apps only* lets them create the templates in **New instance → App from the catalog**, always with the catalog's image; *Any image* allows any container. Either way containers only see their own folder, and non-admins can't publish host ports below 1024 or the panel's own port. Owners can edit their container's settings within the same limits.
+- 🧭 **Portainer & engine access** is a separate switch: it lets a user run Portainer (or any container manager) with the engine socket — control over every container on the host, and with rootful Docker effectively the host. Give it only to people you'd trust as admin.
+- 🔒 Custom processes can only be created by admins.
 
 </details>
 
@@ -283,13 +320,27 @@ Every instance is kept to its own folder — on by default, managed under **Conf
 | 🛡️ **Process sandbox** (bubblewrap, Linux) | The game can only write inside its instance folder (plus a private `/tmp`). System folders are read-only; your home folder, other instances and the panel's database/session secret don't exist inside the sandbox. `HOME` points at `<instance>/.home`. |
 | 🔗 **Symlink-proof file access** | A server, plugin or script can create `ln -s / escape` in its folder — the panel refuses to follow links out of the instance for browsing, editing, uploads, plugins and snapshot restores (an escaping link can still be deleted). |
 | 📤 **Safe uploads** | Uploaded file names are reduced to a plain name, so `../../file` can't land outside the folder. |
-| 🧹 **Clean environment** | Instances never inherit the panel's environment variables — no `MULTICRAFT_*` secrets or credentials that happened to be exported. |
+| 🧹 **Clean environment** | Instances never inherit the panel's environment variables — no `OUTPOST_*` secrets or credentials that happened to be exported. |
 | 🐳 **Containers** | Docker instances only see their mounted folder, with memory, CPU and process limits and `no-new-privileges`. |
 
 Graceful stops still work in the sandbox — signals go straight to the game (e.g. Valheim's SIGINT save). Steam games get `~/.steam/sdk64/steamclient.so` linked from their own folder. Each instance shows its status under **Configuration → Isolation**; an admin can opt a single instance out if it truly needs files elsewhere.
 
 > [!NOTE]
 > The sandbox needs **bubblewrap** (`bwrap`) — already present wherever Flatpak is installed; otherwise `sudo apt install bubblewrap` / `dnf install bubblewrap` / `pacman -S bubblewrap`. Without it (or on Windows/macOS) the other layers still apply, and the Security card says why the sandbox is unavailable.
+
+</details>
+
+<details>
+<summary><h3>🧭 Portainer &amp; the app catalog</h3></summary>
+
+**Portainer** is one click away: **New instance → Portainer**. Outpost runs `portainer/portainer-ce:lts` with its data in the instance folder, publishes `9443` (HTTPS UI) and `8000`, and adds an **Open web UI** button. Open it within 5 minutes to create Portainer's admin account, then pick the *local* environment.
+
+Portainer manages the container engine itself, so it's the one template that mounts the engine's API socket (`/var/run/docker.sock` inside the container). That gives it control over **every container on the host** — keep it admin-only and behind your network.
+
+> [!TIP]
+> On **Podman**, the API socket isn't running by default. Enable it once — `systemctl --user enable --now podman.socket` — and the Docker page will show it as available. With Docker it's `/var/run/docker.sock`. Point `OUTPOST_ENGINE_SOCKET` elsewhere if yours lives somewhere unusual.
+
+The other catalog apps work the same way: pick one, review its settings, create. A few need a value changed first (database passwords, Vaultwarden behind HTTPS) — the dialog says so.
 
 </details>
 
@@ -303,11 +354,14 @@ The **Docker** page shows your container engine and only your container-backed i
 - 🖥️ **Everything else works as usual** — live console with input, start/stop/restart (signals are passed into the container), auto-restart, snapshots, File Management, UPnP and **per-container CPU, memory, network and disk metrics**.
 - ✏️ **Change settings later** under the instance's **Configuration → Container**; **Update** pulls the image tag again.
 - 👤 **Run as the panel's user** keeps files the container writes editable from File Management (turn it off for images that must start as root).
+- 📂 **Extra folders** — mount subfolders of the instance (e.g. `media` → `/media`); the container still can't see anything outside its instance.
+- 🌐 **Web interface** — mark a published port as the app's UI to get an **Open web UI** button (custom processes can do the same under **Launch**).
+- 🔌 **Engine socket** — opt-in, admin-only, for container managers like Portainer (see above).
 
 > [!WARNING]
-> Access to the Docker daemon is root-equivalent on most hosts, so only admins can create or reconfigure Docker instances. Prefer rootless Podman or rootless Docker.
+> Access to the Docker daemon is root-equivalent on most hosts. Admins decide per user who may run containers (catalog apps only or any image) and who may use Portainer — see **Users & permissions**. Prefer rootless Podman or rootless Docker.
 
-Pin an engine with `MULTICRAFT_CONTAINER_ENGINE=docker` or `podman`.
+Pin an engine with `OUTPOST_CONTAINER_ENGINE=docker` or `podman`.
 
 </details>
 
@@ -316,7 +370,7 @@ Pin an engine with `MULTICRAFT_CONTAINER_ENGINE=docker` or `podman`.
 
 Each instance has a **UPnP** tab that asks your router (via UPnP IGD) to forward ports to this machine — no router admin page needed.
 
-- 📡 **Router card** — the router MultiCraft found, this host's LAN address and your public IP.
+- 📡 **Router card** — the router Outpost found, this host's LAN address and your public IP.
 - 🔢 **Rules** — single ports or ranges (up to 256 per rule), TCP, UDP or both, mapped one-to-one (`27015–27020` → `27015–27020`, or shifted to another local range).
 - ⚡ **Forward now / Remove forwarding** — apply or clear on demand, with a per-port result (✅ / ❌ and the router's reason).
 - 🔁 **Forward automatically while running** — opens the ports when the instance starts and closes them when it stops.
@@ -329,7 +383,7 @@ Each instance has a **UPnP** tab that asks your router (via UPnP IGD) to forward
 > [!TIP]
 > **Router not found?** Turn on UPnP in the router and keep the host on the same network (discovery doesn't cross VPNs or Docker bridge networks). Host firewalls often drop the router's replies — with firewalld:
 > `sudo firewall-cmd --permanent --add-service=upnp-client && sudo firewall-cmd --reload`.
-> You can also skip discovery by pointing `MULTICRAFT_UPNP_GATEWAY` at the router's description URL (e.g. `http://192.168.0.1:5000/rootDesc.xml`).
+> You can also skip discovery by pointing `OUTPOST_UPNP_GATEWAY` at the router's description URL (e.g. `http://192.168.0.1:5000/rootDesc.xml`).
 
 </details>
 
@@ -355,7 +409,7 @@ In an instance's **Configuration → General → Automatic restart**:
 
 **🛑 Suspension** — in an instance's **Configuration** (admin): pick a reason and an optional note. The instance stops (gracefully, or killed immediately), can't be started, and its users see a *suspended* screen with the reason — in the panel and the API alike. Admins keep full access.
 
-**🌐 Nodes** — under **Configuration → Nodes** every panel shows its *node key*. Add another MultiCraft host by URL + key, then transfer a stopped instance from its **Configuration** page; its files and settings stream across. Keep a stopped copy or remove the original afterwards.
+**🌐 Nodes** — under **Configuration → Nodes** every panel shows its *node key*. Add another Outpost host by URL + key, then transfer a stopped instance from its **Configuration** page; its files and settings stream across. Keep a stopped copy or remove the original afterwards.
 
 > [!NOTE]
 > Transfers move instances between hosts — they aren't automatic failover. Use HTTPS or a private network between nodes, since instance files travel over that connection.
@@ -419,72 +473,72 @@ Then `npm run setup`, `npm run build`, `npm start`. For development with hot rel
 
 ```bash
 npm install -g pm2 && npm run build
-pm2 start npm --name multicraft -- start
+pm2 start npm --name outpost -- start
 pm2 save && pm2 startup
 ```
 
 **🅱️ systemd** (Linux) — run the panel as its own unprivileged user:
 
 ```bash
-sudo useradd --system --create-home --home-dir /opt/multicraft --shell "$(command -v nologin)" multicraft
-sudo git clone <this-repo-url> /opt/multicraft/app && sudo chown -R multicraft:multicraft /opt/multicraft
-sudo -u multicraft bash -c 'cd /opt/multicraft/app && npm run setup && npm run build'
-sudo -u multicraft mkdir -p /opt/multicraft/data
+sudo useradd --system --create-home --home-dir /opt/outpost --shell "$(command -v nologin)" outpost
+sudo git clone <this-repo-url> /opt/outpost/app && sudo chown -R outpost:outpost /opt/outpost
+sudo -u outpost bash -c 'cd /opt/outpost/app && npm run setup && npm run build'
+sudo -u outpost mkdir -p /opt/outpost/data
 ```
 
-`/etc/systemd/system/multicraft.service`:
+`/etc/systemd/system/outpost.service`:
 
 ```ini
 [Unit]
-Description=MultiCraft panel
+Description=Outpost panel
 After=network.target
 
 [Service]
 Type=simple
-WorkingDirectory=/opt/multicraft/app
+WorkingDirectory=/opt/outpost/app
 ExecStart=/usr/bin/npm start
 Restart=on-failure
-User=multicraft
+User=outpost
 Environment=PORT=8642
-Environment=MULTICRAFT_DATA_DIR=/opt/multicraft/data
+Environment=OUTPOST_DATA_DIR=/opt/outpost/data
 
 [Install]
 WantedBy=multi-user.target
 ```
 
 ```bash
-sudo systemctl daemon-reload && sudo systemctl enable --now multicraft
-journalctl -u multicraft -f
+sudo systemctl daemon-reload && sudo systemctl enable --now outpost
+journalctl -u outpost -f
 ```
 
 Packages for other distros: 🏔️ `pacman -S nodejs npm git jdk21-openjdk` · 🎩 `dnf install nodejs npm git java-21-openjdk-headless` · 🦎 `zypper install nodejs22 npm22 git java-21-openjdk-headless`.
 
 Open ports: the panel's `8642` only needs to reach admins (consider HTTPS via a reverse proxy, or a VPN); each game server needs its own port open to players — e.g. `sudo ufw allow 25565/tcp` or `sudo firewall-cmd --permanent --add-port=25565/tcp && sudo firewall-cmd --reload`.
 
-**🪟 Windows service** — with [NSSM](https://nssm.cc/download): `nssm install MultiCraft` → Path `C:\Program Files\nodejs\node.exe`, Startup directory = the MultiCraft folder, Arguments `server\dist\index.js` → `nssm start MultiCraft`.
+**🪟 Windows service** — with [NSSM](https://nssm.cc/download): `nssm install Outpost` → Path `C:\Program Files\nodejs\node.exe`, Startup directory = the Outpost folder, Arguments `server\dist\index.js` → `nssm start Outpost`.
 
-**🍎 launchd** — `~/Library/LaunchAgents/com.multicraft.panel.plist`:
+**🍎 launchd** — `~/Library/LaunchAgents/com.outpost.panel.plist`:
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
-  <key>Label</key><string>com.multicraft.panel</string>
+  <key>Label</key><string>com.outpost.panel</string>
   <key>ProgramArguments</key><array><string>/usr/local/bin/npm</string><string>start</string></array>
-  <key>WorkingDirectory</key><string>/path/to/MultiCraft</string>
+  <key>WorkingDirectory</key><string>/path/to/Outpost</string>
   <key>RunAtLoad</key><true/>
   <key>KeepAlive</key><true/>
 </dict></plist>
 ```
 
-then `launchctl load ~/Library/LaunchAgents/com.multicraft.panel.plist`.
+then `launchctl load ~/Library/LaunchAgents/com.outpost.panel.plist`.
 
 > [!NOTE]
 > These keep the *panel* running. Whether an instance starts with it is the **“Automatically start this instance when the panel boots”** box in its **Configuration**.
 </details>
 
 <details>
-<summary><b>⬆️ Updating MultiCraft</b></summary>
+<summary><b>⬆️ Updating Outpost</b></summary>
 <br>
 
 ```bash
@@ -493,7 +547,7 @@ then `launchctl load ~/Library/LaunchAgents/com.multicraft.panel.plist`.
 
 Backs up `server/data/` first, records the current commit, `git pull --ff-only`s, rebuilds, and test-starts the new build before touching your live service — offering an instant rollback if it fails. `-y` runs it unattended; `--rollback` restores the previous commit.
 
-Manual: `git pull && npm run setup && npm run build`, then restart (`pm2 restart multicraft` / `sudo systemctl restart multicraft` / …).
+Manual: `git pull && npm run setup && npm run build`, then restart (`pm2 restart outpost` / `sudo systemctl restart outpost` / …).
 
 > [!CAUTION]
 > Never run `git clean -fdx` in the repo — `server/data/` is git-ignored, and `git clean` deletes ignored files: your database, every instance and every snapshot.
@@ -503,11 +557,11 @@ Manual: `git pull && npm run setup && npm run build`, then restart (`pm2 restart
 <summary><b>💾 Backing up, moving &amp; wiping data</b></summary>
 <br>
 
-Everything — database, instances, snapshots — lives in **`server/data/`** (or `MULTICRAFT_DATA_DIR`).
+Everything — database, instances, snapshots — lives in **`server/data/`** (or `OUTPOST_DATA_DIR`).
 
 - 📤 **Export / 📥 import** — **Configuration → Environment backup & restore** (admin). Import replaces the whole install; your current data is renamed to `server/data-pre-import-<timestamp>/`, not deleted. Sign in afterwards with an admin from the *imported* backup.
-- 📦 **Move it out of the repo** (recommended for production) — set `MULTICRAFT_DATA_DIR=/var/lib/multicraft` in your service definition.
-- 🧹 **Start fresh** — **Configuration → Danger zone → Delete everything & start fresh** (three confirmations; old data is kept as `data-pre-reset-…`). By hand: stop MultiCraft and empty `server/data/`.
+- 📦 **Move it out of the repo** (recommended for production) — set `OUTPOST_DATA_DIR=/var/lib/outpost` in your service definition.
+- 🧹 **Start fresh** — **Configuration → Danger zone → Delete everything & start fresh** (three confirmations; old data is kept as `data-pre-reset-…`). By hand: stop Outpost and empty `server/data/`.
 
 Importing across operating systems doesn't convert platform binaries (e.g. `bedrock_server.exe`) — use the instance's **Update** page afterwards.
 </details>
@@ -522,7 +576,7 @@ Importing across operating systems doesn't convert platform binaries (e.g. `bedr
 ./uninstall.sh -y --purge # removes everything, including data, packages and the checkout
 ```
 
-It stops the panel and its game servers, removes `multicraft.service` or the pm2 entry and the panel's firewall rule, deletes data and `update.sh` backups (typing `delete` to confirm), and offers to remove Node.js, Java, steamcmd's 32-bit libraries and the `multicraft` user. git and curl are never removed without asking.
+It stops the panel and its game servers, removes `outpost.service` or the pm2 entry and the panel's firewall rule, deletes data and `update.sh` backups (typing `delete` to confirm), and offers to remove Node.js, Java, steamcmd's 32-bit libraries and the `outpost` user. git and curl are never removed without asking.
 </details>
 
 ---
@@ -531,14 +585,14 @@ It stops the panel and its game servers, removes `multicraft.service` or the pm2
 
 ```mermaid
 flowchart LR
-  B["🌐 Browser<br/>React · Vite · Tailwind"] -- "REST + WebSocket" --> P["⚙️ MultiCraft API<br/>Node.js · Express · ws"]
+  B["🌐 Browser<br/>React · Vite · Tailwind"] -- "REST + WebSocket" --> P["⚙️ Outpost API<br/>Node.js · Express · ws"]
   P --> DB[("🗄️ SQLite<br/>node:sqlite")]
   P --> S1["⛏️ java -jar paper.jar"]
   P --> S2["🪨 bedrock_server"]
   P --> S3["🎮 Steam game binary"]
   P --> S4["⌨️ your script"]
   P --> S5["🐳 docker / podman run"]
-  P <-->|node key| N["🌐 Other MultiCraft nodes"]
+  P <-->|node key| N["🌐 Other Outpost nodes"]
   P -.-> X["⬇️ Mojang · PaperMC · Purpur<br/>SteamCMD · Modrinth"]
 ```
 
@@ -549,7 +603,7 @@ flowchart LR
 - ⬆️ **Safe updates** — Java re-installs only the jar; Bedrock skips `worlds/`, `server.properties` and permission files; Steam re-runs `steamcmd +app_update`.
 
 ```
-MultiCraft/
+Outpost/
 ├── server/   ⚙️  API — Express, ws, node:sqlite
 ├── web/      🎨  UI — React, Vite, Tailwind (Material 3 dark)
 └── docs/     🖼️  README artwork
@@ -557,9 +611,23 @@ MultiCraft/
 
 ---
 
+## 🔁 Upgrading from MultiCraft
+
+Outpost was called **MultiCraft**. Upgrading in place just works — the old names keep working:
+
+| Old | New | What happens |
+|---|---|---|
+| `multicraft.db` | `outpost.db` | Renamed automatically (with its journal files) on first start; old environment backups still import |
+| `MULTICRAFT_DATA_DIR`, `MULTICRAFT_*` | `OUTPOST_DATA_DIR`, `OUTPOST_*` | Old variable names are still read, so existing service files keep working |
+| `multicraft.service` | `outpost.service` | `update.sh` / `uninstall.sh` recognise both; re-running `install.sh` offers to replace the old unit |
+| `multicraft-<id>` containers | `outpost-<id>` | Old containers are cleaned up when the instance next starts |
+| Browser sign-in | | Carried over — nobody is logged out |
+
+Nodes on older versions can still transfer instances to and from upgraded ones.
+
 ## 📝 Good to know
 
-- 📜 Java servers require accepting Mojang's EULA at creation; MultiCraft writes `eula.txt` for you.
+- 📜 Java servers require accepting Mojang's EULA at creation; Outpost writes `eula.txt` for you.
 - 👤 Op/kick/ban go through the live console, so the server must be running. Whitelist edits work either way.
 - ⬆️ Updating a server needs it stopped; tick *create a backup first* on its **Update** page for a safety snapshot.
 
@@ -570,6 +638,7 @@ MultiCraft/
 - [x] 📸 Snapshots with per-file diff &amp; restore
 - [x] 🔌 UPnP port forwarding and ♻️ auto-restart
 - [x] 🛡️ Process sandbox and 🐳 Docker/Podman instances
+- [x] 🧭 General-purpose platform: app catalog, Portainer, web UI links
 - [ ] 🧱 Mohist and SpongeForge instances
 - [ ] ⏪ Restore view for Minecraft's own auto-save states
 

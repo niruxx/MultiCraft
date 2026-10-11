@@ -34,14 +34,14 @@ mapRouter.post(
     const server = getServer(req.params.serverId);
     if (!server) throw new HttpError(404, 'Server not found');
 
-    appendLine(server.id, `[MultiCraft] Rendering map for "${server.name}" (requested by ${req.auth!.username})`);
+    appendLine(server.id, `[Outpost] Rendering map for "${server.name}" (requested by ${req.auth!.username})`);
     try {
       const meta = await renderMap(server, (line) => appendLine(server.id, line));
       logAudit(req.auth!.sub, req.auth!.username, 'map.render', server.id);
       res.json({ meta });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      appendLine(server.id, `[MultiCraft] Map render failed: ${message}`, 'stderr');
+      appendLine(server.id, `[Outpost] Map render failed: ${message}`, 'stderr');
       throw err;
     }
   })

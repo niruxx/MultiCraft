@@ -192,7 +192,7 @@ function TransferCard() {
         <Spinner />
       ) : nodes.length === 0 ? (
         <p className="text-sm text-ink-400">
-          No other nodes yet. Add another MultiCraft host under{' '}
+          No other nodes yet. Add another Outpost host under{' '}
           <Link to="/configuration" className="text-accent-400 underline-offset-2 hover:underline">
             Configuration → Nodes
           </Link>{' '}

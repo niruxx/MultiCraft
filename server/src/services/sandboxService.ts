@@ -148,7 +148,7 @@ export function wrapInSandbox(
   fs.mkdirSync(home, { recursive: true });
   if (server.platform === 'steam') linkSteamClient(dir, home);
 
-  const args: string[] = ['--info-fd', '3', '--unshare-ipc', '--unshare-uts', '--unshare-cgroup-try', '--hostname', 'multicraft'];
+  const args: string[] = ['--info-fd', '3', '--unshare-ipc', '--unshare-uts', '--unshare-cgroup-try', '--hostname', 'outpost'];
   for (const d of SYSTEM_DIRS) {
     let st: fs.Stats;
     try {

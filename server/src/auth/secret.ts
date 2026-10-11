@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import { envVar } from '../utils/env.js';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { DATA_DIR } from '../utils/paths.js';
@@ -15,4 +16,4 @@ function loadOrCreateSecret(): string {
   return secret;
 }
 
-export const SESSION_SECRET = process.env.MULTICRAFT_SESSION_SECRET ?? loadOrCreateSecret();
+export const SESSION_SECRET = envVar('SESSION_SECRET') ?? loadOrCreateSecret();

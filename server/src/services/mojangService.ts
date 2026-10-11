@@ -20,7 +20,7 @@ export function offlineUuid(name: string): string {
 export async function lookupMojangUuid(name: string): Promise<string | null> {
   try {
     const res = await fetch(`https://api.minecraftservices.com/minecraft/profile/lookup/name/${encodeURIComponent(name)}`, {
-      headers: { 'User-Agent': 'MultiCraft-Panel' },
+      headers: { 'User-Agent': 'Outpost-Panel' },
     });
     if (res.status === 404) return null;
     if (!res.ok) return null;

@@ -53,10 +53,10 @@ export function LoginPage() {
         <div className="mb-6 text-center">
           <Logo className="mx-auto mb-3.5 h-11 w-11 rounded-xl" />
           <div className="flex items-center justify-center gap-2">
-            <h1 className="text-xl font-bold text-ink-50">Sign in to MultiCraft</h1>
+            <h1 className="text-xl font-bold text-ink-50">Sign in to Outpost</h1>
             <Badge tone="neutral">v{APP_VERSION}</Badge>
           </div>
-          <p className="mt-1 text-sm text-ink-400">Manage your game server instances.</p>
+          <p className="mt-1 text-sm text-ink-400">Manage your servers, apps and games.</p>
         </div>
         <form onSubmit={onSubmit} className="space-y-4">
           <Field label="Username">

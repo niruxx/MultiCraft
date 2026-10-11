@@ -1,7 +1,9 @@
 import fs from 'node:fs';
+import { envVar } from '../utils/env.js';
+import path from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
 import { HttpError } from '../utils/asyncHandler.js';
-import { instanceDir } from '../utils/paths.js';
+import { instanceDir, safeJoinReal } from '../utils/paths.js';
 import { expandVariables, launchVariables, splitArgs } from './launchConfig.js';
 import type { ServerRecord } from '../types/index.js';
 
@@ -28,6 +30,18 @@ export interface DockerConfig {
   command: string;
   /** Run as the panel's user so files in the instance folder stay editable from the panel. */
   runAsPanelUser: boolean;
+  /** Extra mounts — always subfolders of the instance folder, so the container still sees nothing else. */
+  volumes: { subdir: string; containerPath: string }[];
+  /** For apps with a web interface: which published port to open, and how. */
+  webUi: { port: number; scheme: 'http' | 'https'; path: string } | null;
+  /** Mounts the container engine's API socket (Portainer and other container managers need it).
+   *  This gives the container control over every container on the host — admin-only and explicit. */
+  mountEngineSocket: boolean;
+  /** UI metadata: what kind of thing this is and which icon to show. */
+  category: 'game' | 'app' | 'container';
+  icon: string | null;
+  /** Catalog template it was created from, if any. */
+  template: string | null;
 }
 
 export interface EngineStatus {
@@ -77,7 +91,7 @@ function tryEngine(bin: 'docker' | 'podman'): EngineStatus | null {
 
 export function getEngineStatus(force = false): EngineStatus {
   if (!force && cached && Date.now() - cached.at < 60_000) return cached.status;
-  const pinned = process.env.MULTICRAFT_CONTAINER_ENGINE as 'docker' | 'podman' | undefined;
+  const pinned = envVar('CONTAINER_ENGINE') as 'docker' | 'podman' | undefined;
   const candidates: ('docker' | 'podman')[] = pinned === 'podman' || pinned === 'docker' ? [pinned] : ['docker', 'podman'];
   let status: EngineStatus | null = null;
   for (const bin of candidates) {
@@ -142,6 +156,27 @@ export function sanitizeDockerConfig(input: unknown): DockerConfig {
   if (dataPath === '/' || /[:,\s]/.test(dataPath)) throw new HttpError(400, 'Data path must be an absolute folder inside the container, e.g. /data');
   const cpus = raw.cpus === null || raw.cpus === '' || raw.cpus === undefined ? null : Number(raw.cpus);
   if (cpus !== null && (!Number.isFinite(cpus) || cpus <= 0 || cpus > 256)) throw new HttpError(400, 'CPU limit must be a positive number of cores');
+  const volumes = (Array.isArray(raw.volumes) ? raw.volumes : []).slice(0, 10).map((v: any, i: number) => {
+    const subdir = typeof v?.subdir === 'string' ? v.subdir.trim().replace(/^\/+|\/+$/g, '') : '';
+    const containerPath = typeof v?.containerPath === 'string' ? v.containerPath.trim() : '';
+    if (!subdir || path.isAbsolute(subdir) || subdir.split(/[\\/]/).some((p: string) => p === '..' || p === '.')) {
+      throw new HttpError(400, `Volume ${i + 1}: use a subfolder of the instance folder, e.g. media`);
+    }
+    if (!containerPath.startsWith('/') || containerPath === '/' || /[:,\s]/.test(containerPath)) {
+      throw new HttpError(400, `Volume ${i + 1}: container path must be an absolute folder, e.g. /media`);
+    }
+    return { subdir, containerPath };
+  });
+  const targets = [dataPath, ...volumes.map((v: { containerPath: string }) => v.containerPath)];
+  if (new Set(targets).size !== targets.length) throw new HttpError(400, 'Two mounts point at the same container path');
+
+  let webUi: DockerConfig['webUi'] = null;
+  if (raw.webUi && typeof raw.webUi === 'object') {
+    const port = Number(raw.webUi.port);
+    if (!ports.some((p) => p.host === port && p.protocol === 'tcp')) throw new HttpError(400, 'The web UI port must be one of the published TCP ports');
+    const webPath = typeof raw.webUi.path === 'string' && raw.webUi.path.startsWith('/') ? raw.webUi.path.slice(0, 200) : '/';
+    webUi = { port, scheme: raw.webUi.scheme === 'https' ? 'https' : 'http', path: webPath };
+  }
   return {
     image,
     ports,
@@ -150,10 +185,37 @@ export function sanitizeDockerConfig(input: unknown): DockerConfig {
     cpus,
     command: typeof raw.command === 'string' ? raw.command.trim().slice(0, 2000) : '',
     runAsPanelUser: raw.runAsPanelUser !== false,
+    volumes,
+    webUi,
+    mountEngineSocket: raw.mountEngineSocket === true,
+    category: raw.category === 'game' || raw.category === 'app' ? raw.category : 'container',
+    icon: typeof raw.icon === 'string' && /^[a-z0-9:-]{1,40}$/.test(raw.icon) ? raw.icon : null,
+    template: typeof raw.template === 'string' && /^[a-z0-9-]{1,40}$/.test(raw.template) ? raw.template : null,
   };
 }
 
+/** Where the engine's API socket lives on this host (what Portainer & co. talk to), or why it's missing. */
+export function engineSocket(): { path: string | null; hint: string | null } {
+  const pinned = envVar('ENGINE_SOCKET');
+  if (pinned) return fs.existsSync(pinned) ? { path: pinned, hint: null } : { path: null, hint: `OUTPOST_ENGINE_SOCKET points at ${pinned}, which doesn't exist` };
+  const engine = getEngineStatus().engine;
+  if (engine === 'podman') {
+    const runtime = process.env.XDG_RUNTIME_DIR || `/run/user/${process.getuid?.() ?? 1000}`;
+    const rootless = path.join(runtime, 'podman', 'podman.sock');
+    if (fs.existsSync(rootless)) return { path: rootless, hint: null };
+    if (fs.existsSync('/run/podman/podman.sock')) return { path: '/run/podman/podman.sock', hint: null };
+    return { path: null, hint: "Podman's API socket isn't running. Enable it once with `systemctl --user enable --now podman.socket`, then start the instance again." };
+  }
+  if (fs.existsSync('/var/run/docker.sock')) return { path: '/var/run/docker.sock', hint: null };
+  return { path: null, hint: "Docker's API socket (/var/run/docker.sock) wasn't found." };
+}
+
 export function containerName(server: Pick<ServerRecord, 'id'>): string {
+  return `outpost-${server.id.slice(0, 12)}`;
+}
+
+/** The name containers had before the rename to Outpost (still cleaned up and listed). */
+function legacyContainerName(server: Pick<ServerRecord, 'id'>): string {
   return `multicraft-${server.id.slice(0, 12)}`;
 }
 
@@ -179,7 +241,8 @@ export function buildContainerLaunch(server: ServerRecord): { cmd: string; args:
   fs.mkdirSync(dir, { recursive: true });
   const name = containerName(server);
   // A container left behind by a panel restart would block the name.
-  spawnSync(engine, ['rm', '-f', name], { stdio: 'ignore', timeout: 20000 });
+  // (also the pre-rename name, so an upgrade with a container still running doesn't clash on ports)
+  spawnSync(engine, ['rm', '-f', name, legacyContainerName(server)], { stdio: 'ignore', timeout: 20000 });
 
   const args = [
     'run',
@@ -188,9 +251,14 @@ export function buildContainerLaunch(server: ServerRecord): { cmd: string; args:
     '--init',
     '--sig-proxy=true',
     '--name', name,
-    '--label', `multicraft.instance=${server.id}`,
-    '--hostname', 'multicraft',
+    '--label', `outpost.instance=${server.id}`,
+    '--hostname', 'outpost',
     '-v', `${dir}:${config.dataPath}${selinuxEnforcing() ? ':Z' : ''}`,
+    ...(config.volumes ?? []).flatMap((v) => {
+      const host = safeJoinReal(dir, v.subdir);
+      fs.mkdirSync(host, { recursive: true });
+      return ['-v', `${host}:${v.containerPath}${selinuxEnforcing() ? ':Z' : ''}`];
+    }),
     '--memory', `${server.max_memory_mb}m`,
     '--pids-limit', '4096',
     '--security-opt', 'no-new-privileges',
@@ -198,6 +266,12 @@ export function buildContainerLaunch(server: ServerRecord): { cmd: string; args:
   for (const p of config.ports) args.push('-p', `${p.host}:${p.container}/${p.protocol}`);
   for (const e of config.env) args.push('-e', `${e.key}=${expandVariables(e.value, vars)}`);
   if (config.cpus) args.push('--cpus', String(config.cpus));
+  if (config.mountEngineSocket) {
+    const socket = engineSocket();
+    if (!socket.path) throw new HttpError(400, socket.hint ?? 'Container engine socket not found');
+    args.push('-v', `${socket.path}:/var/run/docker.sock`);
+    if (selinuxEnforcing()) args.push('--security-opt', 'label=disable');
+  }
   if (config.runAsPanelUser && process.platform !== 'win32') {
     // Rootless Podman already maps the container's root to the panel user; keep-id makes the
     // container user *be* the panel user. Docker needs an explicit --user.
@@ -283,23 +357,24 @@ export function sampleContainer(server: Pick<ServerRecord, 'id'>): Promise<Conta
   });
 }
 
-/** Containers MultiCraft launched (by label), including any orphaned by a panel restart. */
+/** Containers Outpost launched (by label), including any orphaned by a panel restart. */
 export function listManagedContainers(): { name: string; status: string; image: string; instanceId: string }[] {
   const engine = getEngineStatus().engine;
   if (!engine) return [];
-  const res = spawnSync(engine, ['ps', '-a', '--filter', 'label=multicraft.instance', '--format', '{{.Names}}|{{.Status}}|{{.Image}}|{{.Labels}}'], {
-    encoding: 'utf8',
-    timeout: 10000,
-  });
-  if (res.status !== 0) return [];
-  return res.stdout
-    .trim()
-    .split('\n')
-    .filter(Boolean)
-    .map((line) => {
-      const [name, status, image, labels] = line.split('|');
-      return { name, status, image, instanceId: labels?.match(/multicraft\.instance[=:]([0-9a-f-]{36})/)?.[1] ?? '' };
+  // Repeated label filters are ANDed by the engine, so query the current and pre-rename labels separately.
+  const out: { name: string; status: string; image: string; instanceId: string }[] = [];
+  for (const label of ['outpost.instance', 'multicraft.instance']) {
+    const res = spawnSync(engine, ['ps', '-a', '--filter', `label=${label}`, '--format', '{{.Names}}|{{.Status}}|{{.Image}}|{{.Labels}}'], {
+      encoding: 'utf8',
+      timeout: 10000,
     });
+    if (res.status !== 0) continue;
+    for (const line of res.stdout.trim().split('\n').filter(Boolean)) {
+      const [name, status, image, labels] = line.split('|');
+      out.push({ name, status, image, instanceId: labels?.match(/(?:outpost|multicraft)\.instance[=:]([0-9a-f-]{36})/)?.[1] ?? '' });
+    }
+  }
+  return out;
 }
 
 export function engineCounts(): { containers: number; running: number; images: number } | null {
@@ -310,4 +385,46 @@ export function engineCounts(): { containers: number; running: number; images: n
     return r.status === 0 ? r.stdout.trim().split('\n').filter(Boolean).length : 0;
   };
   return { containers: count(['ps', '-aq']), running: count(['ps', '-q']), images: count(['images', '-q']) };
+}
+
+// ---------------------------------------------------------------------------
+// Access policy for non-admins
+// ---------------------------------------------------------------------------
+
+const PANEL_PORT = Number(process.env.PORT ?? 8642);
+
+/**
+ * Applies a user's container permission to a requested config. Admins pass through untouched.
+ * - "catalog": the config must come from a catalog template and keep that template's image; the
+ *   template's category/icon are enforced, and only a template that needs the engine socket
+ *   (Portainer) may mount it.
+ * - Mounting the engine socket needs the separate engine-socket permission.
+ * - Host ports below 1024, and the panel's own port, are admin-only.
+ */
+export function enforceContainerPolicy(
+  config: DockerConfig,
+  policy: { containers: 'none' | 'catalog' | 'any'; engineSocket: boolean },
+  isAdmin: boolean,
+  findTemplate: (id: string | null) => { config: DockerConfig; name: string } | undefined
+): DockerConfig {
+  if (isAdmin) return config;
+  if (policy.containers === 'none') throw new HttpError(403, "Your account can't create or change container instances — ask an admin");
+  let out = config;
+  if (policy.containers === 'catalog') {
+    const template = findTemplate(config.template);
+    if (!template) throw new HttpError(403, 'Your account can only run apps from the catalog');
+    if (config.image !== template.config.image) {
+      throw new HttpError(403, `Your account can only run the catalog's image for ${template.name} (${template.config.image})`);
+    }
+    if (config.mountEngineSocket && !template.config.mountEngineSocket) throw new HttpError(403, 'Only Portainer-type templates can mount the engine socket');
+    out = { ...config, category: template.config.category, icon: template.config.icon };
+  }
+  if (out.mountEngineSocket && !policy.engineSocket) {
+    throw new HttpError(403, "Your account isn't allowed to give containers control of the container engine (Portainer access)");
+  }
+  for (const p of out.ports) {
+    if (p.host < 1024) throw new HttpError(403, `Only admins can publish host ports below 1024 (port ${p.host})`);
+    if (p.host === PANEL_PORT) throw new HttpError(403, `Port ${p.host} is the panel's own port`);
+  }
+  return out;
 }

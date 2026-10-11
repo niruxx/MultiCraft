@@ -1,15 +1,18 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { envVar } from './env.js';
 
 // server/src/utils -> server -> repo root/data
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export const SERVER_ROOT = path.resolve(__dirname, '..', '..');
-export const DATA_DIR = process.env.MULTICRAFT_DATA_DIR
-  ? path.resolve(process.env.MULTICRAFT_DATA_DIR)
+export const DATA_DIR = envVar('DATA_DIR')
+  ? path.resolve(envVar('DATA_DIR')!)
   : path.join(SERVER_ROOT, 'data');
 
-export const DB_PATH = path.join(DATA_DIR, 'multicraft.db');
+export const DB_PATH = path.join(DATA_DIR, 'outpost.db');
+/** The database's name before the rename to Outpost — migrated to DB_PATH on first start. */
+export const LEGACY_DB_PATH = path.join(DATA_DIR, 'multicraft.db');
 export const INSTANCES_DIR = path.join(DATA_DIR, 'servers');
 export const BACKUPS_DIR = path.join(DATA_DIR, 'backups');
 export const JAVA_RUNTIMES_DIR = path.join(DATA_DIR, 'runtimes');

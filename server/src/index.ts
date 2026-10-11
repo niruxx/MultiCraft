@@ -20,6 +20,7 @@ import { settingsRouter } from './routes/settings.routes.js';
 import { nodesRouter } from './routes/nodes.routes.js';
 import { upnpRouter } from './routes/upnp.routes.js';
 import { dockerRouter } from './routes/docker.routes.js';
+import { catalogRouter } from './routes/catalog.routes.js';
 import { nodeLinkRouter } from './routes/nodeLink.routes.js';
 import { recoverInterruptedTransfers } from './services/nodeService.js';
 import { verifyToken } from './auth/tokens.js';
@@ -56,6 +57,7 @@ app.use('/api/environment', environmentRouter);
 app.use('/api/settings', settingsRouter);
 app.use('/api/nodes', nodesRouter);
 app.use('/api/docker', dockerRouter);
+app.use('/api/catalog', catalogRouter);
 app.use('/api/node-link', nodeLinkRouter);
 
 app.get('/api/health', (_req, res) => res.json({ ok: true }));
@@ -132,7 +134,7 @@ async function bootstrap() {
   }
 
   httpServer.listen(PORT, () => {
-    logger.info(`MultiCraft panel listening on http://localhost:${PORT}`);
+    logger.info(`Outpost panel listening on http://localhost:${PORT}`);
   });
 }
 

@@ -38,7 +38,7 @@ export function SteamCmdSettingsCard() {
     <Card className="mb-6 p-4">
       <h2 className="text-base font-medium text-ink-100">SteamCMD</h2>
       <p className="mt-1 mb-4 text-xs text-ink-500">
-        Controls where MultiCraft gets SteamCMD from when it needs to bootstrap it (the first time a Steam-based
+        Controls where Outpost gets SteamCMD from when it needs to bootstrap it (the first time a Steam-based
         server is created, or if it's ever removed). Leave this blank to download the official archive from Valve
         automatically — that's the default and works for most installs.
       </p>
@@ -57,11 +57,11 @@ export function SteamCmdSettingsCard() {
         </li>
         <li>
           <span className="font-mono text-ink-500">/path/to/steamcmd.tar.gz</span> — a local archive already on this
-          machine; MultiCraft extracts it directly with no network access at all.
+          machine; Outpost extracts it directly with no network access at all.
         </li>
         <li>
           <span className="font-mono text-ink-500">/path/to/steamcmd/</span> — a directory that already has SteamCMD
-          extracted in it; MultiCraft uses it as-is.
+          extracted in it; Outpost uses it as-is.
         </li>
       </ul>
       <ErrorText>{error}</ErrorText>

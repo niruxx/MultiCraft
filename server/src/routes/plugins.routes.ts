@@ -50,20 +50,20 @@ pluginsRouter.post(
     const { slug } = req.body ?? {};
     if (typeof slug !== 'string' || !slug.trim()) throw new HttpError(400, 'slug is required');
 
-    appendLine(server.id, `[MultiCraft] Resolving ${profile.singular} "${slug}" for ${server.loader} ${server.version}`);
+    appendLine(server.id, `[Outpost] Resolving ${profile.singular} "${slug}" for ${server.loader} ${server.version}`);
     const resolved = await resolvePluginVersion(slug.trim(), profile.catalog, server.version).catch((err) => {
-      appendLine(server.id, `[MultiCraft] ${profile.singular} resolve failed: ${err.message}`, 'stderr');
+      appendLine(server.id, `[Outpost] ${profile.singular} resolve failed: ${err.message}`, 'stderr');
       throw new HttpError(502, err instanceof Error ? err.message : 'Could not resolve version');
     });
     if (resolved.versionMismatchWarning) {
       appendLine(
         server.id,
-        `[MultiCraft] No build listed for Minecraft ${server.version} — installing the latest available build (${resolved.versionNumber}) instead. Check it's compatible.`
+        `[Outpost] No build listed for Minecraft ${server.version} — installing the latest available build (${resolved.versionNumber}) instead. Check it's compatible.`
       );
     }
-    appendLine(server.id, `[MultiCraft] Downloading ${resolved.fileName} (${resolved.versionNumber})`);
+    appendLine(server.id, `[Outpost] Downloading ${resolved.fileName} (${resolved.versionNumber})`);
     await installPluginFile(server, resolved.downloadUrl, resolved.fileName, (line) => appendLine(server.id, line));
-    appendLine(server.id, `[MultiCraft] Installed ${resolved.fileName} — restart the server for it to load`);
+    appendLine(server.id, `[Outpost] Installed ${resolved.fileName} — restart the server for it to load`);
 
     logAudit(req.auth!.sub, req.auth!.username, 'plugin.install', server.id, resolved.fileName);
     res.status(201).json({ plugins: listPlugins(server), resolved });
@@ -82,7 +82,7 @@ pluginsRouter.post(
     for (const file of files) {
       installed.push(...installUploadedAddon(server, file.originalname, file.buffer));
     }
-    appendLine(server.id, `[MultiCraft] Installed ${installed.join(', ')} — restart the server for changes to apply`);
+    appendLine(server.id, `[Outpost] Installed ${installed.join(', ')} — restart the server for changes to apply`);
     logAudit(req.auth!.sub, req.auth!.username, 'plugin.upload', server.id, installed.join(', '));
     res.status(201).json({ installed, plugins: listPlugins(server) });
   })

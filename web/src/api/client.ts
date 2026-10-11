@@ -1,12 +1,24 @@
-const TOKEN_KEY = 'multicraft_token';
+const TOKEN_KEY = 'outpost_token';
+// Sessions signed in before the rename to Outpost are carried over instead of being logged out.
+const LEGACY_TOKEN_KEY = 'multicraft_token';
 
 export function getToken(): string | null {
-  return localStorage.getItem(TOKEN_KEY);
+  const token = localStorage.getItem(TOKEN_KEY);
+  if (token) return token;
+  const legacy = localStorage.getItem(LEGACY_TOKEN_KEY);
+  if (legacy) {
+    localStorage.setItem(TOKEN_KEY, legacy);
+    localStorage.removeItem(LEGACY_TOKEN_KEY);
+  }
+  return legacy;
 }
 
 export function setToken(token: string | null) {
   if (token) localStorage.setItem(TOKEN_KEY, token);
-  else localStorage.removeItem(TOKEN_KEY);
+  else {
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(LEGACY_TOKEN_KEY);
+  }
 }
 
 export class ApiError extends Error {

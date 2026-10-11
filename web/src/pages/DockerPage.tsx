@@ -3,13 +3,13 @@ import { Link, useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Layout, PageHeader } from '../components/Layout.js';
 import { StatusBadge, SuspendedBadge } from '../components/StatusBadge.js';
-import { Badge, Button, Card, CardTitle, ErrorText, Field, Input, Modal, Notice, Spinner } from '../components/ui.js';
+import { Badge, Button, Card, CardTitle, Notice, Spinner } from '../components/ui.js';
 import { GameTile, gameKindOf } from '../components/GameArt.js';
 import { Icon } from '../components/icons.js';
-import { DOCKER_PRESETS, DockerEditor, cleanDockerConfig, type DockerPreset } from '../components/DockerEditor.js';
 import { formatBytes, formatDuration } from '../components/HostOverview.js';
 import { EMPHASIZED } from '../components/motion.js';
 import { useToast } from '../components/Toast.js';
+import { NewInstanceModal } from '../components/NewInstanceModal.js';
 import { api, ApiError } from '../api/client.js';
 import type { DockerConfig, DockerOverview, InstanceListMetrics, ServerRecord } from '../api/types.js';
 import { useAuth } from '../state/AuthContext.js';
@@ -45,6 +45,16 @@ function EngineCard({ overview, refreshing, onRefresh }: { overview: DockerOverv
               </div>
             </div>
           </div>
+          {overview?.socket && (
+            <div className="text-xs">
+              <p className="text-ink-400">API socket (Portainer)</p>
+              {overview.socket.path ? (
+                <p className="font-mono text-ink-200">{overview.socket.path}</p>
+              ) : (
+                <p className="max-w-xs text-yellow-400">{overview.socket.hint}</p>
+              )}
+            </div>
+          )}
           {overview?.counts && (
             <div className="flex gap-6 text-sm">
               {[
@@ -110,99 +120,13 @@ function DockerRow({ server, metrics }: { server: ServerRecord; metrics: Instanc
   );
 }
 
-function CreateDockerModal({ open, onClose, onCreated }: { open: boolean; onClose: () => void; onCreated: (s: ServerRecord) => void }) {
-  const [preset, setPreset] = useState<DockerPreset>(DOCKER_PRESETS[0]);
-  const [config, setConfig] = useState<DockerConfig>(DOCKER_PRESETS[0].config);
-  const [name, setName] = useState('');
-  const [memoryMb, setMemoryMb] = useState(DOCKER_PRESETS[0].memoryMb);
-  const [error, setError] = useState('');
-  const [busy, setBusy] = useState(false);
-
-  function choose(p: DockerPreset) {
-    setPreset(p);
-    setConfig(structuredClone(p.config));
-    setMemoryMb(p.memoryMb);
-  }
-
-  async function submit() {
-    setError('');
-    if (!name.trim()) return setError('Give the instance a name');
-    if (!config.image.trim()) return setError('Enter an image');
-    setBusy(true);
-    try {
-      const { server } = await api.post<{ server: ServerRecord }>('/servers', {
-        name: name.trim(),
-        platform: 'docker',
-        loader: 'docker',
-        minMemoryMb: Math.min(1024, memoryMb),
-        maxMemoryMb: memoryMb,
-        docker: cleanDockerConfig(config),
-      });
-      onCreated(server);
-      onClose();
-      setName('');
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Failed to create the instance');
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <Modal open={open} onClose={onClose} title="New Docker instance" size="xl">
-      <div className="space-y-5">
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-          {DOCKER_PRESETS.map((p) => (
-            <motion.button
-              key={p.id}
-              type="button"
-              whileTap={{ scale: 0.97 }}
-              onClick={() => choose(p)}
-              className={`state-layer rounded-2xl border p-3 text-left ${preset.id === p.id ? 'border-accent-400 bg-accent-container/40' : 'border-surface-600'}`}
-            >
-              <p className="text-sm font-medium text-ink-50">
-                {p.emoji} {p.label}
-              </p>
-              <p className="mt-0.5 line-clamp-2 text-xs text-ink-400">{p.description}</p>
-            </motion.button>
-          ))}
-        </div>
-
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Instance name">
-            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="My container server" autoFocus />
-          </Field>
-          <Field label="Memory limit (MB)">
-            <Input type="number" min={256} step={256} value={memoryMb} onChange={(e) => setMemoryMb(Number(e.target.value))} />
-          </Field>
-        </div>
-
-        <DockerEditor value={config} onChange={setConfig} />
-
-        <p className="rounded-2xl bg-tertiary-container px-3 py-2 text-xs text-tertiary-on-container">
-          The container only sees this instance's folder (at <span className="font-mono">{config.dataPath || '/data'}</span>). It runs with a memory
-          limit, a process limit and <span className="font-mono">no-new-privileges</span>. The image is pulled right after you create it.
-        </p>
-        <ErrorText>{error}</ErrorText>
-        <div className="flex justify-end gap-2">
-          <Button variant="ghost" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button variant="primary" onClick={submit} disabled={busy}>
-            {busy ? 'Creating…' : 'Create & pull image'}
-          </Button>
-        </div>
-      </div>
-    </Modal>
-  );
-}
-
 /** The Docker page: engine status + only the container-backed instances. */
 export function DockerPage() {
-  const { user } = useAuth();
+  const { user, creation } = useAuth();
   const toast = useToast();
   const navigate = useNavigate();
   const isAdmin = user?.role === 'admin';
+  const canCreateContainers = isAdmin || (!!creation?.canCreate && creation.containers !== 'none');
   const [overview, setOverview] = useState<DockerOverview | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [servers, setServers] = useState<ServerRecord[] | null>(null);
@@ -245,11 +169,11 @@ export function DockerPage() {
       <div className="mx-auto max-w-6xl space-y-5 px-4 py-8 sm:px-8">
         <PageHeader
           title="Docker"
-          subtitle="Game servers isolated in containers — each one only sees its own folder."
+          subtitle="Apps, services and game servers in containers — each one only sees its own folder."
           action={
-            isAdmin && (
+            canCreateContainers && (
               <Button variant="primary" onClick={() => setCreateOpen(true)} disabled={!overview?.engine.available}>
-                <Icon name="plus" className="h-4 w-4" /> New Docker instance
+                <Icon name="plus" className="h-4 w-4" /> New container
               </Button>
             )
           }
@@ -266,7 +190,7 @@ export function DockerPage() {
               <GameTile kind="docker" className="mx-auto mb-3 h-14 w-14" />
               <p className="mb-1 text-base font-medium text-ink-100">No container instances yet</p>
               <p className="text-sm text-ink-400">
-                {isAdmin ? 'Create one from a ready-made game image or any image you like.' : 'An admin can create container instances here.'}
+                {canCreateContainers ? 'Create one from the app catalog or any image you’re allowed to run.' : 'Ask an admin for container access to create one here.'}
               </p>
             </Card>
           ) : (
@@ -284,8 +208,8 @@ export function DockerPage() {
 
         {isAdmin && managed.length > 0 && (
           <Card className="p-5">
-            <CardTitle>Containers started by MultiCraft</CardTitle>
-            <p className="mb-3 text-sm text-ink-400">Labelled <span className="font-mono">multicraft.instance</span> on the engine — useful for spotting leftovers after a panel restart.</p>
+            <CardTitle>Containers started by Outpost</CardTitle>
+            <p className="mb-3 text-sm text-ink-400">Labelled <span className="font-mono">outpost.instance</span> on the engine — useful for spotting leftovers after a panel restart.</p>
             <div className="space-y-1 font-mono text-xs text-ink-300">
               {managed.map((c) => (
                 <p key={c.name}>
@@ -297,7 +221,8 @@ export function DockerPage() {
         )}
       </div>
 
-      <CreateDockerModal
+      <NewInstanceModal
+        only={['app', 'portainer', 'container']}
         open={createOpen}
         onClose={() => setCreateOpen(false)}
         onCreated={(s) => {

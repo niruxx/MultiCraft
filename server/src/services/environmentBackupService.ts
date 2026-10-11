@@ -36,7 +36,7 @@ async function renameWithRetry(from: string, to: string, attempts = 5): Promise<
  * responsible for streaming it to the client and deleting it afterward.
  */
 export async function exportEnvironment(): Promise<{ filePath: string; fileName: string }> {
-  const fileName = `multicraft-environment-${timestampSlug()}.zip`;
+  const fileName = `outpost-environment-${timestampSlug()}.zip`;
   const filePath = path.join(os.tmpdir(), fileName);
   const zip = new AdmZip();
   zip.addLocalFolder(DATA_DIR, '');
@@ -45,7 +45,7 @@ export async function exportEnvironment(): Promise<{ filePath: string; fileName:
   return { filePath, fileName };
 }
 
-/** Checks that an uploaded archive actually looks like a MultiCraft data directory export. */
+/** Checks that an uploaded archive actually looks like an Outpost data directory export. */
 export function validateEnvironmentArchive(zipPath: string): void {
   let zip: AdmZip;
   try {
@@ -53,9 +53,9 @@ export function validateEnvironmentArchive(zipPath: string): void {
   } catch {
     throw new HttpError(400, 'That file is not a valid zip archive');
   }
-  const hasDb = zip.getEntries().some((e) => e.entryName === 'multicraft.db' || e.entryName === 'multicraft.db/');
+  const hasDb = zip.getEntries().some((e) => e.entryName === 'outpost.db' || e.entryName === 'multicraft.db' || e.entryName === 'multicraft.db/');
   if (!hasDb) {
-    throw new HttpError(400, "This doesn't look like a MultiCraft environment backup (no multicraft.db found in the archive)");
+    throw new HttpError(400, "This doesn't look like an Outpost environment backup (no outpost.db found in the archive)");
   }
 }
 

@@ -38,7 +38,7 @@ export async function fetchJson<T>(url: string, onLog?: LogFn): Promise<T> {
   onLog?.(`> GET ${url}`);
   const idle = idleTimeout();
   try {
-    const res = await fetch(url, { headers: { 'User-Agent': 'MultiCraft-Panel' }, signal: idle.signal });
+    const res = await fetch(url, { headers: { 'User-Agent': 'Outpost-Panel' }, signal: idle.signal });
     if (!res.ok) throw new Error(`Request to ${url} failed with status ${res.status}`);
     return (await res.json()) as T;
   } catch (err) {
@@ -67,7 +67,7 @@ export async function downloadFile(
 
   let res: Response;
   try {
-    res = await fetch(url, { headers: { 'User-Agent': 'MultiCraft-Panel' }, signal: idle.signal });
+    res = await fetch(url, { headers: { 'User-Agent': 'Outpost-Panel' }, signal: idle.signal });
   } catch (err) {
     idle.clear();
     throw translateAbortError(err, url);

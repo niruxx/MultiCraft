@@ -1,14 +1,18 @@
 #!/usr/bin/env bash
 #
-# MultiCraft installer for Linux (Debian/Ubuntu, Arch/Manjaro, Fedora/RHEL — openSUSE too,
+# Outpost installer for Linux (Debian/Ubuntu, Arch/Manjaro, Fedora/RHEL — openSUSE too,
 # best-effort). Installs prerequisites (Node.js 22.5+, git, optionally Java), builds the app,
 # and optionally sets it up as a systemd service that starts on boot.
 #
-# Usage: run from inside a cloned MultiCraft checkout:
+# Usage: run from inside a cloned Outpost checkout:
 #   ./install.sh
 #
-# Non-interactive (accepts every default — Java yes, systemd no):
+# Non-interactive (accepts every default — Java yes, sandbox + Docker yes, systemd no):
 #   ./install.sh -y
+#
+# Container engine for Docker/Portainer/app instances (default: Docker):
+#   ./install.sh --engine=podman      # rootless Podman instead (no root daemon)
+#   ./install.sh --no-containers      # skip container support entirely
 #
 set -euo pipefail
 
@@ -28,14 +32,21 @@ die()   { err "$*"; exit 1; }
 heading() { printf '\n%s%s%s\n' "$BOLD" "$*" "$NC"; }
 
 NONINTERACTIVE=0
+ENGINE=""        # docker | podman | "" (ask; default docker)
+CONTAINERS=1
 for arg in "$@"; do
   case "$arg" in
     -y|--yes) NONINTERACTIVE=1 ;;
+    --engine=docker|--engine=podman) ENGINE="${arg#--engine=}" ;;
+    --no-containers) CONTAINERS=0 ;;
     -h|--help)
-      echo "Usage: $0 [-y|--yes]"
-      echo "  -y, --yes   Non-interactive: accept every default (installs Java, skips systemd)."
+      echo "Usage: $0 [-y|--yes] [--engine=docker|podman] [--no-containers]"
+      echo "  -y, --yes            Non-interactive: accept every default (Java, sandbox, Docker; skips systemd)."
+      echo "  --engine=ENGINE      Container engine for Docker/Portainer/app instances: docker (default) or podman."
+      echo "  --no-containers      Don't install a container engine."
       exit 0
       ;;
+    *) die "Unknown option: $arg (see --help)" ;;
   esac
 done
 
@@ -55,13 +66,13 @@ confirm() {
 # ---------------------------------------------------------------------------
 # Sanity checks
 # ---------------------------------------------------------------------------
-heading "MultiCraft installer"
+heading "Outpost installer"
 
 [[ "$(uname -s)" == "Linux" ]] || die "This script is for Linux (Debian/Ubuntu, Arch/Manjaro, Fedora/RHEL). Detected: $(uname -s)."
 
 if [[ $EUID -eq 0 ]]; then
   SUDO=""
-  warn "Running as root. Package installation is fine, but consider running MultiCraft itself as a"
+  warn "Running as root. Package installation is fine, but consider running Outpost itself as a"
   warn "normal user — the systemd service below will run as whichever user runs this script."
 else
   command -v sudo >/dev/null 2>&1 || die "sudo is required to install system packages (or re-run this script as root)."
@@ -69,10 +80,10 @@ else
 fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-if [[ -f "$SCRIPT_DIR/package.json" ]] && grep -q '"name": *"multicraft"' "$SCRIPT_DIR/package.json" 2>/dev/null; then
+if [[ -f "$SCRIPT_DIR/package.json" ]] && grep -qE '"name": *"(outpost|multicraft)"' "$SCRIPT_DIR/package.json" 2>/dev/null; then
   PROJECT_DIR="$SCRIPT_DIR"
 else
-  die "Run this from inside a MultiCraft checkout (e.g. 'git clone <repo-url> MultiCraft && cd MultiCraft && ./install.sh')."
+  die "Run this from inside an Outpost checkout (e.g. 'git clone <repo-url> Outpost && cd Outpost && ./install.sh')."
 fi
 ok "Project directory: $PROJECT_DIR"
 
@@ -192,7 +203,91 @@ install_steamcmd_deps() {
   esac
 }
 
-heading "Step 1/4 — Prerequisites"
+# ---------------------------------------------------------------------------
+# Sandbox + container engine (Docker / Podman) for app, container and Portainer instances
+# ---------------------------------------------------------------------------
+RUN_USER="$(id -un)"
+
+install_pkgs() {
+  case "$DISTRO_FAMILY" in
+    debian)   $SUDO apt-get install -y "$@" ;;
+    arch)     $SUDO pacman -Sy --needed --noconfirm "$@" ;;
+    fedora)   $SUDO dnf install -y "$@" ;;
+    opensuse) $SUDO zypper --non-interactive install "$@" ;;
+    *) return 1 ;;
+  esac
+}
+
+install_docker() {
+  if command -v docker >/dev/null 2>&1; then
+    ok "Docker already installed ($(docker --version 2>/dev/null | head -1))"
+  else
+    info "Installing Docker…"
+    case "$DISTRO_FAMILY" in
+      debian)   install_pkgs docker.io ;;
+      arch)     install_pkgs docker ;;
+      # Fedora packages Docker as moby-engine (RHEL clones don't ship it — use --engine=podman there).
+      fedora)   install_pkgs moby-engine || { err "moby-engine isn't available here (RHEL/Alma/Rocky?). Re-run with --engine=podman."; return 1; } ;;
+      opensuse) install_pkgs docker ;;
+      *) err "Don't know how to install Docker on this distro."; return 1 ;;
+    esac
+  fi
+  info "Enabling and starting docker.service + docker.socket…"
+  $SUDO systemctl enable --now docker.socket docker.service
+  if [[ "$RUN_USER" != "root" ]]; then
+    if id -nG "$RUN_USER" | tr ' ' '\n' | grep -qx docker; then
+      ok "$RUN_USER is already in the docker group"
+    else
+      warn "Adding $RUN_USER to the docker group so Outpost can reach the Docker daemon."
+      warn "Membership of the docker group is root-equivalent on this machine — rootless Podman (--engine=podman) avoids that."
+      $SUDO usermod -aG docker "$RUN_USER"
+      DOCKER_GROUP_ADDED=1
+    fi
+  fi
+  ok "Docker is ready"
+}
+
+install_podman() {
+  if command -v podman >/dev/null 2>&1; then
+    ok "Podman already installed ($(podman --version 2>/dev/null | head -1))"
+  else
+    info "Installing Podman…"
+    case "$DISTRO_FAMILY" in
+      debian)   install_pkgs podman uidmap slirp4netns ;;
+      *)        install_pkgs podman || { err "Couldn't install Podman on this distro."; return 1; } ;;
+    esac
+  fi
+  if [[ "$RUN_USER" == "root" ]]; then
+    info "Running as root — enabling the system-wide podman.socket…"
+    $SUDO systemctl enable --now podman.socket
+  else
+    # Rootless Podman needs subordinate uid/gid ranges for the user (Arch doesn't add them by default).
+    if ! grep -q "^$RUN_USER:" /etc/subuid 2>/dev/null || ! grep -q "^$RUN_USER:" /etc/subgid 2>/dev/null; then
+      info "Adding subordinate uid/gid ranges for $RUN_USER (needed by rootless Podman)…"
+      $SUDO usermod --add-subuids 100000-165535 --add-subgids 100000-165535 "$RUN_USER"
+      podman system migrate >/dev/null 2>&1 || true
+    fi
+    info "Enabling $RUN_USER's podman.socket (the Docker-compatible API Portainer talks to)…"
+    systemctl --user enable --now podman.socket || warn "Couldn't enable podman.socket for $RUN_USER — run 'systemctl --user enable --now podman.socket' from a login session."
+    # Lingering keeps the user's services (podman.socket, and the containers) running without an open login session.
+    $SUDO loginctl enable-linger "$RUN_USER" && ok "Enabled lingering for $RUN_USER (user services run without a login session)"
+  fi
+  ok "Podman is ready"
+}
+
+install_sandbox() {
+  if command -v bwrap >/dev/null 2>&1; then
+    ok "bubblewrap already installed ($(bwrap --version 2>/dev/null))"
+  else
+    info "Installing bubblewrap (keeps each instance inside its own folder)…"
+    install_pkgs bubblewrap && ok "bubblewrap installed" || warn "Couldn't install bubblewrap — instances will run without the process sandbox."
+  fi
+}
+
+PORTAINER_IMAGE="docker.io/portainer/portainer-ce:lts"
+DOCKER_GROUP_ADDED=0
+
+heading "Step 1/6 — Prerequisites"
 
 if ! command -v curl >/dev/null 2>&1; then
   info "curl not found (needed for the Node.js installer and health checks), installing…"
@@ -210,7 +305,7 @@ if node_version_ok; then
   ok "Node.js $(node -v) already installed"
 else
   if command -v node >/dev/null 2>&1; then
-    warn "Found Node.js $(node -v), but MultiCraft needs 22.5+ (for built-in node:sqlite)."
+    warn "Found Node.js $(node -v), but Outpost needs 22.5+ (for built-in node:sqlite)."
   else
     info "Node.js not found."
   fi
@@ -249,9 +344,49 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+# Sandbox + containers
+# ---------------------------------------------------------------------------
+heading "Step 2/6 — Sandbox & containers"
+
+if confirm "Install bubblewrap, the sandbox that keeps every instance inside its own folder?" y; then
+  install_sandbox
+else
+  warn "Skipping bubblewrap — instances will run without the process sandbox."
+fi
+
+if [[ "$CONTAINERS" == "1" ]] && confirm "Install a container engine for Docker, Portainer and app-catalog instances?" y; then
+  if [[ -z "$ENGINE" ]]; then
+    if command -v podman >/dev/null 2>&1 && ! command -v docker >/dev/null 2>&1; then
+      ENGINE=podman
+    elif [[ "$NONINTERACTIVE" == "1" || ! -t 0 ]]; then
+      ENGINE=docker
+    else
+      read -r -p "Which engine — docker or podman (rootless, no root daemon)? [docker] " ENGINE || ENGINE=""
+      ENGINE="${ENGINE:-docker}"
+    fi
+  fi
+  case "$ENGINE" in
+    docker) install_docker || warn "Docker setup didn't finish — see above." ;;
+    podman) install_podman || warn "Podman setup didn't finish — see above." ;;
+    *) warn "Unknown engine '$ENGINE' — skipping container setup." ; ENGINE="" ;;
+  esac
+
+  if [[ -n "$ENGINE" ]] && command -v "$ENGINE" >/dev/null 2>&1 && confirm "Pre-download the Portainer image so one-click Portainer instances start immediately?" y; then
+    if [[ "$ENGINE" == "docker" ]]; then
+      $SUDO docker pull "$PORTAINER_IMAGE" && ok "Portainer image ready" || warn "Couldn't pull $PORTAINER_IMAGE — it'll be pulled when you create a Portainer instance."
+    else
+      podman pull "$PORTAINER_IMAGE" && ok "Portainer image ready" || warn "Couldn't pull $PORTAINER_IMAGE — it'll be pulled when you create a Portainer instance."
+    fi
+  fi
+else
+  ENGINE=""
+  info "Skipping container support. Re-run with --engine=docker or --engine=podman to add it later."
+fi
+
+# ---------------------------------------------------------------------------
 # Install dependencies and build
 # ---------------------------------------------------------------------------
-heading "Step 2/4 — Installing dependencies and building"
+heading "Step 3/6 — Installing dependencies and building"
 
 cd "$PROJECT_DIR"
 info "npm run setup (installs root, server, and web workspace dependencies)…"
@@ -266,12 +401,12 @@ ok "Build complete"
 # ---------------------------------------------------------------------------
 # Run once, verify it actually serves the UI, then stop it
 # ---------------------------------------------------------------------------
-heading "Step 3/4 — Verifying"
+heading "Step 4/6 — Verifying"
 
 VERIFY_PORT="${PORT:-8642}"
 # Run the compiled server directly (what `npm start` does under the hood) rather than through
 # the npm wrapper, so $! is the actual Node process and killing it doesn't leave an orphan.
-( cd "$PROJECT_DIR/server" && exec env PORT="$VERIFY_PORT" node dist/index.js ) >/tmp/multicraft-install-check.log 2>&1 &
+( cd "$PROJECT_DIR/server" && exec env PORT="$VERIFY_PORT" node dist/index.js ) >/tmp/outpost-install-check.log 2>&1 &
 VERIFY_PID=$!
 trap 'kill "$VERIFY_PID" >/dev/null 2>&1 || true' EXIT
 
@@ -281,8 +416,8 @@ if curl -fsS "http://localhost:$VERIFY_PORT/api/health" >/dev/null 2>&1; then
 else
   kill "$VERIFY_PID" >/dev/null 2>&1 || true
   trap - EXIT
-  err "MultiCraft didn't respond on port $VERIFY_PORT. Recent log output:"
-  tail -n 30 /tmp/multicraft-install-check.log || true
+  err "Outpost didn't respond on port $VERIFY_PORT. Recent log output:"
+  tail -n 30 /tmp/outpost-install-check.log || true
   die "Fix the error above and re-run this script."
 fi
 
@@ -293,15 +428,22 @@ trap - EXIT
 # ---------------------------------------------------------------------------
 # Optional: systemd service
 # ---------------------------------------------------------------------------
-heading "Step 4/4 — Run on boot?"
+heading "Step 5/6 — Run on boot?"
 
 if ! command -v systemctl >/dev/null 2>&1; then
   warn "systemd isn't available on this system — skipping the service setup."
   warn "Use pm2 instead (see the README's 'Running 24/7' section)."
 else
-  if confirm "Set up a systemd service so MultiCraft starts automatically and restarts on boot/crash?" n; then
-    SERVICE_FILE="/etc/systemd/system/multicraft.service"
-    RUN_USER="$(id -un)"
+  if confirm "Set up a systemd service so Outpost starts automatically and restarts on boot/crash?" n; then
+    SERVICE_FILE="/etc/systemd/system/outpost.service"
+    LEGACY_SERVICE_FILE="/etc/systemd/system/multicraft.service"
+    # Before the rename this unit was multicraft.service — replace it rather than run two panels.
+    if [[ -f "$LEGACY_SERVICE_FILE" ]] && confirm "Found the old multicraft.service — replace it with outpost.service?" y; then
+      $SUDO systemctl disable --now multicraft.service >/dev/null 2>&1 || true
+      $SUDO rm -f "$LEGACY_SERVICE_FILE"
+      $SUDO systemctl daemon-reload
+      ok "Removed multicraft.service"
+    fi
     RUN_GROUP="$(id -gn)"
     NPM_PATH="$(command -v npm)"
 
@@ -310,13 +452,13 @@ else
     fi
 
     if [[ -n "$SERVICE_FILE" ]]; then
-      read -r -p "Port for MultiCraft to listen on [8642]: " SERVICE_PORT || true
+      read -r -p "Port for Outpost to listen on [8642]: " SERVICE_PORT || true
       SERVICE_PORT="${SERVICE_PORT:-8642}"
 
       info "Writing $SERVICE_FILE (runs as $RUN_USER)…"
       $SUDO tee "$SERVICE_FILE" >/dev/null <<EOF
 [Unit]
-Description=MultiCraft panel
+Description=Outpost panel
 After=network.target
 
 [Service]
@@ -327,32 +469,33 @@ Restart=on-failure
 User=$RUN_USER
 Group=$RUN_GROUP
 Environment=PORT=$SERVICE_PORT
+$( [[ "$ENGINE" == "podman" && "$RUN_USER" != "root" ]] && echo "Environment=XDG_RUNTIME_DIR=/run/user/$(id -u "$RUN_USER")" )
 
 [Install]
 WantedBy=multi-user.target
 EOF
 
       $SUDO systemctl daemon-reload
-      $SUDO systemctl enable --now multicraft
+      $SUDO systemctl enable --now outpost
 
       sleep 2
-      if systemctl is-active --quiet multicraft; then
-        ok "multicraft.service is active"
+      if systemctl is-active --quiet outpost; then
+        ok "outpost.service is active"
         if curl -fsS "http://localhost:$SERVICE_PORT/api/health" >/dev/null 2>&1; then
           ok "Confirmed reachable at http://localhost:$SERVICE_PORT"
         else
-          warn "Service is running but didn't answer on port $SERVICE_PORT yet — give it a moment, then check 'journalctl -u multicraft -f'."
+          warn "Service is running but didn't answer on port $SERVICE_PORT yet — give it a moment, then check 'journalctl -u outpost -f'."
         fi
       else
-        err "Service didn't start. Check: journalctl -u multicraft -e"
+        err "Service didn't start. Check: journalctl -u outpost -e"
       fi
 
       echo
       echo "Manage it with:"
-      echo "  sudo systemctl status multicraft"
-      echo "  sudo systemctl restart multicraft"
-      echo "  sudo systemctl stop multicraft"
-      echo "  journalctl -u multicraft -f"
+      echo "  sudo systemctl status outpost"
+      echo "  sudo systemctl restart outpost"
+      echo "  sudo systemctl stop outpost"
+      echo "  journalctl -u outpost -f"
     fi
   else
     ok "Skipping systemd. Start it manually whenever you want it running:"
@@ -364,11 +507,20 @@ fi
 # ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
-heading "Done"
-echo "MultiCraft is installed at: $PROJECT_DIR"
+heading "Step 6/6 — Done"
+echo "Outpost is installed at: $PROJECT_DIR"
 echo "Panel URL (once running):  http://<this-machine's-ip>:${SERVICE_PORT:-${VERIFY_PORT:-8642}}"
 echo
+if [[ -n "$ENGINE" ]]; then
+  echo "Containers:                $ENGINE ($( [[ "$ENGINE" == docker ]] && echo 'docker.service + docker.socket enabled' || echo "podman.socket enabled for $RUN_USER" ))"
+fi
+command -v bwrap >/dev/null 2>&1 && echo "Sandbox:                   bubblewrap $(bwrap --version 2>/dev/null | awk '{print $2}')"
+echo
 echo "Reminders:"
+if [[ "$DOCKER_GROUP_ADDED" == "1" ]]; then
+  echo "  - $RUN_USER was added to the docker group: log out and back in (and restart Outpost if it's"
+  echo "    already running) before Docker/Portainer instances can start."
+fi
 echo "  - The panel's own port only needs to be reachable by admins — consider a reverse proxy/VPN for it."
-echo "  - Each Minecraft server you create needs its own port opened (25565/tcp for Java, 19132/udp for Bedrock)."
+echo "  - Each instance needs its own port opened to its users (e.g. 25565/tcp Minecraft, 9443/tcp Portainer)."
 echo "  - See the README for firewall commands (ufw/firewalld) and moving data outside the checkout."

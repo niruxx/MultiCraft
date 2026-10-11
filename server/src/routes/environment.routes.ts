@@ -57,7 +57,7 @@ environmentRouter.post(
 
       res.json({
         ok: true,
-        message: 'Import applied. MultiCraft is restarting now — this may take a few seconds.',
+        message: 'Import applied. Outpost is restarting now — this may take a few seconds.',
         previousDataDirBackup: result.previousDataDirBackup,
       });
 
@@ -92,7 +92,7 @@ environmentRouter.post(
 
     res.json({
       ok: true,
-      message: 'Factory reset applied. MultiCraft is restarting now — you\'ll land on the first-run setup wizard.',
+      message: 'Factory reset applied. Outpost is restarting now — you\'ll land on the first-run setup wizard.',
       previousDataDirBackup: result.previousDataDirBackup,
     });
 

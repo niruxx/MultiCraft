@@ -1,4 +1,5 @@
 import crypto from 'node:crypto';
+import { envVar } from '../utils/env.js';
 import dgram from 'node:dgram';
 import { HttpError } from '../utils/asyncHandler.js';
 import { logger } from '../utils/logger.js';
@@ -170,9 +171,9 @@ export async function discoverGateway(force = false): Promise<Gateway> {
   if (!force && cachedGateway && Date.now() - Date.parse(cachedGateway.discoveredAt) < GATEWAY_CACHE_MS) return cachedGateway;
   if (discovering) return discovering;
   discovering = (async () => {
-    // MULTICRAFT_UPNP_GATEWAY=http://<router>:<port>/<description>.xml skips multicast discovery —
+    // OUTPOST_UPNP_GATEWAY=http://<router>:<port>/<description>.xml skips multicast discovery —
     // for networks where SSDP can't get through (Docker, VPNs) or to pin a specific router.
-    const pinned = process.env.MULTICRAFT_UPNP_GATEWAY?.trim();
+    const pinned = envVar('UPNP_GATEWAY')?.trim();
     const locations = pinned ? [pinned] : await ssdpSearch();
     for (const location of locations) {
       try {
@@ -190,7 +191,7 @@ export async function discoverGateway(force = false): Promise<Gateway> {
       'No UPnP router answered. Check that UPnP ("UPnP IGD") is on in your router and that this host is on the same network — ' +
         "discovery doesn't cross VPNs, Docker bridge networks or a second router. A host firewall also commonly drops the router's " +
         'replies: with firewalld run `sudo firewall-cmd --permanent --add-service=upnp-client && sudo firewall-cmd --reload` (or open ' +
-        'UDP 1900 inbound). If discovery still fails, set MULTICRAFT_UPNP_GATEWAY to the router\'s description URL to skip it.'
+        'UDP 1900 inbound). If discovery still fails, set OUTPOST_UPNP_GATEWAY to the router\'s description URL to skip it.'
     );
   })().finally(() => {
     discovering = null;
@@ -395,7 +396,7 @@ function expand(config: UpnpConfig): { externalPort: number; internalPort: numbe
 
 function description(server: ServerRecord): string {
   // Short, and tagged with the instance id so the router list shows whose mapping it is.
-  return `MultiCraft ${server.id.slice(0, 8)} ${server.name}`.slice(0, 48);
+  return `Outpost ${server.id.slice(0, 8)} ${server.name}`.slice(0, 48);
 }
 
 // ---------------------------------------------------------------------------
@@ -427,16 +428,16 @@ export async function applyMappings(serverId: string, why = 'requested'): Promis
   }
   states.set(serverId, result);
   const ok = result.filter((r) => r.ok).length;
-  appendLine(serverId, `[MultiCraft] UPnP (${why}): forwarded ${ok}/${result.length} port mapping(s) on ${gw.friendlyName} to ${gw.localAddress}`, 'system');
+  appendLine(serverId, `[Outpost] UPnP (${why}): forwarded ${ok}/${result.length} port mapping(s) on ${gw.friendlyName} to ${gw.localAddress}`, 'system');
   for (const r of result.filter((x) => !x.ok).slice(0, 5)) {
-    appendLine(serverId, `[MultiCraft] UPnP: ${r.protocol} ${r.externalPort} failed — ${r.error}`, 'system');
+    appendLine(serverId, `[Outpost] UPnP: ${r.protocol} ${r.externalPort} failed — ${r.error}`, 'system');
   }
 
   clearTimeout(renewTimers.get(serverId));
   if (config.leaseSeconds > 0) {
     const timer = setTimeout(() => {
       applyMappings(serverId, 'lease renewal').catch((err) =>
-        appendLine(serverId, `[MultiCraft] UPnP lease renewal failed: ${err instanceof Error ? err.message : String(err)}`, 'system')
+        appendLine(serverId, `[Outpost] UPnP lease renewal failed: ${err instanceof Error ? err.message : String(err)}`, 'system')
       );
     }, Math.max(60, config.leaseSeconds / 2) * 1000);
     timer.unref();
@@ -466,7 +467,7 @@ export async function removeMappings(serverId: string, why = 'requested'): Promi
     }
   }
   states.delete(serverId);
-  appendLine(serverId, `[MultiCraft] UPnP (${why}): removed ${removed} port mapping(s)`, 'system');
+  appendLine(serverId, `[Outpost] UPnP (${why}): removed ${removed} port mapping(s)`, 'system');
   return removed;
 }
 
@@ -481,7 +482,7 @@ export async function upnpOnStart(server: ServerRecord) {
   try {
     await applyMappings(server.id, 'instance started');
   } catch (err) {
-    appendLine(server.id, `[MultiCraft] UPnP: ${err instanceof Error ? err.message : String(err)}`, 'system');
+    appendLine(server.id, `[Outpost] UPnP: ${err instanceof Error ? err.message : String(err)}`, 'system');
   }
 }
 
@@ -496,6 +497,6 @@ export async function upnpOnStop(serverId: string) {
   try {
     await removeMappings(serverId, 'instance stopped');
   } catch (err) {
-    appendLine(serverId, `[MultiCraft] UPnP: ${err instanceof Error ? err.message : String(err)}`, 'system');
+    appendLine(serverId, `[Outpost] UPnP: ${err instanceof Error ? err.message : String(err)}`, 'system');
   }
 }

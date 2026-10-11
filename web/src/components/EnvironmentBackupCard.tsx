@@ -34,7 +34,7 @@ export function EnvironmentBackupCard() {
       message: (
         <>
           Import <span className="font-mono text-ink-100">{file.name}</span>? This{' '}
-          <strong className="text-red-400">replaces everything</strong> in this MultiCraft install — all users,
+          <strong className="text-red-400">replaces everything</strong> in this Outpost install — all users,
           servers, and backups — with what's in the archive. The current data is kept as a timestamped backup on
           disk, but every account (including yours) will be replaced.
         </>
@@ -60,7 +60,7 @@ export function EnvironmentBackupCard() {
       } else {
         // A dropped connection here can also mean the import succeeded and the process is
         // already restarting (the server may exit before the HTTP response finishes).
-        toast.show("Lost the connection — if the import actually started, MultiCraft is restarting now. Wait a few seconds and reload.");
+        toast.show("Lost the connection — if the import actually started, Outpost is restarting now. Wait a few seconds and reload.");
         setRestarting(true);
       }
     } finally {
@@ -75,7 +75,7 @@ export function EnvironmentBackupCard() {
         <div className="flex items-center gap-3">
           <Spinner className="h-5 w-5 text-accent-400" />
           <div>
-            <p className="text-sm font-semibold text-ink-100">MultiCraft is restarting…</p>
+            <p className="text-sm font-semibold text-ink-100">Outpost is restarting…</p>
             <p className="text-xs text-ink-400">
               This page will stop responding for a few seconds. Reload once it's back, then sign in with an admin
               account from the restored backup.
@@ -90,7 +90,7 @@ export function EnvironmentBackupCard() {
     <Card className="mb-6 p-4">
       <h2 className="text-base font-medium text-ink-100">Environment backup &amp; restore</h2>
       <p className="mt-1 mb-4 text-xs text-ink-500">
-        Exports everything MultiCraft manages — the database, every server's files and worlds, and all backups — as
+        Exports everything Outpost manages — the database, every server's files and worlds, and all backups — as
         one compressed archive. Import it into a fresh install to move or restore your whole setup.
       </p>
       <div className="flex flex-wrap items-center gap-3">

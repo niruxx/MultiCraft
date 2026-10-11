@@ -144,7 +144,7 @@ export function getAddonSupport(server: ServerRecord): AddonSupport {
           ],
           warning: bepinexInstalled(server)
             ? null
-            : 'BepInEx isn’t installed in this instance yet, so plugins won’t load. Upload the contents of BepInExPack_Valheim (BepInEx/, doorstop_libs/, doorstop_config.ini, winhttp.dll) to the instance root in File Management — MultiCraft loads it automatically on the next start.',
+            : 'BepInEx isn’t installed in this instance yet, so plugins won’t load. Upload the contents of BepInExPack_Valheim (BepInEx/, doorstop_libs/, doorstop_config.ini, winhttp.dll) to the instance root in File Management — Outpost loads it automatically on the next start.',
         },
       };
     }
@@ -180,7 +180,7 @@ export function getAddonSupport(server: ServerRecord): AddonSupport {
           'The official Terraria dedicated server can’t load mods. Modded Terraria needs tModLoader, which isn’t a supported instance type yet.',
       };
     }
-    return { supported: false, reason: 'MultiCraft doesn’t know this game’s mod format. Manage its files directly from File Management.' };
+    return { supported: false, reason: 'Outpost doesn’t know this game’s mod format. Manage its files directly from File Management.' };
   }
 
   if (server.platform === 'docker') {

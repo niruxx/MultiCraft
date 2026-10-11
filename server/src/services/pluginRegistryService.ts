@@ -5,7 +5,7 @@ const MODRINTH_API = 'https://api.modrinth.com/v2';
 const BUKKIT_LOADERS = ['bukkit', 'spigot', 'paper', 'purpur', 'folia'];
 
 async function modrinthFetch<T>(path: string): Promise<T> {
-  const res = await fetch(`${MODRINTH_API}${path}`, { headers: { 'User-Agent': 'MultiCraft-Panel (contact: panel-admin)' } });
+  const res = await fetch(`${MODRINTH_API}${path}`, { headers: { 'User-Agent': 'Outpost-Panel (contact: panel-admin)' } });
   if (!res.ok) throw new Error(`Modrinth request failed (${res.status}): ${path}`);
   return (await res.json()) as T;
 }

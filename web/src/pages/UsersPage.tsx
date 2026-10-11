@@ -403,9 +403,15 @@ const ALL_CREATABLE: CreatablePlatform[] = ['java', 'bedrock', 'steam'];
 
 function roleCreation(role: Role): CreationPolicy {
   return role === 'viewer'
-    ? { canCreate: false, platforms: [], maxInstances: 0, maxMemoryMb: 0 }
-    : { canCreate: true, platforms: ALL_CREATABLE, maxInstances: 0, maxMemoryMb: 0 };
+    ? { canCreate: false, platforms: [], maxInstances: 0, maxMemoryMb: 0, containers: 'none', engineSocket: false }
+    : { canCreate: true, platforms: ALL_CREATABLE, maxInstances: 0, maxMemoryMb: 0, containers: 'none', engineSocket: false };
 }
+
+const CONTAINER_OPTIONS: { value: CreationPolicy['containers']; label: string; hint: string }[] = [
+  { value: 'none', label: 'No containers', hint: '' },
+  { value: 'catalog', label: '📦 Catalog apps only', hint: 'Only the templates in New instance → App from the catalog, with their images.' },
+  { value: 'any', label: '🐳 Any image', hint: 'Any container image. Containers still only see their own folder and can’t use host ports below 1024.' },
+];
 
 /** May this user create instances — which kinds, how many, how big. New instances are owned by them. */
 function CreationEditor({
@@ -423,7 +429,9 @@ function CreationEditor({
   const effective = value ?? roleCreation(role);
   const set = (patch: Partial<CreationPolicy>) => onChange({ ...effective, ...patch });
   const summary = effective.canCreate
-    ? `${effective.platforms.map((p) => PLATFORM_LABEL[p].split(' ').slice(1).join(' ')).join(', ') || 'nothing'}${effective.maxInstances ? ` · up to ${effective.maxInstances}` : ' · no limit'}`
+    ? `${effective.platforms.map((p) => PLATFORM_LABEL[p].split(' ').slice(1).join(' ')).join(', ') || 'nothing'}${
+        effective.containers === 'any' ? ', any container' : effective.containers === 'catalog' ? ', catalog apps' : ''
+      }${effective.maxInstances ? ` · up to ${effective.maxInstances}` : ' · no limit'}`
     : 'cannot create instances';
 
   return (
@@ -466,6 +474,41 @@ function CreationEditor({
                   );
                 })}
               </div>
+              <div className="space-y-2">
+                <span className="text-xs font-medium text-ink-300">Containers</span>
+                <div className="flex flex-wrap gap-1.5">
+                  {CONTAINER_OPTIONS.map((o) => (
+                    <button
+                      key={o.value}
+                      type="button"
+                      onClick={() => set({ containers: o.value, engineSocket: o.value === 'none' ? false : effective.engineSocket })}
+                      className={`state-layer rounded-lg border px-2.5 py-1 text-xs font-medium ${
+                        effective.containers === o.value ? 'border-transparent bg-secondary-container text-secondary-on-container' : 'border-surface-500 text-ink-400'
+                      }`}
+                    >
+                      {effective.containers === o.value ? '✓ ' : ''}
+                      {o.label}
+                    </button>
+                  ))}
+                </div>
+                {CONTAINER_OPTIONS.find((o) => o.value === effective.containers)?.hint && (
+                  <p className="text-xs text-ink-500">{CONTAINER_OPTIONS.find((o) => o.value === effective.containers)!.hint}</p>
+                )}
+                {effective.containers !== 'none' && (
+                  <label
+                    className={`flex items-start gap-2 rounded-xl p-2.5 text-sm ${effective.engineSocket ? 'bg-error-container text-error-on-container' : 'text-ink-200'}`}
+                  >
+                    <input type="checkbox" className="mt-1" checked={effective.engineSocket} onChange={(e) => set({ engineSocket: e.target.checked })} />
+                    <span>
+                      🧭 Portainer &amp; engine access
+                      <span className="block text-xs opacity-80">
+                        Lets them run Portainer (or any container manager) with the engine socket — control over every container on this host, and
+                        with rootful Docker effectively the host itself. Only for people you'd trust with admin.
+                      </span>
+                    </span>
+                  </label>
+                )}
+              </div>
               <div className="grid grid-cols-2 gap-3">
                 <Field label="Max instances (0 = no limit)">
                   <Input type="number" min={0} value={effective.maxInstances} onChange={(e) => set({ maxInstances: Math.max(0, Number(e.target.value)) })} />
@@ -480,7 +523,7 @@ function CreationEditor({
       )}
       <p className="mt-3 text-xs text-ink-500">
         Owners get full control of their own instances except editing the launch command and UPnP (grant those per instance below). Custom
-        and Docker instances can only be created by admins.
+        processes can only be created by admins.
       </p>
     </div>
   );

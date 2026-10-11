@@ -24,15 +24,18 @@ import { publish, consoleTopic } from './wsHub.js';
 import type { ServerRecord, ServerStatus } from '../types/index.js';
 
 /**
- * Multi-node support: every MultiCraft panel has a node key. Adding another panel here (its URL
+ * Multi-node support: every Outpost panel has a node key. Adding another panel here (its URL
  * + its node key) lets this panel push an instance's files and settings to it. Transfers stream a
  * gzipped tar of the instance directory straight into the receiving panel — nothing is staged in
  * memory or on disk on the sending side.
  */
 
 const NODE_KEY_SETTING = 'node_key';
-const NODE_KEY_HEADER = 'x-multicraft-node-key';
-const SERVER_META_HEADER = 'x-multicraft-server';
+const NODE_KEY_HEADER = 'x-outpost-node-key';
+const SERVER_META_HEADER = 'x-outpost-server';
+// Pre-rename header names: still sent and accepted so nodes on older versions keep talking.
+const LEGACY_NODE_KEY_HEADER = 'x-multicraft-node-key';
+const LEGACY_SERVER_META_HEADER = 'x-multicraft-server';
 
 export interface NodeRecord {
   id: string;
@@ -79,7 +82,7 @@ export function regenerateLocalNodeKey(): string {
 
 /** Validates the node key on inbound node-to-node requests (constant-time compare). */
 export function requireNodeKey(req: Request): void {
-  const presented = req.headers[NODE_KEY_HEADER];
+  const presented = req.headers[NODE_KEY_HEADER] ?? req.headers[LEGACY_NODE_KEY_HEADER];
   const expected = getLocalNodeKey();
   if (typeof presented !== 'string') throw new HttpError(401, 'Node key required');
   const a = Buffer.from(presented);
@@ -131,7 +134,7 @@ async function callNode<T>(url: string, apiKey: string, path: string, timeoutMs 
   let res: Response;
   try {
     res = await fetch(`${url}/api/node-link${path}`, {
-      headers: { [NODE_KEY_HEADER]: apiKey },
+      headers: { [NODE_KEY_HEADER]: apiKey, [LEGACY_NODE_KEY_HEADER]: apiKey },
       signal: AbortSignal.timeout(timeoutMs),
     });
   } catch (err) {
@@ -240,7 +243,7 @@ export function startTransfer(serverId: string, nodeId: string, deleteSource: bo
   };
   transfers.set(serverId, state);
   setStatus(serverId, 'transferring');
-  appendLine(serverId, `[MultiCraft] Transferring to node "${node.name}" (${node.url})…`);
+  appendLine(serverId, `[Outpost] Transferring to node "${node.name}" (${node.url})…`);
 
   const meta: TransferMeta = {
     name: server.name,
@@ -279,7 +282,9 @@ export function startTransfer(serverId: string, nodeId: string, deleteSource: bo
         method: 'POST',
         headers: {
           [NODE_KEY_HEADER]: node.api_key,
+          [LEGACY_NODE_KEY_HEADER]: node.api_key,
           [SERVER_META_HEADER]: Buffer.from(JSON.stringify(meta)).toString('base64url'),
+          [LEGACY_SERVER_META_HEADER]: Buffer.from(JSON.stringify(meta)).toString('base64url'),
           'content-type': 'application/gzip',
         },
         body: Readable.toWeb(counter) as unknown as ReadableStream,
@@ -292,7 +297,7 @@ export function startTransfer(serverId: string, nodeId: string, deleteSource: bo
       if (!res.ok || !body.serverId) throw new Error(body.error ?? `Remote node answered ${res.status}`);
 
       state.remoteServerId = body.serverId;
-      appendLine(serverId, `[MultiCraft] Transfer complete — ${(state.bytesSent / 1024 / 1024).toFixed(1)} MB sent to "${node.name}"`);
+      appendLine(serverId, `[Outpost] Transfer complete — ${(state.bytesSent / 1024 / 1024).toFixed(1)} MB sent to "${node.name}"`);
       if (deleteSource) {
         deleteServerRecord(serverId);
         state.sourceDeleted = true;
@@ -306,7 +311,7 @@ export function startTransfer(serverId: string, nodeId: string, deleteSource: bo
       tar.kill();
       state.state = 'failed';
       state.error = err instanceof Error ? err.message : String(err);
-      appendLine(serverId, `[MultiCraft] Transfer failed: ${state.error}`, 'stderr');
+      appendLine(serverId, `[Outpost] Transfer failed: ${state.error}`, 'stderr');
       logger.error(`Transfer of ${serverId} to node ${node.id} failed`, err);
       if (getServer(serverId)) setStatus(serverId, previousStatus);
     } finally {
@@ -319,7 +324,7 @@ export function startTransfer(serverId: string, nodeId: string, deleteSource: bo
 
 /** Receiving side: creates a new instance from the metadata header and unpacks the streamed tar into it. */
 export async function receiveTransfer(req: Request): Promise<ServerRecord> {
-  const header = req.headers[SERVER_META_HEADER];
+  const header = req.headers[SERVER_META_HEADER] ?? req.headers[LEGACY_SERVER_META_HEADER];
   if (typeof header !== 'string') throw new HttpError(400, 'Missing instance metadata');
   let meta: TransferMeta;
   try {
@@ -364,7 +369,7 @@ export async function receiveTransfer(req: Request): Promise<ServerRecord> {
 
     applyTransferredFields(record.id, meta);
     setServerStatus(record.id, 'stopped');
-    appendLine(record.id, `[MultiCraft] Received "${meta.name}" from another node`);
+    appendLine(record.id, `[Outpost] Received "${meta.name}" from another node`);
     return getServer(record.id)!;
   } catch (err) {
     deleteServerRecord(record.id);

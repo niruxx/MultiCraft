@@ -84,7 +84,7 @@ export function cancelAutoRestart(serverId: string, reason?: string): boolean {
   if (!pending) return false;
   clearTimeout(pending.timer);
   pendingRestarts.delete(serverId);
-  if (reason) appendLog(serverId, `[MultiCraft] Auto-restart cancelled (${reason})`, 'system');
+  if (reason) appendLog(serverId, `[Outpost] Auto-restart cancelled (${reason})`, 'system');
   publish(consoleTopic(serverId), { type: 'auto_restart', pendingAt: null });
   return true;
 }
@@ -102,7 +102,7 @@ function maybeScheduleAutoRestart(serverId: string, crashed: boolean, ranForMs: 
   const attempt = (restartAttempts.get(serverId) ?? 0) + 1;
   const max = server.restart_max_attempts;
   if (max > 0 && attempt > max) {
-    appendLog(serverId, `[MultiCraft] Auto-restart gave up after ${max} attempt${max === 1 ? '' : 's'} — start it manually once the problem is fixed`, 'system');
+    appendLog(serverId, `[Outpost] Auto-restart gave up after ${max} attempt${max === 1 ? '' : 's'} — start it manually once the problem is fixed`, 'system');
     restartAttempts.delete(serverId);
     return;
   }
@@ -111,7 +111,7 @@ function maybeScheduleAutoRestart(serverId: string, crashed: boolean, ranForMs: 
   const at = Date.now() + delayMs;
   appendLog(
     serverId,
-    `[MultiCraft] ${crashed ? 'Crash detected' : 'Process exited'} — auto-restarting in ${delayMs / 1000}s (attempt ${attempt}${max ? ` of ${max}` : ''})`,
+    `[Outpost] ${crashed ? 'Crash detected' : 'Process exited'} — auto-restarting in ${delayMs / 1000}s (attempt ${attempt}${max ? ` of ${max}` : ''})`,
     'system'
   );
   const timer = setTimeout(async () => {
@@ -122,7 +122,7 @@ function maybeScheduleAutoRestart(serverId: string, crashed: boolean, ranForMs: 
     try {
       await startServer(serverId, { auto: true });
     } catch (err) {
-      appendLog(serverId, `[MultiCraft] Auto-restart failed to start: ${err instanceof Error ? err.message : String(err)}`, 'system');
+      appendLog(serverId, `[Outpost] Auto-restart failed to start: ${err instanceof Error ? err.message : String(err)}`, 'system');
       maybeScheduleAutoRestart(serverId, true, 0);
     }
   }, delayMs);
@@ -324,7 +324,7 @@ function signalInstance(instance: RunningInstance, signal: NodeJS.Signals) {
 /** Runs a configured stop/restart script with the instance's environment, streaming its output to the console. */
 function runScript(serverId: string, instance: Pick<RunningInstance, 'server' | 'config' | 'cwd'>, command: string, label: string): Promise<number | null> {
   const line = expandVariables(command, launchVariables(instance.server));
-  appendLog(serverId, `[MultiCraft] Running ${label} script: ${line}`, 'system');
+  appendLog(serverId, `[Outpost] Running ${label} script: ${line}`, 'system');
   return new Promise((resolve) => {
     const proc = spawn(process.platform === 'win32' ? line : '/bin/sh', process.platform === 'win32' ? [] : ['-c', line], {
       cwd: instance.cwd,
@@ -338,11 +338,11 @@ function runScript(serverId: string, instance: Pick<RunningInstance, 'server' | 
     proc.stdout.on('data', forward);
     proc.stderr.on('data', forward);
     proc.on('error', (err) => {
-      appendLog(serverId, `[MultiCraft] ${label} script failed to run: ${err.message}`, 'system');
+      appendLog(serverId, `[Outpost] ${label} script failed to run: ${err.message}`, 'system');
       resolve(null);
     });
     proc.on('exit', (code) => {
-      appendLog(serverId, `[MultiCraft] ${label} script exited with code ${code ?? 'null'}`, 'system');
+      appendLog(serverId, `[Outpost] ${label} script exited with code ${code ?? 'null'}`, 'system');
       resolve(code);
     });
   });
@@ -396,9 +396,9 @@ export async function startServer(serverId: string, options: { auto?: boolean } 
   const config = launchConfigOf(server);
   const plan = await buildLaunch(server);
 
-  appendLog(serverId, `[MultiCraft] Host environment: ${process.platform} (${process.arch})`, 'system');
-  appendLog(serverId, `[MultiCraft] Launching: ${plan.display}`, 'system');
-  if (config.env?.length) appendLog(serverId, `[MultiCraft] Extra environment: ${config.env.map((e) => e.key).join(', ')}`, 'system');
+  appendLog(serverId, `[Outpost] Host environment: ${process.platform} (${process.arch})`, 'system');
+  appendLog(serverId, `[Outpost] Launching: ${plan.display}`, 'system');
+  if (config.env?.length) appendLog(serverId, `[Outpost] Extra environment: ${config.env.map((e) => e.key).join(', ')}`, 'system');
 
   resetOnlinePlayers(serverId);
   setServerStatus(serverId, 'starting');
@@ -411,7 +411,7 @@ export async function startServer(serverId: string, options: { auto?: boolean } 
   const sandboxed = sandboxApplies(server);
   const target = sandboxed ? wrapInSandbox(server, { cmd: plan.cmd, args: plan.args, cwd: plan.cwd, env }) : { cmd: plan.cmd, args: plan.args };
   if (sandboxed) {
-    appendLog(serverId, `[MultiCraft] Sandboxed (bubblewrap): only ${dir} is writable; the rest of the host's files are read-only system folders or hidden`, 'system');
+    appendLog(serverId, `[Outpost] Sandboxed (bubblewrap): only ${dir} is writable; the rest of the host's files are read-only system folders or hidden`, 'system');
   }
 
   const child = spawn(target.cmd, target.args, {
@@ -475,7 +475,7 @@ export async function startServer(serverId: string, options: { auto?: boolean } 
   });
 
   child.on('error', (err) => {
-    appendLog(serverId, `[MultiCraft] Failed to start process: ${err.message}`, 'system');
+    appendLog(serverId, `[Outpost] Failed to start process: ${err.message}`, 'system');
   });
 
   child.on('exit', (code, signal) => {
@@ -489,7 +489,7 @@ export async function startServer(serverId: string, options: { auto?: boolean } 
     resetOnlinePlayers(serverId);
     const finalStatus = wasManual || code === 0 ? 'stopped' : 'crashed';
     setServerStatus(serverId, finalStatus);
-    appendLog(serverId, `[MultiCraft] Process exited (code ${code ?? 'null'}, signal ${signal ?? 'none'})`, 'system');
+    appendLog(serverId, `[Outpost] Process exited (code ${code ?? 'null'}, signal ${signal ?? 'none'})`, 'system');
     publish(consoleTopic(serverId), { type: 'status', status: finalStatus });
     void upnpOnStop(serverId);
     if (!wasManual) maybeScheduleAutoRestart(serverId, code !== 0, Date.now() - instance.startedAt);
@@ -549,7 +549,7 @@ export function stopServer(serverId: string, options: { force?: boolean } = {}):
 
   instance.forceKillTimer = setTimeout(() => {
     if (running.has(serverId)) {
-      appendLog(serverId, '[MultiCraft] Graceful stop timed out, forcing termination', 'system');
+      appendLog(serverId, '[Outpost] Graceful stop timed out, forcing termination', 'system');
       signalInstance(instance, 'SIGKILL');
     }
   }, instance.stopTimeoutMs);
