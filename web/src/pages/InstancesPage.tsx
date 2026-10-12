@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { AnimatePresence, LayoutGroup, motion } from 'framer-motion';
 import { Layout, PageHeader } from '../components/Layout.js';
 import { StatusBadge, SuspendedBadge } from '../components/StatusBadge.js';
-import { Button, Card, Skeleton } from '../components/ui.js';
+import { Button, Card, Notice, Skeleton } from '../components/ui.js';
 import { NewInstanceModal } from '../components/NewInstanceModal.js';
 import { GameTile, gameKindOf, gameLabel, instanceCategory, type InstanceCategory } from '../components/GameArt.js';
 import { HostOverview, formatBytes, formatDuration } from '../components/HostOverview.js';
@@ -298,6 +298,7 @@ export function InstancesPage() {
   const { user, creation, refreshCreation } = useAuth();
   const toast = useToast();
   const [servers, setServers] = useState<ServerRecord[] | null>(null);
+  const [unreachable, setUnreachable] = useState(false);
   const [metrics, setMetrics] = useState<Record<string, InstanceListMetrics>>({});
   const [hostMemMb, setHostMemMb] = useState<number | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
@@ -318,9 +319,12 @@ export function InstancesPage() {
     try {
       const res = await api.get<{ servers: ServerRecord[]; metrics: Record<string, InstanceListMetrics> }>('/servers');
       setServers(res.servers);
+      setUnreachable(false);
       setMetrics(res.metrics ?? {});
     } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : 'Failed to load instances');
+      // A network failure (no HTTP response) means the panel server itself isn't reachable.
+      if (err instanceof ApiError) toast.error(err.message);
+      else setUnreachable(true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -389,6 +393,15 @@ export function InstancesPage() {
             )
           }
         />
+
+        {unreachable && (
+          <div className="mb-5">
+            <Notice tone="error">
+              Can't reach the Outpost server — it may have stopped or be restarting. Start it with <span className="font-mono">npm start</span> (or{' '}
+              <span className="font-mono">sudo systemctl start outpost</span>), then this page reconnects by itself.
+            </Notice>
+          </div>
+        )}
 
         <HostOverview />
 
